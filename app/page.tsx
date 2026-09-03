@@ -41,7 +41,7 @@ type InventoryItem = {
   price: number;
 };
 
-type NavItem = "dashboard" | "plan-cuentas" | "transacciones" | "macola-sync" | "clientes" | "proveedores" | "inventario" | "configuracion";
+type NavItem = "dashboard" | "plan-cuentas" | "transacciones" | "macola-sync" | "clientes" | "proveedores" | "inventario" | "reportes" | "configuracion";
 
 export default function AdminDashboard() {
   const router = useRouter();
@@ -392,6 +392,21 @@ export default function AdminDashboard() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
             </svg>
             {!sidebarCollapsed && <span>Inventario ({inventory.length})</span>}
+          </button>
+
+          {/* Reportes */}
+          <button
+            onClick={() => setCurrentView("reportes")}
+            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition cursor-pointer ${
+              currentView === "reportes"
+                ? "bg-[#fff7ed] text-[#f6821f] font-semibold shadow-xs"
+                : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+            }`}
+          >
+            <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            {!sidebarCollapsed && <span>Reportes</span>}
           </button>
 
           {/* Configuración */}
@@ -1098,6 +1113,130 @@ export default function AdminDashboard() {
                     )}
                   </tbody>
                 </table>
+              </div>
+            </div>
+          )}
+
+          {/* ================= VIEW: REPORTES ================= */}
+          {currentView === "reportes" && (
+            <div className="space-y-6">
+              <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-5">
+                  <div>
+                    <h2 className="font-bold text-base text-slate-900">Centro de Reportes</h2>
+                    <p className="text-xs text-slate-500 mt-0.5">Informes financieros, contables y operativos de Wayne Trademark Honduras</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-slate-500 font-medium">Período fiscal:</span>
+                    <span className="px-3 py-1.5 rounded-lg bg-slate-100 text-slate-800 text-xs font-semibold border border-slate-200">
+                      Año 2026 (Actual)
+                    </span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 pt-5">
+                  {/* Reporte 1: Pérdidas y Ganancias */}
+                  <div className="p-5 rounded-xl border border-slate-200 hover:border-[#f6821f]/50 hover:shadow-xs transition bg-white flex flex-col justify-between group">
+                    <div>
+                      <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center mb-3">
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                        </svg>
+                      </div>
+                      <h3 className="font-semibold text-sm text-slate-900 group-hover:text-[#f6821f] transition">Estado de Pérdidas y Ganancias</h3>
+                      <p className="text-xs text-slate-500 mt-1">Desglose de ingresos brutos, gastos operacionales e ingresos netos del período.</p>
+                    </div>
+                    <div className="pt-4 mt-4 border-t border-slate-100 flex items-center justify-between">
+                      <span className="text-[11px] font-medium text-slate-400">Actualizado hoy</span>
+                      <button className="text-xs font-semibold text-[#f6821f] hover:underline cursor-pointer">Descargar PDF</button>
+                    </div>
+                  </div>
+
+                  {/* Reporte 2: Balance General */}
+                  <div className="p-5 rounded-xl border border-slate-200 hover:border-[#f6821f]/50 hover:shadow-xs transition bg-white flex flex-col justify-between group">
+                    <div>
+                      <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center mb-3">
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3" />
+                        </svg>
+                      </div>
+                      <h3 className="font-semibold text-sm text-slate-900 group-hover:text-[#f6821f] transition">Balance de Situación</h3>
+                      <p className="text-xs text-slate-500 mt-1">Resumen patrimonial clasificado: Activos, Pasivos y Capital Contable.</p>
+                    </div>
+                    <div className="pt-4 mt-4 border-t border-slate-100 flex items-center justify-between">
+                      <span className="text-[11px] font-medium text-slate-400">Mensual</span>
+                      <button className="text-xs font-semibold text-[#f6821f] hover:underline cursor-pointer">Descargar PDF</button>
+                    </div>
+                  </div>
+
+                  {/* Reporte 3: Valoración de Inventario */}
+                  <div className="p-5 rounded-xl border border-slate-200 hover:border-[#f6821f]/50 hover:shadow-xs transition bg-white flex flex-col justify-between group">
+                    <div>
+                      <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center mb-3">
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                        </svg>
+                      </div>
+                      <h3 className="font-semibold text-sm text-slate-900 group-hover:text-[#f6821f] transition">Valoración de Inventario</h3>
+                      <p className="text-xs text-slate-500 mt-1">Existencias físicas, valor total en libros ({formatCurrency(totalInventoryValuation)}) y costos unitarios.</p>
+                    </div>
+                    <div className="pt-4 mt-4 border-t border-slate-100 flex items-center justify-between">
+                      <span className="text-[11px] font-medium text-slate-400">En tiempo real</span>
+                      <button className="text-xs font-semibold text-[#f6821f] hover:underline cursor-pointer">Descargar Excel</button>
+                    </div>
+                  </div>
+
+                  {/* Reporte 4: Cuentas por Cobrar (Clientes) */}
+                  <div className="p-5 rounded-xl border border-slate-200 hover:border-[#f6821f]/50 hover:shadow-xs transition bg-white flex flex-col justify-between group">
+                    <div>
+                      <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-700 flex items-center justify-center mb-3">
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                      </div>
+                      <h3 className="font-semibold text-sm text-slate-900 group-hover:text-[#f6821f] transition">Antigüedad de Saldos Clientes</h3>
+                      <p className="text-xs text-slate-500 mt-1">Detalle de facturación pendiente y estados de cuenta por cliente.</p>
+                    </div>
+                    <div className="pt-4 mt-4 border-t border-slate-100 flex items-center justify-between">
+                      <span className="text-[11px] font-medium text-slate-400">{customers.length} clientes</span>
+                      <button className="text-xs font-semibold text-[#f6821f] hover:underline cursor-pointer">Descargar CSV</button>
+                    </div>
+                  </div>
+
+                  {/* Reporte 5: Cuentas por Pagar (Proveedores) */}
+                  <div className="p-5 rounded-xl border border-slate-200 hover:border-[#f6821f]/50 hover:shadow-xs transition bg-white flex flex-col justify-between group">
+                    <div>
+                      <div className="w-10 h-10 rounded-xl bg-rose-50 text-rose-700 flex items-center justify-center mb-3">
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5" />
+                        </svg>
+                      </div>
+                      <h3 className="font-semibold text-sm text-slate-900 group-hover:text-[#f6821f] transition">Antigüedad de Saldos Proveedores</h3>
+                      <p className="text-xs text-slate-500 mt-1">Obligaciones comerciales por vencer y programaciones de pago.</p>
+                    </div>
+                    <div className="pt-4 mt-4 border-t border-slate-100 flex items-center justify-between">
+                      <span className="text-[11px] font-medium text-slate-400">{vendors.length} proveedores</span>
+                      <button className="text-xs font-semibold text-[#f6821f] hover:underline cursor-pointer">Descargar CSV</button>
+                    </div>
+                  </div>
+
+                  {/* Reporte 6: Libro Mayor y Plan de Cuentas */}
+                  <div className="p-5 rounded-xl border border-slate-200 hover:border-[#f6821f]/50 hover:shadow-xs transition bg-white flex flex-col justify-between group">
+                    <div>
+                      <div className="w-10 h-10 rounded-xl bg-teal-50 text-teal-700 flex items-center justify-center mb-3">
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+                        </svg>
+                      </div>
+                      <h3 className="font-semibold text-sm text-slate-900 group-hover:text-[#f6821f] transition">Libro Mayor / Catálogo Contable</h3>
+                      <p className="text-xs text-slate-500 mt-1">Estructura completa del catálogo contable y saldos acumulados por cuenta.</p>
+                    </div>
+                    <div className="pt-4 mt-4 border-t border-slate-100 flex items-center justify-between">
+                      <span className="text-[11px] font-medium text-slate-400">{accounts.length} cuentas activas</span>
+                      <button className="text-xs font-semibold text-[#f6821f] hover:underline cursor-pointer">Descargar Excel</button>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           )}
