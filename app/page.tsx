@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 
 type Account = {
@@ -84,6 +84,57 @@ export default function AdminDashboard() {
   const [showBlockTooltip, setShowBlockTooltip] = useState(false);
   const [showSaveDropdown, setShowSaveDropdown] = useState(false);
   const [showAccountTypeTooltip, setShowAccountTypeTooltip] = useState(false);
+
+  // Logo upload state & ref
+  const [companyLogo, setCompanyLogo] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    try {
+      const savedLogo = localStorage.getItem("wayne_company_logo");
+      if (savedLogo) {
+        setCompanyLogo(savedLogo);
+      }
+    } catch {
+      // ignore storage error
+    }
+  }, []);
+
+  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 2 * 1024 * 1024) {
+      alert("El archivo excede el tamaño máximo permitido de 2MB.");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const result = event.target?.result as string;
+      if (result) {
+        setCompanyLogo(result);
+        try {
+          localStorage.setItem("wayne_company_logo", result);
+        } catch {
+          // ignore
+        }
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleRemoveLogo = () => {
+    setCompanyLogo(null);
+    try {
+      localStorage.removeItem("wayne_company_logo");
+    } catch {
+      // ignore
+    }
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
 
   // Configuration module states (Matching screenshot)
   const [configSubTab, setConfigSubTab] = useState<
@@ -643,9 +694,15 @@ export default function AdminDashboard() {
         {/* Brand Header */}
         <div className="h-16 px-4 border-b border-slate-200 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3 overflow-hidden">
-            <div className="w-10 h-10 rounded-xl bg-[#fff7ed] border border-[#f6821f]/30 flex items-center justify-center font-bold text-[#f6821f] text-lg shrink-0 shadow-xs">
-              W
-            </div>
+            {companyLogo ? (
+              <div className="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center p-1 shrink-0 shadow-xs overflow-hidden">
+                <img src={companyLogo} alt="Logo" className="w-full h-full object-contain" />
+              </div>
+            ) : (
+              <div className="w-10 h-10 rounded-xl bg-[#fff7ed] border border-[#f6821f]/30 flex items-center justify-center font-bold text-[#f6821f] text-lg shrink-0 shadow-xs">
+                W
+              </div>
+            )}
             {!sidebarCollapsed && (
               <div className="truncate">
                 <h1 className="font-bold text-sm text-slate-900 leading-tight">Wayne Admin</h1>
@@ -1978,27 +2035,79 @@ export default function AdminDashboard() {
                   {/* SUBTAB 1: EMPRESA */}
                   {configSubTab === "empresa" && (
                     <div className="max-w-3xl space-y-6">
-                      {/* Company Logo Header matching screenshot */}
+                      {/* Hidden File Input for Logo Upload */}
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/png, image/jpeg, image/webp, image/svg+xml"
+                        className="hidden"
+                        onChange={handleLogoUpload}
+                      />
+
+                      {/* Company Logo Header with Fallback matching screenshot */}
                       <div className="flex flex-col items-center justify-center pb-2">
-                        <div className="flex items-center gap-2">
-                          <svg className="w-9 h-9 text-[#f6821f]" viewBox="0 0 100 100" fill="currentColor">
-                            <path d="M10 25 L35 75 L50 45 L65 75 L90 25 L75 25 L60 60 L50 40 L40 60 L25 25 Z" />
-                          </svg>
-                          <div className="flex flex-col">
-                            <span className="font-black text-2xl tracking-tight text-[#f6821f] leading-none">wayne</span>
-                            <span className="text-[7px] tracking-wider text-slate-500 font-bold uppercase">PRINTING & PACKAGING HONDURAS</span>
+                        {companyLogo ? (
+                          /* Uploaded Custom Logo Display */
+                          <div className="flex flex-col items-center">
+                            <div className="p-3 border border-slate-200 rounded-2xl bg-white shadow-xs max-w-xs flex items-center justify-center">
+                              <img
+                                src={companyLogo}
+                                alt="Logotipo Wayne Trademark"
+                                className="max-h-20 max-w-[260px] object-contain"
+                              />
+                            </div>
+                            <div className="flex items-center gap-2 mt-2.5">
+                              <button
+                                type="button"
+                                onClick={() => fileInputRef.current?.click()}
+                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium cursor-pointer transition"
+                                title="Cambiar logotipo"
+                              >
+                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                </svg>
+                                <span>Cambiar logo</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={handleRemoveLogo}
+                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-600 text-xs font-medium cursor-pointer transition border border-red-200"
+                                title="Eliminar logotipo personalizado"
+                              >
+                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                                <span>Eliminar</span>
+                              </button>
+                            </div>
                           </div>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => alert("Para actualizar el logotipo oficial, selecciona una imagen PNG/SVG de alta resolución.")}
-                          className="mt-2.5 w-7 h-7 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center cursor-pointer shadow-xs transition"
-                          title="Editar logotipo de la empresa"
-                        >
-                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                          </svg>
-                        </button>
+                        ) : (
+                          /* Fallback State (with Default Wayne emblem + Upload prompt) */
+                          <div className="flex flex-col items-center">
+                            <div className="flex items-center gap-2 mb-2">
+                              <svg className="w-9 h-9 text-[#f6821f]" viewBox="0 0 100 100" fill="currentColor">
+                                <path d="M10 25 L35 75 L50 45 L65 75 L90 25 L75 25 L60 60 L50 40 L40 60 L25 25 Z" />
+                              </svg>
+                              <div className="flex flex-col">
+                                <span className="font-black text-2xl tracking-tight text-[#f6821f] leading-none">wayne</span>
+                                <span className="text-[7px] tracking-wider text-slate-500 font-bold uppercase">PRINTING & PACKAGING HONDURAS</span>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2 mt-1">
+                              <button
+                                type="button"
+                                onClick={() => fileInputRef.current?.click()}
+                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-[#fff7ed] hover:text-[#f6821f] text-slate-700 text-xs font-medium cursor-pointer shadow-xs border border-slate-200 hover:border-[#f6821f] transition"
+                                title="Subir logotipo oficial"
+                              >
+                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                                </svg>
+                                <span>Subir logotipo</span>
+                              </button>
+                            </div>
+                          </div>
+                        )}
                       </div>
 
                       {/* Card 1: Información de la empresa */}
