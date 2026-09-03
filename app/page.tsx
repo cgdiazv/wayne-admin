@@ -81,6 +81,8 @@ export default function AdminDashboard() {
   const [accountModalLoading, setAccountModalLoading] = useState(false);
   const [accountModalError, setAccountModalError] = useState("");
   const [accountModalSuccess, setAccountModalSuccess] = useState("");
+  const [showBlockTooltip, setShowBlockTooltip] = useState(false);
+  const [showSaveDropdown, setShowSaveDropdown] = useState(false);
 
   // Plan de cuentas personalization sidebar states (Matching screenshot)
   const [showConfigSidebar, setShowConfigSidebar] = useState(false);
@@ -389,8 +391,11 @@ export default function AdminDashboard() {
     window.print();
   };
 
-  const handleCreateAccount = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleCreateAccount = async (
+    e?: React.FormEvent,
+    keepOpenAndNew: boolean = false
+  ) => {
+    if (e) e.preventDefault();
     setAccountModalLoading(true);
     setAccountModalError("");
     setAccountModalSuccess("");
@@ -427,22 +432,41 @@ export default function AdminDashboard() {
 
       setAccounts((prev) => [...prev, data.data].sort((a, b) => a.code.localeCompare(b.code)));
       setAccountModalSuccess("Cuenta contable creada exitosamente");
-      setTimeout(() => {
-        setShowNewAccountModal(false);
-        setAccountModalSuccess("");
-        setNewAccountForm({
-          code: "",
-          name: "",
-          type: "ACTIVO",
-          detailType: "Efectivo y equivalentes de efectivo",
-          isSubAccount: false,
-          parentAccountId: "",
-          description: "",
-          isLocked: false,
-          currency: "USD",
-          isActive: true,
-        });
-      }, 800);
+
+      if (keepOpenAndNew) {
+        setTimeout(() => {
+          setAccountModalSuccess("");
+          setNewAccountForm({
+            code: "",
+            name: "",
+            type: "ACTIVO",
+            detailType: "Efectivo y equivalentes de efectivo",
+            isSubAccount: false,
+            parentAccountId: "",
+            description: "",
+            isLocked: false,
+            currency: "USD",
+            isActive: true,
+          });
+        }, 600);
+      } else {
+        setTimeout(() => {
+          setShowNewAccountModal(false);
+          setAccountModalSuccess("");
+          setNewAccountForm({
+            code: "",
+            name: "",
+            type: "ACTIVO",
+            detailType: "Efectivo y equivalentes de efectivo",
+            isSubAccount: false,
+            parentAccountId: "",
+            description: "",
+            isLocked: false,
+            currency: "USD",
+            isActive: true,
+          });
+        }, 700);
+      }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Error inesperado";
       setAccountModalError(msg);
@@ -2270,12 +2294,24 @@ export default function AdminDashboard() {
                 {/* Divider & Bloquear cuenta */}
                 <div className="border-t border-slate-200 pt-4">
                   <div className="flex items-center justify-between">
-                    <span
-                      className="text-slate-700 font-medium border-b border-dotted border-slate-400 cursor-help"
-                      title="Bloquear cuenta para evitar modificaciones accidentales"
-                    >
-                      Bloquear cuenta
-                    </span>
+                    <div className="relative inline-block">
+                      <span
+                        onMouseEnter={() => setShowBlockTooltip(true)}
+                        onMouseLeave={() => setShowBlockTooltip(false)}
+                        className="text-slate-700 font-medium border-b border-dotted border-slate-400 cursor-help select-none"
+                      >
+                        Bloquear cuenta
+                      </span>
+
+                      {showBlockTooltip && (
+                        <div className="absolute bottom-full left-0 mb-2.5 z-30 w-72 sm:w-80 p-3 bg-slate-900 text-white rounded-lg shadow-2xl text-[11px] leading-relaxed animate-in fade-in zoom-in-95 duration-150 pointer-events-none">
+                          <p>
+                            Al bloquear cuentas, los usuarios no podrán seleccionarlas en los menús desplegables de formularios y transacciones. Esto evita la contabilización incorrecta. Las funciones y las aplicaciones externas que registran transacciones automáticamente en esta cuenta seguirán haciéndolo.
+                          </p>
+                          <div className="absolute top-full left-4 -mt-0.5 border-4 border-transparent border-t-slate-900" />
+                        </div>
+                      )}
+                    </div>
 
                     <div className="inline-flex rounded-lg border border-slate-200 p-0.5 bg-slate-100/70">
                       <button
@@ -2312,45 +2348,56 @@ export default function AdminDashboard() {
               </div>
 
               {/* Sticky Footer */}
-              <div className="border-t border-slate-200 px-6 py-3.5 bg-slate-50/50 flex items-center justify-between">
+              <div className="border-t border-slate-200 px-6 py-3.5 bg-slate-50/50 flex items-center justify-end gap-2.5">
                 <button
                   type="button"
-                  onClick={() => alert("Los video tutoriales estarán disponibles próximamente.")}
-                  className="flex items-center gap-1.5 text-xs text-[#0f62fe] hover:text-[#0353e9] hover:underline font-medium cursor-pointer"
+                  onClick={() => setShowNewAccountModal(false)}
+                  className="px-4 py-2 rounded-lg border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 font-semibold text-xs transition cursor-pointer"
                 >
-                  <svg className="w-4 h-4 text-[#0f62fe]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <circle cx="12" cy="12" r="9" strokeWidth="2" />
-                    <polygon points="10,8 16,12 10,16" fill="currentColor" />
-                  </svg>
-                  <span>Video tutorials</span>
+                  Cancelar
                 </button>
 
-                <div className="flex items-center gap-2.5">
+                <div className="relative inline-flex rounded-lg shadow-sm">
+                  <button
+                    type="submit"
+                    disabled={accountModalLoading}
+                    className="px-4 py-2 rounded-l-lg bg-[#f6821f] hover:bg-[#e07216] text-white font-semibold text-xs transition cursor-pointer disabled:opacity-50 flex items-center gap-1"
+                  >
+                    {accountModalLoading ? "Guardando..." : "Guardar"}
+                  </button>
                   <button
                     type="button"
-                    onClick={() => setShowNewAccountModal(false)}
-                    className="px-4 py-2 rounded-lg border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 font-semibold text-xs transition cursor-pointer"
+                    onClick={() => setShowSaveDropdown(!showSaveDropdown)}
+                    className="px-2 py-2 rounded-r-lg bg-[#e07216] hover:bg-[#d06512] text-white border-l border-white/20 transition cursor-pointer flex items-center justify-center"
                   >
-                    Cancelar
+                    <svg
+                      className={`w-3.5 h-3.5 transition-transform ${showSaveDropdown ? "rotate-180" : "rotate-0"}`}
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                    </svg>
                   </button>
 
-                  <div className="inline-flex rounded-lg shadow-sm">
-                    <button
-                      type="submit"
-                      disabled={accountModalLoading}
-                      className="px-4 py-2 rounded-l-lg bg-[#f6821f] hover:bg-[#e07216] text-white font-semibold text-xs transition cursor-pointer disabled:opacity-50 flex items-center gap-1"
-                    >
-                      {accountModalLoading ? "Guardando..." : "Guardar"}
-                    </button>
-                    <button
-                      type="button"
-                      className="px-2 py-2 rounded-r-lg bg-[#e07216] hover:bg-[#d06512] text-white border-l border-white/20 transition cursor-pointer flex items-center justify-center"
-                    >
-                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
-                      </svg>
-                    </button>
-                  </div>
+                  {/* Dropdown: Guardar y crear nueva */}
+                  {showSaveDropdown && (
+                    <div className="absolute bottom-full right-0 mb-2 w-52 bg-white rounded-xl shadow-2xl border border-slate-200 py-1 z-30 animate-in fade-in zoom-in-95 duration-150">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowSaveDropdown(false);
+                          handleCreateAccount(undefined, true);
+                        }}
+                        className="w-full text-left px-4 py-2.5 text-xs text-slate-700 hover:bg-[#fff7ed] hover:text-[#f6821f] font-semibold transition cursor-pointer flex items-center gap-2"
+                      >
+                        <svg className="w-4 h-4 text-[#f6821f]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
+                        </svg>
+                        <span>Guardar y crear nueva</span>
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
             </form>
