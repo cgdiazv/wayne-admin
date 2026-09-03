@@ -80,7 +80,15 @@ export default function AdminDashboard() {
   // Plan de cuentas personalization sidebar states (Matching screenshot)
   const [showConfigSidebar, setShowConfigSidebar] = useState(false);
   const [pageSize, setPageSize] = useState<number>(75);
-  const [rowDensity, setRowDensity] = useState<"acogedor" | "compacto">("acogedor");
+  const [rowDensity, setRowDensity] = useState<"espacioso" | "acogedor" | "compacto">("acogedor");
+  const [collapsedSections, setCollapsedSections] = useState<{ [key: string]: boolean }>({
+    rows: false,
+    columns: false,
+    preferences: false,
+  });
+  const toggleSection = (sec: string) => {
+    setCollapsedSections((prev) => ({ ...prev, [sec]: !prev[sec] }));
+  };
   const [visibleColumns, setVisibleColumns] = useState<{ [key: string]: boolean }>({
     code: true, // N.º
     type: true, // Tipo de cuenta
@@ -1138,7 +1146,12 @@ export default function AdminDashboard() {
                       <tr>
                         {columnOrder.map((colKey) => {
                           if (!visibleColumns[colKey]) return null;
-                          const cellPadding = rowDensity === "compacto" ? "py-2 px-3" : "p-3.5";
+                          const cellPadding =
+                            rowDensity === "espacioso"
+                              ? "py-4 px-4"
+                              : rowDensity === "compacto"
+                              ? "py-2 px-3"
+                              : "py-3 px-3.5";
                           switch (colKey) {
                             case "code":
                               return <th key="code" className={cellPadding}>N.º</th>;
@@ -1158,12 +1171,27 @@ export default function AdminDashboard() {
                               return null;
                           }
                         })}
-                        <th className={rowDensity === "compacto" ? "py-2 px-3" : "p-3.5"}>Estado</th>
+                        <th
+                          className={
+                            rowDensity === "espacioso"
+                              ? "py-4 px-4"
+                              : rowDensity === "compacto"
+                              ? "py-2 px-3"
+                              : "py-3 px-3.5"
+                          }
+                        >
+                          Estado
+                        </th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                       {displayedAccounts.map((acc, idx) => {
-                        const cellPadding = rowDensity === "compacto" ? "py-1.5 px-3" : "p-3.5";
+                        const cellPadding =
+                          rowDensity === "espacioso"
+                            ? "py-4 px-4"
+                            : rowDensity === "compacto"
+                            ? "py-1.5 px-3"
+                            : "py-2.5 px-3.5";
                         const rowBg = alternateRowColor && idx % 2 === 1 ? "bg-slate-50/70" : "bg-white";
                         return (
                           <tr key={acc.id} className={`${rowBg} hover:bg-[#fff7ed]/50 transition`}>
@@ -2084,183 +2112,231 @@ export default function AdminDashboard() {
             <div className="divide-y divide-slate-100 text-xs">
               {/* Section: Rows */}
               <div className="p-5 space-y-4">
-                <div className="flex items-center gap-1.5 font-bold text-slate-800">
-                  <svg className="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
-                  </svg>
-                  <span>Rows</span>
-                </div>
-
-                <div className="space-y-1.5 pl-5">
-                  <label className="text-slate-600 block text-xs">Tamaño de página</label>
-                  <div className="relative">
-                    <select
-                      value={pageSize}
-                      onChange={(e) => setPageSize(Number(e.target.value))}
-                      className="w-full pl-3.5 pr-8 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-medium appearance-none focus:outline-none focus:border-[#f6821f] cursor-pointer"
+                <button
+                  type="button"
+                  onClick={() => toggleSection("rows")}
+                  className="w-full flex items-center justify-between font-bold text-slate-800 hover:text-slate-900 transition cursor-pointer select-none"
+                >
+                  <div className="flex items-center gap-1.5">
+                    <svg
+                      className={`w-4 h-4 text-slate-500 transform transition-transform duration-200 ${
+                        collapsedSections.rows ? "-rotate-90" : "rotate-0"
+                      }`}
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
                     >
-                      <option value={25}>25</option>
-                      <option value={50}>50</option>
-                      <option value={75}>75</option>
-                      <option value={100}>100</option>
-                      <option value={300}>300</option>
-                    </select>
-                    <svg className="w-4 h-4 text-slate-400 absolute right-2.5 top-2.5 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
                     </svg>
+                    <span>Rows</span>
                   </div>
-                </div>
+                </button>
 
-                <div className="space-y-1.5 pl-5">
-                  <label className="text-slate-600 block text-xs">Densidad de filas</label>
-                  <div className="relative">
-                    <select
-                      value={rowDensity}
-                      onChange={(e) => setRowDensity(e.target.value as "acogedor" | "compacto")}
-                      className="w-full pl-3.5 pr-8 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-medium appearance-none focus:outline-none focus:border-[#f6821f] cursor-pointer"
-                    >
-                      <option value="acogedor">Acogedor</option>
-                      <option value="compacto">Compacto</option>
-                    </select>
-                    <svg className="w-4 h-4 text-slate-400 absolute right-2.5 top-2.5 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
-                    </svg>
+                {!collapsedSections.rows && (
+                  <div className="space-y-4 pt-1">
+                    <div className="space-y-1.5 pl-5">
+                      <label className="text-slate-600 block text-xs">Tamaño de página</label>
+                      <div className="relative">
+                        <select
+                          value={pageSize}
+                          onChange={(e) => setPageSize(Number(e.target.value))}
+                          className="w-full pl-3.5 pr-8 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-medium appearance-none focus:outline-none focus:border-[#f6821f] cursor-pointer"
+                        >
+                          <option value={25}>25</option>
+                          <option value={50}>50</option>
+                          <option value={75}>75</option>
+                          <option value={100}>100</option>
+                          <option value={300}>300</option>
+                        </select>
+                        <svg className="w-4 h-4 text-slate-400 absolute right-2.5 top-2.5 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </div>
+                    </div>
+
+                    <div className="space-y-1.5 pl-5">
+                      <label className="text-slate-600 block text-xs">Densidad de filas</label>
+                      <div className="relative">
+                        <select
+                          value={rowDensity}
+                          onChange={(e) => setRowDensity(e.target.value as "espacioso" | "acogedor" | "compacto")}
+                          className="w-full pl-3.5 pr-8 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-medium appearance-none focus:outline-none focus:border-[#f6821f] cursor-pointer"
+                        >
+                          <option value="espacioso">Espacioso</option>
+                          <option value="acogedor">Acogedor</option>
+                          <option value="compacto">Compacto</option>
+                        </select>
+                        <svg className="w-4 h-4 text-slate-400 absolute right-2.5 top-2.5 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </div>
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
 
               {/* Section: Columnas */}
               <div className="p-5 space-y-3">
-                <div className="flex items-center gap-1.5 font-bold text-slate-800">
-                  <svg className="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
-                  </svg>
-                  <span>Columnas</span>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => toggleSection("columns")}
+                  className="w-full flex items-center justify-between font-bold text-slate-800 hover:text-slate-900 transition cursor-pointer select-none"
+                >
+                  <div className="flex items-center gap-1.5">
+                    <svg
+                      className={`w-4 h-4 text-slate-500 transform transition-transform duration-200 ${
+                        collapsedSections.columns ? "-rotate-90" : "rotate-0"
+                      }`}
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                    </svg>
+                    <span>Columnas</span>
+                  </div>
+                </button>
 
-                <p className="text-[11px] text-slate-500 pl-5">Drag to change the order of columns</p>
+                {!collapsedSections.columns && (
+                  <div className="space-y-3 pt-1">
+                    <p className="text-[11px] text-slate-500 pl-5">Drag to change the order of columns</p>
 
-                <div className="space-y-2 pl-5 pt-1">
-                  {[
-                    { id: "code", label: "N.º" },
-                    { id: "type", label: "Tipo de cuenta" },
-                    { id: "detailType", label: "Tipo de detalles" },
-                    { id: "description", label: "Descripción" },
-                    { id: "currency", label: "Moneda" },
-                    { id: "bookBalance", label: "Saldo contable" },
-                    { id: "bankBalance", label: "Saldo bancario" },
-                  ].map((col, index) => (
-                    <div key={col.id} className="flex items-center justify-between group py-0.5">
-                      <div className="flex items-center gap-2.5">
-                        {/* Drag grip icon */}
-                        <div className="flex items-center text-slate-400">
-                          <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
-                            <circle cx="8.5" cy="6.5" r="1.5" />
-                            <circle cx="15.5" cy="6.5" r="1.5" />
-                            <circle cx="8.5" cy="12" r="1.5" />
-                            <circle cx="15.5" cy="12" r="1.5" />
-                            <circle cx="8.5" cy="17.5" r="1.5" />
-                            <circle cx="15.5" cy="17.5" r="1.5" />
-                          </svg>
+                    <div className="space-y-2 pl-5">
+                      {[
+                        { id: "code", label: "N.º" },
+                        { id: "type", label: "Tipo de cuenta" },
+                        { id: "detailType", label: "Tipo de detalles" },
+                        { id: "description", label: "Descripción" },
+                        { id: "currency", label: "Moneda" },
+                        { id: "bookBalance", label: "Saldo contable" },
+                        { id: "bankBalance", label: "Saldo bancario" },
+                      ].map((col, index) => (
+                        <div key={col.id} className="flex items-center justify-between group py-0.5">
+                          <div className="flex items-center gap-2.5">
+                            {/* Drag grip icon */}
+                            <div className="flex items-center text-slate-400">
+                              <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+                                <circle cx="8.5" cy="6.5" r="1.5" />
+                                <circle cx="15.5" cy="6.5" r="1.5" />
+                                <circle cx="8.5" cy="12" r="1.5" />
+                                <circle cx="15.5" cy="12" r="1.5" />
+                                <circle cx="8.5" cy="17.5" r="1.5" />
+                                <circle cx="15.5" cy="17.5" r="1.5" />
+                              </svg>
+                            </div>
+                            <label className="flex items-center gap-2.5 cursor-pointer select-none text-slate-700">
+                              <input
+                                type="checkbox"
+                                checked={Boolean(visibleColumns[col.id])}
+                                onChange={() =>
+                                  setVisibleColumns((prev) => ({
+                                    ...prev,
+                                    [col.id]: !prev[col.id],
+                                  }))
+                                }
+                                className="w-4 h-4 rounded border-slate-300 text-[#f6821f] focus:ring-[#f6821f] cursor-pointer accent-[#f6821f]"
+                              />
+                              <span className="font-medium text-xs text-slate-800">{col.label}</span>
+                            </label>
+                          </div>
+
+                          {/* Quick re-order arrows */}
+                          <div className="opacity-0 group-hover:opacity-100 flex items-center gap-0.5 transition">
+                            {index > 0 && (
+                              <button
+                                type="button"
+                                title="Mover arriba"
+                                onClick={() => {
+                                  const nextOrder = [...columnOrder];
+                                  const temp = nextOrder[index - 1];
+                                  nextOrder[index - 1] = nextOrder[index];
+                                  nextOrder[index] = temp;
+                                  setColumnOrder(nextOrder);
+                                }}
+                                className="p-1 hover:bg-slate-100 rounded text-slate-400 hover:text-slate-700 cursor-pointer"
+                              >
+                                ▲
+                              </button>
+                            )}
+                            {index < columnOrder.length - 1 && (
+                              <button
+                                type="button"
+                                title="Mover abajo"
+                                onClick={() => {
+                                  const nextOrder = [...columnOrder];
+                                  const temp = nextOrder[index + 1];
+                                  nextOrder[index + 1] = nextOrder[index];
+                                  nextOrder[index] = temp;
+                                  setColumnOrder(nextOrder);
+                                }}
+                                className="p-1 hover:bg-slate-100 rounded text-slate-400 hover:text-slate-700 cursor-pointer"
+                              >
+                                ▼
+                              </button>
+                            )}
+                          </div>
                         </div>
-                        <label className="flex items-center gap-2.5 cursor-pointer select-none text-slate-700">
-                          <input
-                            type="checkbox"
-                            checked={Boolean(visibleColumns[col.id])}
-                            onChange={() =>
-                              setVisibleColumns((prev) => ({
-                                ...prev,
-                                [col.id]: !prev[col.id],
-                              }))
-                            }
-                            className="w-4 h-4 rounded border-slate-300 text-[#f6821f] focus:ring-[#f6821f] cursor-pointer accent-[#f6821f]"
-                          />
-                          <span className="font-medium text-xs text-slate-800">{col.label}</span>
-                        </label>
-                      </div>
-
-                      {/* Quick re-order arrows */}
-                      <div className="opacity-0 group-hover:opacity-100 flex items-center gap-0.5 transition">
-                        {index > 0 && (
-                          <button
-                            type="button"
-                            title="Mover arriba"
-                            onClick={() => {
-                              const nextOrder = [...columnOrder];
-                              const temp = nextOrder[index - 1];
-                              nextOrder[index - 1] = nextOrder[index];
-                              nextOrder[index] = temp;
-                              setColumnOrder(nextOrder);
-                            }}
-                            className="p-1 hover:bg-slate-100 rounded text-slate-400 hover:text-slate-700 cursor-pointer"
-                          >
-                            ▲
-                          </button>
-                        )}
-                        {index < columnOrder.length - 1 && (
-                          <button
-                            type="button"
-                            title="Mover abajo"
-                            onClick={() => {
-                              const nextOrder = [...columnOrder];
-                              const temp = nextOrder[index + 1];
-                              nextOrder[index + 1] = nextOrder[index];
-                              nextOrder[index] = temp;
-                              setColumnOrder(nextOrder);
-                            }}
-                            className="p-1 hover:bg-slate-100 rounded text-slate-400 hover:text-slate-700 cursor-pointer"
-                          >
-                            ▼
-                          </button>
-                        )}
-                      </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
+                  </div>
+                )}
               </div>
-
-
 
               {/* Section: Preferencias */}
               <div className="p-5 space-y-3">
-                <div className="flex items-center gap-1.5 font-bold text-slate-800">
-                  <svg className="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
-                  </svg>
-                  <span>Preferencias</span>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => toggleSection("preferences")}
+                  className="w-full flex items-center justify-between font-bold text-slate-800 hover:text-slate-900 transition cursor-pointer select-none"
+                >
+                  <div className="flex items-center gap-1.5">
+                    <svg
+                      className={`w-4 h-4 text-slate-500 transform transition-transform duration-200 ${
+                        collapsedSections.preferences ? "-rotate-90" : "rotate-0"
+                      }`}
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                    </svg>
+                    <span>Preferencias</span>
+                  </div>
+                </button>
 
-                <div className="space-y-3 pl-5 pt-1 text-slate-700">
-                  <label className="flex items-center gap-2.5 cursor-pointer select-none">
-                    <input
-                      type="checkbox"
-                      checked={alternateRowColor}
-                      onChange={(e) => setAlternateRowColor(e.target.checked)}
-                      className="w-4 h-4 rounded border-slate-300 text-[#f6821f] focus:ring-[#f6821f] cursor-pointer accent-[#f6821f]"
-                    />
-                    <span className="font-medium text-xs">Alternar color de fila</span>
-                  </label>
+                {!collapsedSections.preferences && (
+                  <div className="space-y-3 pl-5 pt-1 text-slate-700">
+                    <label className="flex items-center gap-2.5 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={alternateRowColor}
+                        onChange={(e) => setAlternateRowColor(e.target.checked)}
+                        className="w-4 h-4 rounded border-slate-300 text-[#f6821f] focus:ring-[#f6821f] cursor-pointer accent-[#f6821f]"
+                      />
+                      <span className="font-medium text-xs">Alternar color de fila</span>
+                    </label>
 
-                  <label className="flex items-center gap-2.5 cursor-pointer select-none">
-                    <input
-                      type="checkbox"
-                      checked={showInactiveAccounts}
-                      onChange={(e) => setShowInactiveAccounts(e.target.checked)}
-                      className="w-4 h-4 rounded border-slate-300 text-[#f6821f] focus:ring-[#f6821f] cursor-pointer accent-[#f6821f]"
-                    />
-                    <span className="font-medium text-xs">Mostrar cuentas inactivas</span>
-                  </label>
+                    <label className="flex items-center gap-2.5 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={showInactiveAccounts}
+                        onChange={(e) => setShowInactiveAccounts(e.target.checked)}
+                        className="w-4 h-4 rounded border-slate-300 text-[#f6821f] focus:ring-[#f6821f] cursor-pointer accent-[#f6821f]"
+                      />
+                      <span className="font-medium text-xs">Mostrar cuentas inactivas</span>
+                    </label>
 
-                  <label className="flex items-center gap-2.5 cursor-pointer select-none">
-                    <input
-                      type="checkbox"
-                      checked={showReportBadges}
-                      onChange={(e) => setShowReportBadges(e.target.checked)}
-                      className="w-4 h-4 rounded border-slate-300 text-[#f6821f] focus:ring-[#f6821f] cursor-pointer accent-[#f6821f]"
-                    />
-                    <span className="font-medium text-xs">Mostrar distintivos de tipo de informe</span>
-                  </label>
-                </div>
+                    <label className="flex items-center gap-2.5 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={showReportBadges}
+                        onChange={(e) => setShowReportBadges(e.target.checked)}
+                        className="w-4 h-4 rounded border-slate-300 text-[#f6821f] focus:ring-[#f6821f] cursor-pointer accent-[#f6821f]"
+                      />
+                      <span className="font-medium text-xs">Mostrar distintivos de tipo de informe</span>
+                    </label>
+                  </div>
+                )}
               </div>
             </div>
           </aside>
