@@ -36,45 +36,56 @@ body {
   }
 }
 
-/* ================= PRINT STYLES FOR OFFICIAL INVOICE DOCUMENT ================= */
+/* ================= UNIVERSAL PRINT STYLES ================= */
 @media print {
-  body {
-    background: #ffffff !important;
-    color: #000000 !important;
-  }
-
-  /* Hide UI elements, sidebars, headers, footers, action bars */
+  /* Hide non-printable UI elements: sidebar, top header, page content, action bars */
+  aside,
   header,
   footer,
-  aside,
   nav,
-  .no-print {
+  button,
+  .no-print,
+  main > div {
     display: none !important;
   }
 
-  /* Hide everything outside printable container */
-  body * {
-    visibility: hidden;
-  }
-
-  /* Only show the official printable invoice document */
-  #printable-invoice-document,
-  #printable-invoice-document * {
-    visibility: visible;
-  }
-
-  #printable-invoice-document {
-    position: absolute;
-    left: 0;
-    top: 0;
+  /* Reset body and html layout */
+  html, body {
+    background: #ffffff !important;
+    color: #000000 !important;
     width: 100% !important;
-    max-width: 100% !important;
+    height: auto !important;
     margin: 0 !important;
-    padding: 10px !important;
+    padding: 0 !important;
+    overflow: visible !important;
+  }
+
+  /* Force display of official printable document templates at fixed overlay position */
+  #printable-invoice-document,
+  #printable-po-document,
+  #printable-note-document,
+  .printable-document {
+    display: block !important;
+    visibility: visible !important;
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    margin: 0 !important;
+    padding: 24px !important;
     box-shadow: none !important;
     border: none !important;
     background: #ffffff !important;
     color: #000000 !important;
+    z-index: 999999 !important;
+  }
+
+  #printable-invoice-document *,
+  #printable-po-document *,
+  #printable-note-document *,
+  .printable-document * {
+    visibility: visible !important;
   }
 
   @page {

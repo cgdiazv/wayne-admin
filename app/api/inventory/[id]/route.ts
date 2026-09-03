@@ -14,6 +14,14 @@ export async function GET(request: NextRequest, { params }: RouteProps) {
       where: {
         OR: [{ id }, { sku: id }],
       },
+      include: {
+        lots: {
+          orderBy: { expirationDate: "asc" },
+        },
+        serials: {
+          orderBy: { serialNumber: "asc" },
+        },
+      },
     });
 
     if (!item) {
@@ -48,7 +56,7 @@ export async function PATCH(request: NextRequest, { params }: RouteProps) {
       );
     }
 
-    const { sku, description, quantity, cost, price } = body;
+    const { sku, description, quantity, cost, price, trackingType } = body;
 
     // Check SKU uniqueness if changing
     if (sku && sku !== existing.sku) {
@@ -71,6 +79,11 @@ export async function PATCH(request: NextRequest, { params }: RouteProps) {
         ...(quantity !== undefined && { quantity: Number(quantity) }),
         ...(cost !== undefined && { cost: Number(cost) }),
         ...(price !== undefined && { price: Number(price) }),
+        ...(trackingType !== undefined && { trackingType }),
+      },
+      include: {
+        lots: true,
+        serials: true,
       },
     });
 

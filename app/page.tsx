@@ -2,7 +2,9 @@
 
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { Users, Factory, Package, BookOpen, Download, Upload, CheckCircle2, FileSpreadsheet, ArrowRight, X } from "lucide-react";
+import { Users, Factory, Package, Tag, Boxes, AlertCircle, Clock, CheckCircle2, ShieldAlert, Layers, Hash, BookOpen, Download, Upload, FileSpreadsheet, ArrowRight, X, FileText } from "lucide-react";
+
+
 
 type Account = {
   id: string;
@@ -34,6 +36,24 @@ type Vendor = {
   currency: string;
 };
 
+type ItemLot = {
+  id: string;
+  inventoryItemId: string;
+  lotNumber: string;
+  quantity: number;
+  manufactureDate?: string | null;
+  expirationDate?: string | null;
+  notes?: string | null;
+};
+
+type ItemSerial = {
+  id: string;
+  inventoryItemId: string;
+  serialNumber: string;
+  status: string; // "DISPONIBLE" | "VENDIDO" | "RESERVADO" | "DEFECTUOSO"
+  notes?: string | null;
+};
+
 type InventoryItem = {
   id: string;
   sku: string;
@@ -41,7 +61,11 @@ type InventoryItem = {
   quantity: number;
   cost: number;
   price: number;
+  trackingType?: string; // "NONE" | "LOT" | "SERIAL"
+  lots?: ItemLot[];
+  serials?: ItemSerial[];
 };
+
 
 type BankAccount = {
   id: string;
@@ -85,7 +109,91 @@ type BankRule = {
   active: boolean;
 };
 
-type NavItem = "dashboard" | "plan-cuentas" | "transacciones" | "macola-sync" | "clientes" | "proveedores" | "inventario" | "reportes" | "configuracion" | "factura-editor" | "lista-facturas" | "lista-ordenes-compra" | "orden-compra-editor" | "deposito-bancario" | "recibir-pago" | "agregar-gasto" | "pagar-proveedor";
+type CreditDebitNote = {
+  id: string;
+  noteNumber: string;
+  type: "CREDIT" | "DEBIT";
+  entityType: "CUSTOMER" | "VENDOR";
+  entityId?: string | null;
+  entityName: string;
+  targetDocNum?: string | null;
+  issueDate: string;
+  reason: string;
+  amount: number;
+  tax: number;
+  total: number;
+  currency: string;
+  status: string; // "APLICADA" | "BORRADOR" | "ANULADA"
+  notes?: string | null;
+  createdAt?: string;
+};
+
+type SalesRep = {
+
+  id: string;
+  code: string;
+  name: string;
+  email: string | null;
+  phone: string | null;
+  zone: string | null;
+  commissionRate: number;
+  commissionType: string;
+  monthlyTarget: number;
+  status: string;
+  notes?: string | null;
+  commissions?: CommissionRecord[];
+};
+
+type CommissionRecord = {
+  id: string;
+  salesRepId: string;
+  salesRepName: string;
+  period: string;
+  invoiceNumber: string | null;
+  customerName: string | null;
+  saleAmount: number;
+  commissionRate: number;
+  commissionAmount: number;
+  status: string;
+  paidDate: string | null;
+  notes?: string | null;
+};
+
+type PurchaseInvoiceItem = {
+  id?: string;
+  sku: string;
+  description: string;
+  quantity: number;
+  unitCost: number;
+  totalCost: number;
+  lotNumber?: string | null;
+};
+
+type PurchaseInvoice = {
+  id: string;
+  invoiceNumber: string;
+  purchaseOrderNumber?: string | null;
+  vendorId?: string | null;
+  vendorName: string;
+  issueDate: string;
+  dueDate: string;
+  currency: string;
+  subtotal: number;
+  tax: number;
+  total: number;
+  paymentStatus: string;
+  inventoryStatus: string;
+  notes?: string | null;
+  items?: PurchaseInvoiceItem[];
+  createdAt?: string;
+};
+
+type NavItem = "dashboard" | "plan-cuentas" | "transacciones" | "macola-sync" | "clientes" | "proveedores" | "vendedores" | "comisiones" | "inventario" | "lotes" | "series" | "notas-credito-debito" | "reportes" | "configuracion" | "factura-editor" | "lista-facturas" | "lista-ordenes-compra" | "orden-compra-editor" | "factura-compra-lista" | "factura-compra-editor" | "deposito-bancario" | "recibir-pago" | "agregar-gasto" | "pagar-proveedor" | "devoluciones-proveedor";
+
+
+
+
+
 
 export default function AdminDashboard() {
   const router = useRouter();
@@ -186,6 +294,7 @@ export default function AdminDashboard() {
     quantity: number;
     cost: number;
     price: number;
+    trackingType: string;
   } | null>(null);
 
   const [productForm, setProductForm] = useState({
@@ -194,7 +303,218 @@ export default function AdminDashboard() {
     quantity: 0,
     cost: 0,
     price: 0,
+    trackingType: "NONE",
   });
+
+  // Lotes Modal State
+  const [activeLotItem, setActiveLotItem] = useState<InventoryItem | null>(null);
+  const [showLotModal, setShowLotModal] = useState(false);
+  const [lotList, setLotList] = useState<ItemLot[]>([]);
+  const [lotLoading, setLotLoading] = useState(false);
+  const [lotError, setLotError] = useState("");
+  const [lotSuccess, setLotSuccess] = useState("");
+  const [newLotForm, setNewLotForm] = useState({
+    lotNumber: "",
+    quantity: 0,
+    manufactureDate: "",
+    expirationDate: "",
+    notes: "",
+  });
+
+  // Serials Modal State
+  const [activeSerialItem, setActiveSerialItem] = useState<InventoryItem | null>(null);
+  const [showSerialModal, setShowSerialModal] = useState(false);
+  const [serialList, setSerialList] = useState<ItemSerial[]>([]);
+  const [serialLoading, setSerialLoading] = useState(false);
+  const [serialError, setSerialError] = useState("");
+  const [serialSuccess, setSerialSuccess] = useState("");
+  const [serialInputMode, setSerialInputMode] = useState<"single" | "bulk">("single");
+  const [singleSerialForm, setSingleSerialForm] = useState({
+    serialNumber: "",
+    status: "DISPONIBLE",
+    notes: "",
+  });
+  const [bulkSerialText, setBulkSerialText] = useState("");
+  const [serialFilterStatus, setSerialFilterStatus] = useState("TODOS");
+
+  const openLotManagementModal = async (item: InventoryItem) => {
+    setActiveLotItem(item);
+    setShowLotModal(true);
+    setLotLoading(true);
+    setLotError("");
+    setLotSuccess("");
+    try {
+      const res = await fetch(`/api/inventory/${item.id}/lots`);
+      const json = await res.json();
+      if (json.success && Array.isArray(json.data)) {
+        setLotList(json.data);
+      } else {
+        setLotList(item.lots || []);
+      }
+    } catch (err) {
+      console.error("Error loading lots:", err);
+      setLotList(item.lots || []);
+    } finally {
+      setLotLoading(false);
+    }
+  };
+
+  const handleCreateLot = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!activeLotItem || !newLotForm.lotNumber) return;
+    setLotLoading(true);
+    setLotError("");
+    setLotSuccess("");
+    try {
+      const res = await fetch(`/api/inventory/${activeLotItem.id}/lots`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newLotForm),
+      });
+      const json = await res.json();
+      if (json.success && json.data) {
+        setLotList((prev) => [...prev, json.data]);
+        const newTotalQty = lotList.reduce((acc, l) => acc + l.quantity, 0) + Number(newLotForm.quantity);
+        setInventory((prev) =>
+          prev.map((i) =>
+            i.id === activeLotItem.id
+              ? { ...i, quantity: newTotalQty, trackingType: "LOT" }
+              : i
+          )
+        );
+        setLotSuccess(`Lote ${newLotForm.lotNumber} agregado con éxito.`);
+        setNewLotForm({ lotNumber: "", quantity: 0, manufactureDate: "", expirationDate: "", notes: "" });
+      } else {
+        setLotError(json.error || "Error al agregar el lote");
+      }
+    } catch (err: any) {
+      setLotError(err.message || "Error al conectar con la API de lotes");
+    } finally {
+      setLotLoading(false);
+    }
+  };
+
+  const handleDeleteLot = async (lotId: string) => {
+    if (!activeLotItem) return;
+    try {
+      const res = await fetch(`/api/inventory/lots/${lotId}`, { method: "DELETE" });
+      const json = await res.json();
+      if (json.success) {
+        const updatedLots = lotList.filter((l) => l.id !== lotId);
+        setLotList(updatedLots);
+        const newTotalQty = updatedLots.reduce((acc, l) => acc + l.quantity, 0);
+        setInventory((prev) =>
+          prev.map((i) => (i.id === activeLotItem.id ? { ...i, quantity: newTotalQty } : i))
+        );
+      }
+    } catch (err) {
+      console.error("Error deleting lot:", err);
+    }
+  };
+
+  const openSerialManagementModal = async (item: InventoryItem) => {
+    setActiveSerialItem(item);
+    setShowSerialModal(true);
+    setSerialLoading(true);
+    setSerialError("");
+    setSerialSuccess("");
+    try {
+      const res = await fetch(`/api/inventory/${item.id}/serials`);
+      const json = await res.json();
+      if (json.success && Array.isArray(json.data)) {
+        setSerialList(json.data);
+      } else {
+        setSerialList(item.serials || []);
+      }
+    } catch (err) {
+      console.error("Error loading serials:", err);
+      setSerialList(item.serials || []);
+    } finally {
+      setSerialLoading(false);
+    }
+  };
+
+  const handleCreateSerial = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!activeSerialItem) return;
+    setSerialLoading(true);
+    setSerialError("");
+    setSerialSuccess("");
+    try {
+      const payload =
+        serialInputMode === "bulk"
+          ? { serialNumber: bulkSerialText }
+          : { ...singleSerialForm };
+
+      const res = await fetch(`/api/inventory/${activeSerialItem.id}/serials`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const json = await res.json();
+      if (json.success && Array.isArray(json.data)) {
+        setSerialList((prev) => [...prev, ...json.data]);
+        const allSerials = [...serialList, ...json.data];
+        const availCount = allSerials.filter((s) => s.status === "DISPONIBLE").length;
+        setInventory((prev) =>
+          prev.map((i) =>
+            i.id === activeSerialItem.id
+              ? { ...i, quantity: availCount, trackingType: "SERIAL" }
+              : i
+          )
+        );
+        setSerialSuccess(`Se agregaron ${json.addedCount || json.data.length} números de serie.`);
+        setSingleSerialForm({ serialNumber: "", status: "DISPONIBLE", notes: "" });
+        setBulkSerialText("");
+      } else {
+        setSerialError(json.error || "Error al agregar números de serie");
+      }
+    } catch (err: any) {
+      setSerialError(err.message || "Error al conectar con API de series");
+    } finally {
+      setSerialLoading(false);
+    }
+  };
+
+  const handleUpdateSerialStatus = async (serialId: string, newStatus: string) => {
+    if (!activeSerialItem) return;
+    try {
+      const res = await fetch(`/api/inventory/serials/${serialId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: newStatus }),
+      });
+      const json = await res.json();
+      if (json.success && json.data) {
+        const updatedList = serialList.map((s) => (s.id === serialId ? json.data : s));
+        setSerialList(updatedList);
+        const availCount = updatedList.filter((s) => s.status === "DISPONIBLE").length;
+        setInventory((prev) =>
+          prev.map((i) => (i.id === activeSerialItem.id ? { ...i, quantity: availCount } : i))
+        );
+      }
+    } catch (err) {
+      console.error("Error updating serial status:", err);
+    }
+  };
+
+  const handleDeleteSerial = async (serialId: string) => {
+    if (!activeSerialItem) return;
+    try {
+      const res = await fetch(`/api/inventory/serials/${serialId}`, { method: "DELETE" });
+      const json = await res.json();
+      if (json.success) {
+        const updatedList = serialList.filter((s) => s.id !== serialId);
+        setSerialList(updatedList);
+        const availCount = updatedList.filter((s) => s.status === "DISPONIBLE").length;
+        setInventory((prev) =>
+          prev.map((i) => (i.id === activeSerialItem.id ? { ...i, quantity: availCount } : i))
+        );
+      }
+    } catch (err) {
+      console.error("Error deleting serial:", err);
+    }
+  };
 
   const handleOpenEditProduct = (prod: any) => {
     setEditingProduct(prod);
@@ -204,6 +524,7 @@ export default function AdminDashboard() {
       quantity: prod.quantity,
       cost: prod.cost,
       price: prod.price,
+      trackingType: prod.trackingType || "NONE",
     });
     setModalError("");
     setModalSuccess("");
@@ -217,13 +538,21 @@ export default function AdminDashboard() {
     setModalError("");
     setModalSuccess("");
     try {
-      setInventory((prev) =>
-        prev.map((item) =>
-          item.id === editingProduct.id
-            ? { ...item, ...productForm }
-            : item
-        )
-      );
+      const res = await fetch(`/api/inventory/${editingProduct.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(productForm),
+      });
+      const json = await res.json();
+      if (json.success && json.data) {
+        setInventory((prev) =>
+          prev.map((item) => (item.id === editingProduct.id ? { ...item, ...json.data } : item))
+        );
+      } else {
+        setInventory((prev) =>
+          prev.map((item) => (item.id === editingProduct.id ? { ...item, ...productForm } : item))
+        );
+      }
       setModalSuccess("¡Producto de inventario actualizado correctamente!");
       setTimeout(() => {
         setActiveModal(null);
@@ -236,6 +565,7 @@ export default function AdminDashboard() {
       setModalLoading(false);
     }
   };
+
 
   const paymentFileInputRef = useRef<HTMLInputElement>(null);
 
@@ -387,8 +717,327 @@ export default function AdminDashboard() {
       setRecibirPagoLoading(false);
     }
   };
-  const [contabilidadOpen, setContabilidadOpen] = useState(true);
+  const [contabilidadOpen, setContabilidadOpen] = useState(false);
+  const [inventarioOpen, setInventarioOpen] = useState(false);
+
+  const [lotesFilter, setLotesFilter] = useState<"todos" | "vencidos" | "por-vencer" | "vigentes">("todos");
+  const [lotesSearch, setLotesSearch] = useState("");
+  const [seriesFilterView, setSeriesFilterView] = useState("TODOS");
+  const [seriesSearchView, setSeriesSearchView] = useState("");
+  // Credit & Debit Notes State
+  const [creditDebitNotes, setCreditDebitNotes] = useState<CreditDebitNote[]>([]);
+  const [selectedPrintNote, setSelectedPrintNote] = useState<CreditDebitNote | null>(null);
+  const [notasFilter, setNotasFilter] = useState<"TODAS" | "CREDITO" | "DEBITO" | "APLICADAS" | "ANULADAS">("TODAS");
+  const [notasSearch, setNotasSearch] = useState("");
+
+  // Vendedores & Comisiones State
+  const [salesReps, setSalesReps] = useState<SalesRep[]>([]);
+  const [commissionRecords, setCommissionRecords] = useState<CommissionRecord[]>([]);
+  const [vendedoresSearch, setVendedoresSearch] = useState("");
+  const [vendedoresFilter, setVendedoresFilter] = useState<"TODOS" | "ACTIVOS" | "INACTIVOS">("TODOS");
+  const [comisionesSearch, setComisionesSearch] = useState("");
+  const [comisionesStatusFilter, setComisionesStatusFilter] = useState<"TODOS" | "PENDIENTE" | "APROBADO" | "PAGADO">("TODOS");
+  const [showSalesRepDrawer, setShowSalesRepDrawer] = useState(false);
+  const [salesRepLoading, setSalesRepLoading] = useState(false);
+  const [salesRepError, setSalesRepError] = useState("");
+  const [salesRepSuccess, setSalesRepSuccess] = useState("");
+  const [editingRepId, setEditingRepId] = useState<string | null>(null);
+  const [salesRepForm, setSalesRepForm] = useState({
+    code: "",
+    name: "",
+    email: "",
+    phone: "",
+    zone: "San Pedro Sula / Zona Norte",
+    commissionRate: 5.0,
+    commissionType: "PERCENTAGE",
+    monthlyTarget: 50000.0,
+    status: "ACTIVO",
+    notes: "",
+  });
+
+  const [showCommissionModal, setShowCommissionModal] = useState(false);
+  const [commLoading, setCommLoading] = useState(false);
+  const [commError, setCommError] = useState("");
+  const [commSuccess, setCommSuccess] = useState("");
+  const [commissionForm, setCommissionForm] = useState({
+    salesRepId: "",
+    period: new Date().toISOString().slice(0, 7),
+    invoiceNumber: "",
+    customerName: "",
+    saleAmount: 0,
+    commissionRate: 5.0,
+    commissionAmount: 0,
+    status: "PENDIENTE",
+    notes: "",
+  });
+
+  // Purchase Invoices (Facturas de Compra & Entradas de Inventario) State
+  const [purchaseInvoices, setPurchaseInvoices] = useState<PurchaseInvoice[]>([]);
+  const [purchaseInvoicesSearch, setPurchaseInvoicesSearch] = useState("");
+  const [purchaseInvoicesFilter, setPurchaseInvoicesFilter] = useState<"TODAS" | "PENDIENTES" | "PAGADAS" | "INGRESADAS">("TODAS");
+  const [selectedDetailPurchaseInvoice, setSelectedDetailPurchaseInvoice] = useState<PurchaseInvoice | null>(null);
+
+  const [purchaseInvoiceLoading, setPurchaseInvoiceLoading] = useState(false);
+  const [purchaseInvoiceError, setPurchaseInvoiceError] = useState("");
+  const [purchaseInvoiceSuccess, setPurchaseInvoiceSuccess] = useState("");
+  const [purchaseInvoiceForm, setPurchaseInvoiceForm] = useState({
+    invoiceNumber: "",
+    purchaseOrderNumber: "",
+    vendorName: "",
+    issueDate: new Date().toISOString().split("T")[0],
+    dueDate: new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString().split("T")[0],
+    currency: "USD",
+    notes: "",
+    items: [] as { sku: string; description: string; quantity: number; unitCost: number; lotNumber: string }[],
+  });
+
+  // Vendor Returns (Devoluciones a Proveedores) State
+  type VendorReturnItem = {
+    id?: string;
+    sku: string;
+    description: string;
+    quantity: number;
+    unitCost: number;
+    totalCost: number;
+    lotNumber: string;
+    itemReason: string;
+  };
+  type VendorReturnRecord = {
+    id: string;
+    returnNumber: string;
+    vendorName: string;
+    vendorId?: string;
+    purchaseInvoiceNumber?: string;
+    returnDate: string;
+    reason: string;
+    status: string;
+    currency: string;
+    subtotal: number;
+    total: number;
+    notes?: string;
+    items: VendorReturnItem[];
+    createdAt?: string;
+  };
+  const [vendorReturns, setVendorReturns] = useState<VendorReturnRecord[]>([]);
+  const [vendorReturnsSearch, setVendorReturnsSearch] = useState("");
+  const [vendorReturnsFilter, setVendorReturnsFilter] = useState<"TODAS" | "BORRADOR" | "APROBADA" | "ENVIADA" | "COMPLETADA" | "ANULADA">("TODAS");
+  const [showVendorReturnDrawer, setShowVendorReturnDrawer] = useState(false);
+  const [editingVendorReturn, setEditingVendorReturn] = useState<VendorReturnRecord | null>(null);
+  const [vendorReturnLoading, setVendorReturnLoading] = useState(false);
+  const [vendorReturnError, setVendorReturnError] = useState("");
+  const [vendorReturnSuccess, setVendorReturnSuccess] = useState("");
+  const [vendorReturnDetailModal, setVendorReturnDetailModal] = useState<VendorReturnRecord | null>(null);
+
+  const defaultVendorReturnForm = {
+    returnNumber: "",
+    vendorId: "",
+    vendorName: "",
+    purchaseInvoiceNumber: "",
+    returnDate: new Date().toISOString().split("T")[0],
+    reason: "DEFECTO",
+    status: "BORRADOR",
+    currency: "USD",
+    notes: "",
+    items: [] as VendorReturnItem[],
+  };
+  const [vendorReturnForm, setVendorReturnForm] = useState(defaultVendorReturnForm);
+
+  const vendorReturnSubtotal = vendorReturnForm.items.reduce(
+    (sum, item) => sum + (item.quantity ?? 0) * (item.unitCost ?? 0),
+    0
+  );
+
+  const loadVendorReturns = async () => {
+    try {
+      const res = await fetch("/api/vendor-returns");
+      if (res.ok) setVendorReturns(await res.json());
+    } catch (e) {
+      console.error("Error loading vendor returns:", e);
+    }
+  };
+
+  const openNewVendorReturn = () => {
+    const nextNum = `DEV-${new Date().getFullYear()}-${String(vendorReturns.length + 1).padStart(3, "0")}`;
+    setVendorReturnForm({ ...defaultVendorReturnForm, returnNumber: nextNum });
+    setEditingVendorReturn(null);
+    setVendorReturnError("");
+    setVendorReturnSuccess("");
+    setShowVendorReturnDrawer(true);
+  };
+
+  const openEditVendorReturn = (vr: VendorReturnRecord) => {
+    setVendorReturnForm({
+      returnNumber: vr.returnNumber,
+      vendorId: vr.vendorId ?? "",
+      vendorName: vr.vendorName,
+      purchaseInvoiceNumber: vr.purchaseInvoiceNumber ?? "",
+      returnDate: vr.returnDate,
+      reason: vr.reason,
+      status: vr.status,
+      currency: vr.currency,
+      notes: vr.notes ?? "",
+      items: vr.items.map((i) => ({ ...i })),
+    });
+    setEditingVendorReturn(vr);
+    setVendorReturnError("");
+    setVendorReturnSuccess("");
+    setShowVendorReturnDrawer(true);
+  };
+
+  const handleSaveVendorReturn = async (approveOnSave = false) => {
+    if (!vendorReturnForm.vendorName.trim()) {
+      setVendorReturnError("El nombre del proveedor es obligatorio.");
+      return;
+    }
+    if (!vendorReturnForm.returnNumber.trim()) {
+      setVendorReturnError("El número de devolución es obligatorio.");
+      return;
+    }
+    if (vendorReturnForm.items.length === 0) {
+      setVendorReturnError("Debe agregar al menos un artículo.");
+      return;
+    }
+    setVendorReturnLoading(true);
+    setVendorReturnError("");
+    try {
+      const payload = {
+        ...vendorReturnForm,
+        status: approveOnSave ? "APROBADA" : vendorReturnForm.status,
+        subtotal: vendorReturnSubtotal,
+        total: vendorReturnSubtotal,
+        items: vendorReturnForm.items.map((item) => ({
+          ...item,
+          totalCost: (item.quantity ?? 0) * (item.unitCost ?? 0),
+        })),
+      };
+      const url = editingVendorReturn
+        ? `/api/vendor-returns/${editingVendorReturn.id}`
+        : "/api/vendor-returns";
+      const method = editingVendorReturn ? "PATCH" : "POST";
+      const res = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        setVendorReturnError(err.error ?? "Error al guardar.");
+        return;
+      }
+      setVendorReturnSuccess(approveOnSave ? "¡Devolución aprobada!" : "¡Devolución guardada!");
+      await loadVendorReturns();
+      setTimeout(() => {
+        setShowVendorReturnDrawer(false);
+        setVendorReturnSuccess("");
+      }, 1500);
+    } catch (e) {
+      setVendorReturnError("Error de conexión.");
+    } finally {
+      setVendorReturnLoading(false);
+    }
+  };
+
+  const handleVendorReturnStatusChange = async (vr: VendorReturnRecord, newStatus: string) => {
+    try {
+      const res = await fetch(`/api/vendor-returns/${vr.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: newStatus }),
+      });
+      if (res.ok) await loadVendorReturns();
+    } catch (e) {
+      console.error("Error updating vendor return status:", e);
+    }
+  };
+
+  const handleDeleteVendorReturn = async (vr: VendorReturnRecord) => {
+    if (!confirm(`¿Eliminar devolución ${vr.returnNumber}? Esta acción no se puede deshacer.`)) return;
+    try {
+      const res = await fetch(`/api/vendor-returns/${vr.id}`, { method: "DELETE" });
+      if (res.ok) await loadVendorReturns();
+      else {
+        const err = await res.json();
+        alert(err.error ?? "Error al eliminar.");
+      }
+    } catch (e) {
+      console.error("Error deleting vendor return:", e);
+    }
+  };
+
+  const addVendorReturnLine = () => {
+    setVendorReturnForm((prev) => ({
+      ...prev,
+      items: [
+        ...prev.items,
+        { sku: "", description: "", quantity: 1, unitCost: 0, totalCost: 0, lotNumber: "", itemReason: "" },
+      ],
+    }));
+  };
+
+  const updateVendorReturnLine = (idx: number, field: keyof VendorReturnItem, value: string | number) => {
+    setVendorReturnForm((prev) => {
+      const items = [...prev.items];
+      (items[idx] as any)[field] = value;
+      items[idx].totalCost = (items[idx].quantity ?? 0) * (items[idx].unitCost ?? 0);
+      return { ...prev, items };
+    });
+  };
+
+  const removeVendorReturnLine = (idx: number) => {
+    setVendorReturnForm((prev) => ({ ...prev, items: prev.items.filter((_, i) => i !== idx) }));
+  };
+
+  const fillVendorReturnLineFromInventory = (idx: number, invItem: { sku: string; name: string; unitCost?: number; cost?: number }) => {
+    setVendorReturnForm((prev) => {
+      const items = [...prev.items];
+      items[idx] = {
+        ...items[idx],
+        sku: invItem.sku,
+        description: invItem.name,
+        unitCost: invItem.unitCost ?? invItem.cost ?? 0,
+        totalCost: (items[idx].quantity ?? 1) * (invItem.unitCost ?? invItem.cost ?? 0),
+      };
+      return { ...prev, items };
+    });
+  };
+
+
+
+  const handlePrintNote = (note: CreditDebitNote) => {
+    setSelectedPrintNote(note);
+    setTimeout(() => {
+      window.print();
+    }, 100);
+  };
+
+
+
+  const [showNoteModal, setShowNoteModal] = useState(false);
+  const [noteLoading, setNoteLoading] = useState(false);
+  const [noteError, setNoteError] = useState("");
+  const [noteSuccess, setNoteSuccess] = useState("");
+  const [noteForm, setNoteForm] = useState({
+    noteNumber: "",
+    type: "CREDIT" as "CREDIT" | "DEBIT",
+    entityType: "CUSTOMER" as "CUSTOMER" | "VENDOR",
+    entityId: "",
+    entityName: "",
+    targetDocNum: "",
+    issueDate: new Date().toISOString().split("T")[0],
+    reason: "Devolución de Insumos / Mercadería Defectuosa",
+    amount: 0,
+    tax: 0,
+    total: 0,
+    currency: "USD",
+    status: "APLICADA",
+    notes: "",
+  });
+
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [showAccionesDropdown, setShowAccionesDropdown] = useState(false);
+  const accionesDropdownRef = useRef<HTMLDivElement>(null);
+
+
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [showPnL, setShowPnL] = useState(true);
@@ -399,9 +1048,12 @@ export default function AdminDashboard() {
     gastos: true,
   });
 
+
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [vendors, setVendors] = useState<Vendor[]>([]);
+
+
 
   // Plan de cuentas dedicated states
   const [accountsSearch, setAccountsSearch] = useState("");
@@ -539,7 +1191,60 @@ export default function AdminDashboard() {
         }
       })
       .catch((err) => console.error("Error loading company settings from DB:", err));
+
+    // 3. Load inventory items from database
+    fetch("/api/inventory")
+      .then((res) => res.json())
+      .then((res) => {
+        if (res.success && Array.isArray(res.data) && res.data.length > 0) {
+          setInventory(res.data);
+        }
+      })
+      .catch((err) => console.error("Error loading inventory items from DB:", err));
+
+    // 4. Load credit and debit notes from database
+    fetch("/api/credit-debit-notes")
+      .then((res) => res.json())
+      .then((res) => {
+        if (res.success && Array.isArray(res.data)) {
+          setCreditDebitNotes(res.data);
+        }
+      })
+      .catch((err) => console.error("Error loading credit debit notes from DB:", err));
+
+    // 5. Load sales reps from database
+    fetch("/api/sales-reps")
+      .then((res) => res.json())
+      .then((res) => {
+        if (res.success && Array.isArray(res.data)) {
+          setSalesReps(res.data);
+        }
+      })
+      .catch((err) => console.error("Error loading sales reps from DB:", err));
+
+    // 6. Load commissions from database
+    fetch("/api/commissions")
+      .then((res) => res.json())
+      .then((res) => {
+        if (res.success && Array.isArray(res.data)) {
+          setCommissionRecords(res.data);
+        }
+      })
+      .catch((err) => console.error("Error loading commissions from DB:", err));
+
+    // 7. Load purchase invoices from database
+    fetch("/api/purchase-invoices")
+      .then((res) => res.json())
+      .then((res) => {
+        if (res.success && Array.isArray(res.data)) {
+          setPurchaseInvoices(res.data);
+        }
+      })
+      .catch((err) => console.error("Error loading purchase invoices from DB:", err));
   }, []);
+
+
+
 
   const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -1245,15 +1950,15 @@ export default function AdminDashboard() {
 
   // Quick Actions Bar State & Config
   const quickActions = [
-    { id: "crear-producto", label: "Crear producto / servicio" },
-    { id: "crear-factura", label: "Crear factura" },
-    { id: "agregar-cliente", label: "Agregar cliente" },
-    { id: "registrar-pago", label: "Registrar pago" },
-    { id: "agregar-deposito", label: "Agregar depósito bancario" },
-    { id: "crear-orden-compra", label: "Crear orden de compra" },
-    { id: "agregar-proveedor", label: "Agregar proveedor" },
-    { id: "registrar-gasto", label: "Registrar gasto" },
-    { id: "pagar-facturas", label: "Pagar facturas" },
+    { id: "crear-factura", label: "Crear Factura de Venta" },
+    { id: "registrar-pago", label: "Registrar Cobro a Cliente" },
+    { id: "crear-factura-compra", label: "Registrar Factura de Compra" },
+    { id: "crear-orden-compra", label: "Crear Orden de Compra" },
+    { id: "crear-producto", label: "Crear Producto / Insumo" },
+    { id: "agregar-cliente", label: "Agregar Cliente" },
+    { id: "agregar-proveedor", label: "Agregar Proveedor" },
+    { id: "agregar-deposito", label: "Agregar Depósito Bancario" },
+    { id: "registrar-gasto", label: "Registrar Gasto" },
   ];
 
   const [activeModal, setActiveModal] = useState<string | null>(null);
@@ -1280,6 +1985,7 @@ export default function AdminDashboard() {
   });
 
   const handleQuickAction = (id: string) => {
+    setShowAccionesDropdown(false);
     setModalError("");
     setModalSuccess("");
     if (id === "crear-producto") {
@@ -1296,6 +2002,10 @@ export default function AdminDashboard() {
     }
     if (id === "registrar-pago") {
       openRecibirPagoView();
+      return;
+    }
+    if (id === "crear-factura-compra") {
+      openCreatePurchaseInvoice();
       return;
     }
     if (id === "crear-orden-compra") {
@@ -1320,6 +2030,7 @@ export default function AdminDashboard() {
     }
     setActiveModal(id);
   };
+
 
   const handleCreateCustomerDrawer = async (e?: React.FormEvent, createAnother = false) => {
     if (e) e.preventDefault();
@@ -1924,6 +2635,68 @@ export default function AdminDashboard() {
     }
   };
 
+  const openCreateNoteModal = () => {
+
+    setNoteError("");
+    setNoteSuccess("");
+    const isCredit = noteForm.type === "CREDIT";
+    const prefix = isCredit ? "NC" : "ND";
+    setNoteForm({
+      noteNumber: `${prefix}-2026-00${creditDebitNotes.length + 1}`,
+      type: "CREDIT",
+      entityType: "CUSTOMER",
+      entityId: "",
+      entityName: "",
+      targetDocNum: "",
+      issueDate: new Date().toISOString().split("T")[0],
+      reason: "Devolución de Insumos / Mercadería Defectuosa",
+      amount: 0,
+      tax: 0,
+      total: 0,
+      currency: "USD",
+      status: "APLICADA",
+      notes: "",
+    });
+    setShowNoteModal(true);
+  };
+
+  const handleSaveNote = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setNoteLoading(true);
+    setNoteError("");
+    setNoteSuccess("");
+
+    if (!noteForm.noteNumber || !noteForm.entityName || Number(noteForm.amount) <= 0) {
+      setNoteError("Por favor completa los campos requeridos y asegura un monto válido.");
+      setNoteLoading(false);
+      return;
+    }
+
+    try {
+      const res = await fetch("/api/credit-debit-notes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(noteForm),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setNoteSuccess(`¡${noteForm.type === "CREDIT" ? "Nota de Crédito" : "Nota de Débito"} ${noteForm.noteNumber} guardada correctamente!`);
+        await loadDashboardData();
+        setTimeout(() => {
+          setShowNoteModal(false);
+          setNoteSuccess("");
+        }, 1200);
+      } else {
+        setNoteError(data.error || "Error al registrar la nota.");
+      }
+    } catch (err: any) {
+      setNoteError(err.message || "Error al procesar la solicitud.");
+    } finally {
+      setNoteLoading(false);
+    }
+  };
+
+
   const handleToggleSelectBill = (id: string) => {
     if (selectedBillIds.includes(id)) {
       setSelectedBillIds((prev) => prev.filter((bId) => bId !== id));
@@ -2147,13 +2920,69 @@ export default function AdminDashboard() {
     }
   };
 
-  const [inventory, setInventory] = useState<InventoryItem[]>([]);
+  const defaultSampleInventory: InventoryItem[] = [
+    {
+      id: "prod-1",
+      sku: "SKU-104928",
+      description: "Tinta Flexográfica Violeta Búfalo 20L",
+      quantity: 150,
+      cost: 45.0,
+      price: 85.0,
+      trackingType: "LOT",
+      lots: [
+        {
+          id: "lot-1",
+          inventoryItemId: "prod-1",
+          lotNumber: "LOT-2026-08A",
+          quantity: 100,
+          manufactureDate: "2026-08-01",
+          expirationDate: "2027-08-01",
+          notes: "Lote de alta viscosidad",
+        },
+        {
+          id: "lot-2",
+          inventoryItemId: "prod-1",
+          lotNumber: "LOT-2026-05B",
+          quantity: 50,
+          manufactureDate: "2026-05-10",
+          expirationDate: "2026-10-10",
+          notes: "Lote por vencer en 30 días",
+        },
+      ],
+    },
+    {
+      id: "prod-2",
+      sku: "SKU-209412",
+      description: "Impresora Industrial de Etiquetas Zebra ZT411",
+      quantity: 3,
+      cost: 1200.0,
+      price: 1850.0,
+      trackingType: "SERIAL",
+      serials: [
+        { id: "ser-1", inventoryItemId: "prod-2", serialNumber: "SN-ZB-99401", status: "DISPONIBLE" },
+        { id: "ser-2", inventoryItemId: "prod-2", serialNumber: "SN-ZB-99402", status: "DISPONIBLE" },
+        { id: "ser-3", inventoryItemId: "prod-2", serialNumber: "SN-ZB-99403", status: "DISPONIBLE" },
+        { id: "ser-4", inventoryItemId: "prod-2", serialNumber: "SN-ZB-99398", status: "VENDIDO" },
+      ],
+    },
+    {
+      id: "prod-3",
+      sku: "SKU-301928",
+      description: "Caja de Cartón Corrugado Búfalo 40x30x30",
+      quantity: 2500,
+      cost: 0.85,
+      price: 2.10,
+      trackingType: "NONE",
+    },
+  ];
+
+  const [inventory, setInventory] = useState<InventoryItem[]>(defaultSampleInventory);
 
   // Fetch all live data from Next.js API routes
   const loadDashboardData = async () => {
     setLoading(true);
     try {
-      const [accRes, cusRes, venRes, invRes, bankRes, txRes, ruleRes] = await Promise.all([
+      const [accRes, cusRes, venRes, invRes, bankRes, txRes, ruleRes, noteRes] = await Promise.all([
         fetch("/api/accounts").then((r) => r.json()),
         fetch("/api/customers").then((r) => r.json()),
         fetch("/api/vendors").then((r) => r.json()),
@@ -2161,15 +2990,25 @@ export default function AdminDashboard() {
         fetch("/api/bank-accounts").then((r) => r.json()),
         fetch("/api/bank-transactions").then((r) => r.json()),
         fetch("/api/bank-rules").then((r) => r.json()),
+        fetch("/api/credit-debit-notes").then((r) => r.json()).catch(() => ({ success: false })),
       ]);
 
       if (accRes.success) setAccounts(accRes.data || []);
       if (cusRes.success) setCustomers(cusRes.data || []);
       if (venRes.success) setVendors(venRes.data || []);
-      if (invRes.success) setInventory(invRes.data || []);
+      if (invRes.success) {
+        if (Array.isArray(invRes.data) && invRes.data.length > 0) {
+          setInventory(invRes.data);
+        } else {
+          setInventory(defaultSampleInventory);
+        }
+      }
+
       if (bankRes.success) setConnectedBanks(bankRes.data || []);
       if (txRes.success) setBankTransactions(txRes.data || []);
       if (ruleRes.success) setAutomationRules(ruleRes.data || []);
+      if (noteRes && noteRes.success) setCreditDebitNotes(noteRes.data || []);
+
     } catch (err) {
       console.error("Error loading dashboard data:", err);
     } finally {
@@ -2241,6 +3080,8 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     loadDashboardData();
+    loadVendorReturns();
+
   }, []);
 
   const handleLogout = async () => {
@@ -2636,8 +3477,477 @@ export default function AdminDashboard() {
       i.description.toLowerCase().includes(search.toLowerCase())
   );
 
+  const filteredCreditDebitNotes = useMemo(() => {
+    return creditDebitNotes.filter((note) => {
+      const q = notasSearch.toLowerCase();
+      const matchesSearch =
+        !q ||
+        note.noteNumber.toLowerCase().includes(q) ||
+        note.entityName.toLowerCase().includes(q) ||
+        (note.targetDocNum && note.targetDocNum.toLowerCase().includes(q)) ||
+        note.reason.toLowerCase().includes(q);
+
+      const matchesFilter =
+        notasFilter === "TODAS" ||
+        (notasFilter === "CREDITO" && note.type === "CREDIT") ||
+        (notasFilter === "DEBITO" && note.type === "DEBIT") ||
+        (notasFilter === "APLICADAS" && note.status === "APLICADA") ||
+        (notasFilter === "ANULADAS" && note.status === "ANULADA");
+
+      return matchesSearch && matchesFilter;
+    });
+  }, [creditDebitNotes, notasSearch, notasFilter]);
+
+  const filteredSalesReps = useMemo(() => {
+
+    return salesReps.filter((r) => {
+      const q = vendedoresSearch.toLowerCase();
+      const matchesSearch =
+        !q ||
+        r.name.toLowerCase().includes(q) ||
+        r.code.toLowerCase().includes(q) ||
+        (r.zone && r.zone.toLowerCase().includes(q)) ||
+        (r.email && r.email.toLowerCase().includes(q));
+
+      const matchesFilter =
+        vendedoresFilter === "TODOS" ||
+        (vendedoresFilter === "ACTIVOS" && r.status === "ACTIVO") ||
+        (vendedoresFilter === "INACTIVOS" && r.status === "INACTIVO");
+
+      return matchesSearch && matchesFilter;
+    });
+  }, [salesReps, vendedoresSearch, vendedoresFilter]);
+
+  const filteredCommissions = useMemo(() => {
+    return commissionRecords.filter((c) => {
+      const q = comisionesSearch.toLowerCase();
+      const matchesSearch =
+        !q ||
+        c.salesRepName.toLowerCase().includes(q) ||
+        (c.invoiceNumber && c.invoiceNumber.toLowerCase().includes(q)) ||
+        (c.customerName && c.customerName.toLowerCase().includes(q));
+
+      const matchesStatus =
+        comisionesStatusFilter === "TODOS" || c.status === comisionesStatusFilter;
+
+      return matchesSearch && matchesStatus;
+    });
+  }, [commissionRecords, comisionesSearch, comisionesStatusFilter]);
+
+  const openCreateSalesRepModal = () => {
+    setEditingRepId(null);
+    setSalesRepError("");
+    setSalesRepSuccess("");
+    setSalesRepForm({
+      code: `VEND-00${salesReps.length + 1}`,
+      name: "",
+      email: "",
+      phone: "",
+      zone: "San Pedro Sula / Zona Norte",
+      commissionRate: 5.0,
+      commissionType: "PERCENTAGE",
+      monthlyTarget: 50000.0,
+      status: "ACTIVO",
+      notes: "",
+    });
+    setShowSalesRepDrawer(true);
+  };
+
+  const openEditSalesRepModal = (rep: SalesRep) => {
+    setEditingRepId(rep.id);
+    setSalesRepError("");
+    setSalesRepSuccess("");
+    setSalesRepForm({
+      code: rep.code,
+      name: rep.name,
+      email: rep.email || "",
+      phone: rep.phone || "",
+      zone: rep.zone || "San Pedro Sula / Zona Norte",
+      commissionRate: rep.commissionRate,
+      commissionType: rep.commissionType,
+      monthlyTarget: rep.monthlyTarget,
+      status: rep.status,
+      notes: rep.notes || "",
+    });
+    setShowSalesRepDrawer(true);
+  };
+
+  const handleSaveSalesRep = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSalesRepLoading(true);
+    setSalesRepError("");
+    setSalesRepSuccess("");
+
+    if (!salesRepForm.name || !salesRepForm.code) {
+      setSalesRepError("El nombre y código son obligatorios.");
+      setSalesRepLoading(false);
+      return;
+    }
+
+    try {
+      const url = editingRepId ? `/api/sales-reps/${editingRepId}` : "/api/sales-reps";
+      const method = editingRepId ? "PATCH" : "POST";
+
+      const res = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(salesRepForm),
+      });
+
+      const data = await res.json();
+      if (!data.success) {
+        throw new Error(data.error || "Error al guardar vendedor");
+      }
+
+      const repsRes = await fetch("/api/sales-reps").then((r) => r.json());
+      if (repsRes.success) setSalesReps(repsRes.data);
+
+      setSalesRepSuccess(editingRepId ? "Vendedor actualizado exitosamente." : "Vendedor registrado exitosamente.");
+      setTimeout(() => {
+        setShowSalesRepDrawer(false);
+      }, 1000);
+    } catch (err: any) {
+      setSalesRepError(err.message || "Ocurrió un error al guardar el vendedor");
+    } finally {
+      setSalesRepLoading(false);
+    }
+  };
+
+  const openCreateCommissionModal = () => {
+    setCommError("");
+    setCommSuccess("");
+    const defaultRep = salesReps[0];
+    setCommissionForm({
+      salesRepId: defaultRep ? defaultRep.id : "",
+      period: new Date().toISOString().slice(0, 7),
+      invoiceNumber: "",
+      customerName: "",
+      saleAmount: 0,
+      commissionRate: defaultRep ? defaultRep.commissionRate : 5.0,
+      commissionAmount: 0,
+      status: "PENDIENTE",
+      notes: "",
+    });
+    setShowCommissionModal(true);
+  };
+
+  const handleSaveCommission = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setCommLoading(true);
+    setCommError("");
+    setCommSuccess("");
+
+    if (!commissionForm.salesRepId || Number(commissionForm.saleAmount) <= 0) {
+      setCommError("Seleccione un vendedor y especifique el monto de la venta.");
+      setCommLoading(false);
+      return;
+    }
+
+    try {
+      const res = await fetch("/api/commissions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(commissionForm),
+      });
+
+      const data = await res.json();
+      if (!data.success) {
+        throw new Error(data.error || "Error al registrar comisión");
+      }
+
+      const commsRes = await fetch("/api/commissions").then((r) => r.json());
+      if (commsRes.success) setCommissionRecords(commsRes.data);
+
+      setCommSuccess("Comisión registrada exitosamente.");
+      setTimeout(() => {
+        setShowCommissionModal(false);
+      }, 1000);
+    } catch (err: any) {
+      setCommError(err.message || "Ocurrió un error al guardar la comisión");
+    } finally {
+      setCommLoading(false);
+    }
+  };
+
+  const handleUpdateCommissionStatus = async (id: string, newStatus: string) => {
+    try {
+      const res = await fetch("/api/commissions", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, status: newStatus }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setCommissionRecords((prev) =>
+          prev.map((c) => (c.id === id ? { ...c, status: newStatus } : c))
+        );
+      }
+    } catch (err) {
+      console.error("Error updating commission status:", err);
+    }
+  };
+
+  const filteredPurchaseInvoices = useMemo(() => {
+    return purchaseInvoices.filter((inv) => {
+      const q = purchaseInvoicesSearch.toLowerCase();
+      const matchesSearch =
+        !q ||
+        inv.invoiceNumber.toLowerCase().includes(q) ||
+        inv.vendorName.toLowerCase().includes(q) ||
+        (inv.purchaseOrderNumber && inv.purchaseOrderNumber.toLowerCase().includes(q));
+
+      const matchesFilter =
+        purchaseInvoicesFilter === "TODAS" ||
+        (purchaseInvoicesFilter === "PENDIENTES" && inv.paymentStatus === "PENDIENTE") ||
+        (purchaseInvoicesFilter === "PAGADAS" && inv.paymentStatus === "PAGADA") ||
+        (purchaseInvoicesFilter === "INGRESADAS" && inv.inventoryStatus === "INGRESADO");
+
+      return matchesSearch && matchesFilter;
+    });
+  }, [purchaseInvoices, purchaseInvoicesSearch, purchaseInvoicesFilter]);
+
+  const openCreatePurchaseInvoice = () => {
+    setPurchaseInvoiceError("");
+    setPurchaseInvoiceSuccess("");
+    setPurchaseInvoiceForm({
+      invoiceNumber: `FPROV-2026-${Math.floor(100 + Math.random() * 900)}`,
+      purchaseOrderNumber: "OC-2026-012",
+      vendorName: vendors[0]?.name || "Sun Chemical Ink Corporation",
+      issueDate: new Date().toISOString().split("T")[0],
+      dueDate: new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString().split("T")[0],
+      currency: "USD",
+      notes: "",
+      items: [
+        {
+          sku: inventory[0]?.sku || "TIN-FLEX-001",
+          description: inventory[0]?.description || "Tinta Flexográfica Cyan Pro",
+          quantity: 5,
+          unitCost: inventory[0]?.cost || 120.0,
+          lotNumber: `LOT-${new Date().toISOString().slice(0, 7)}-01`,
+        },
+      ],
+    });
+    setCurrentView("factura-compra-editor");
+  };
+
+  const handleSavePurchaseInvoice = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPurchaseInvoiceLoading(true);
+    setPurchaseInvoiceError("");
+    setPurchaseInvoiceSuccess("");
+
+    if (!purchaseInvoiceForm.invoiceNumber || !purchaseInvoiceForm.vendorName) {
+      setPurchaseInvoiceError("Ingrese el N° de factura de proveedor y el proveedor.");
+      setPurchaseInvoiceLoading(false);
+      return;
+    }
+
+    if (purchaseInvoiceForm.items.length === 0) {
+      setPurchaseInvoiceError("Agregue al menos un insumo/producto para ingresar al inventario.");
+      setPurchaseInvoiceLoading(false);
+      return;
+    }
+
+    try {
+      const res = await fetch("/api/purchase-invoices", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(purchaseInvoiceForm),
+      });
+
+      const data = await res.json();
+      if (!data.success) {
+        throw new Error(data.error || "Error al registrar factura de compra");
+      }
+
+      const [invRes, itemsRes] = await Promise.all([
+        fetch("/api/purchase-invoices").then((r) => r.json()),
+        fetch("/api/inventory").then((r) => r.json()),
+      ]);
+
+      if (invRes.success) setPurchaseInvoices(invRes.data);
+      if (itemsRes.success && Array.isArray(itemsRes.data)) setInventory(itemsRes.data);
+
+      setPurchaseInvoiceSuccess("Factura de Compra e Ingreso a Inventario registrado exitosamente.");
+      setTimeout(() => {
+        setCurrentView("factura-compra-lista");
+      }, 1200);
+    } catch (err: any) {
+      setPurchaseInvoiceError(err.message || "Ocurrió un error al guardar la factura de compra");
+    } finally {
+      setPurchaseInvoiceLoading(false);
+    }
+  };
+
+  const handleUpdatePurchaseInvoiceStatus = async (id: string, newStatus: string) => {
+    try {
+      const res = await fetch(`/api/purchase-invoices/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ paymentStatus: newStatus }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setPurchaseInvoices((prev) =>
+          prev.map((pi) => (pi.id === id ? { ...pi, paymentStatus: newStatus } : pi))
+        );
+      }
+    } catch (err) {
+      console.error("Error updating purchase invoice status:", err);
+    }
+  };
+
+  const allLots = useMemo(() => {
+
+    const list: {
+      lot: ItemLot;
+      item: InventoryItem;
+      daysLeft: number | null;
+      status: "vencido" | "por-vencer" | "vigente" | "sin-fecha";
+    }[] = [];
+
+    inventory.forEach((item) => {
+      if (item.lots && item.lots.length > 0) {
+        item.lots.forEach((lot) => {
+          const expDate = lot.expirationDate ? new Date(lot.expirationDate) : null;
+          const today = new Date();
+          const daysLeft = expDate ? Math.ceil((expDate.getTime() - today.getTime()) / (1000 * 3600 * 24)) : null;
+
+          let status: "vencido" | "por-vencer" | "vigente" | "sin-fecha" = "sin-fecha";
+          if (daysLeft !== null) {
+            if (daysLeft < 0) status = "vencido";
+            else if (daysLeft <= 30) status = "por-vencer";
+            else status = "vigente";
+          }
+
+          list.push({ lot, item, daysLeft, status });
+        });
+      }
+    });
+
+    return list;
+  }, [inventory]);
+
+  const filteredAllLots = useMemo(() => {
+    return allLots.filter((entry) => {
+      const q = lotesSearch.toLowerCase();
+      const matchesSearch =
+        !q ||
+        entry.lot.lotNumber.toLowerCase().includes(q) ||
+        entry.item.sku.toLowerCase().includes(q) ||
+        entry.item.description.toLowerCase().includes(q);
+
+      const matchesFilter =
+        lotesFilter === "todos" ||
+        (lotesFilter === "vencidos" && entry.status === "vencido") ||
+        (lotesFilter === "por-vencer" && entry.status === "por-vencer") ||
+        (lotesFilter === "vigentes" && entry.status === "vigente");
+
+      return matchesSearch && matchesFilter;
+    });
+  }, [allLots, lotesSearch, lotesFilter]);
+
+  const allSerials = useMemo(() => {
+    const list: {
+      serial: ItemSerial;
+      item: InventoryItem;
+    }[] = [];
+
+    inventory.forEach((item) => {
+      if (item.serials && item.serials.length > 0) {
+        item.serials.forEach((serial) => {
+          list.push({ serial, item });
+        });
+      }
+    });
+
+    return list;
+  }, [inventory]);
+
+  const filteredAllSerials = useMemo(() => {
+    return allSerials.filter((entry) => {
+      const q = seriesSearchView.toLowerCase();
+      const matchesSearch =
+        !q ||
+        entry.serial.serialNumber.toLowerCase().includes(q) ||
+        entry.item.sku.toLowerCase().includes(q) ||
+        entry.item.description.toLowerCase().includes(q);
+
+      const matchesFilter =
+        seriesFilterView === "TODOS" || entry.serial.status === seriesFilterView;
+
+      return matchesSearch && matchesFilter;
+    });
+  }, [allSerials, seriesSearchView, seriesFilterView]);
+
+  // Global click-outside handler: closes ALL open dropdowns when clicking outside them
+  useEffect(() => {
+    const anyOpen =
+      showAccionesDropdown ||
+      showRecibirPagoSaveDropdown ||
+      showInvoiceSaveDropdown ||
+      showInvoiceSendDropdown ||
+      showProductSaveDropdown ||
+      showCustomerSaveDropdown ||
+      showVendorSaveDropdown ||
+      showPOSaveDropdown ||
+      showPOPrintDropdown ||
+      showPOSendDropdown ||
+      showDepositSaveDropdown ||
+      showGastoSaveDropdown ||
+      showPagarProveedorSaveDropdown ||
+      showSaveDropdown;
+
+    if (!anyOpen) return;
+
+    const handleGlobalClick = (e: MouseEvent) => {
+      // Close Acciones if click is outside its ref'd container
+      if (accionesDropdownRef.current && !accionesDropdownRef.current.contains(e.target as Node)) {
+        setShowAccionesDropdown(false);
+      }
+      // For split-button dropdowns: close when clicking outside any [data-dropdown] wrapper
+      const target = e.target as HTMLElement;
+      if (!target.closest("[data-dropdown]")) {
+        setShowRecibirPagoSaveDropdown(false);
+        setShowInvoiceSaveDropdown(false);
+        setShowInvoiceSendDropdown(false);
+        setShowProductSaveDropdown(false);
+        setShowCustomerSaveDropdown(false);
+        setShowVendorSaveDropdown(false);
+        setShowPOSaveDropdown(false);
+        setShowPOPrintDropdown(false);
+        setShowPOSendDropdown(false);
+        setShowDepositSaveDropdown(false);
+        setShowGastoSaveDropdown(false);
+        setShowPagarProveedorSaveDropdown(false);
+        setShowSaveDropdown(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleGlobalClick);
+    return () => document.removeEventListener("mousedown", handleGlobalClick);
+  }, [
+    showAccionesDropdown,
+    showRecibirPagoSaveDropdown,
+    showInvoiceSaveDropdown,
+    showInvoiceSendDropdown,
+    showProductSaveDropdown,
+    showCustomerSaveDropdown,
+    showVendorSaveDropdown,
+    showPOSaveDropdown,
+    showPOPrintDropdown,
+    showPOSendDropdown,
+    showDepositSaveDropdown,
+    showGastoSaveDropdown,
+    showPagarProveedorSaveDropdown,
+    showSaveDropdown,
+  ]);
+
   return (
+
     <div className="min-h-screen bg-slate-50 text-slate-900 flex font-sans antialiased">
+
+
       {/* ===================== SIDEBAR ===================== */}
       <aside
         className={`${
@@ -2790,6 +4100,49 @@ export default function AdminDashboard() {
             {!sidebarCollapsed && <span>Facturas</span>}
           </button>
 
+          {/* Notas de Crédito & Débito */}
+          <button
+            onClick={() => setCurrentView("notas-credito-debito")}
+            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition cursor-pointer ${
+              currentView === "notas-credito-debito"
+                ? "bg-[#fff7ed] text-[#f6821f] font-semibold shadow-xs"
+                : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+            }`}
+          >
+            <FileText className="w-4 h-4 shrink-0 text-slate-600" />
+            {!sidebarCollapsed && <span>Notas Crédito / Débito</span>}
+          </button>
+
+          {/* Vendedores */}
+          <button
+            onClick={() => setCurrentView("vendedores")}
+            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition cursor-pointer ${
+              currentView === "vendedores"
+                ? "bg-[#fff7ed] text-[#f6821f] font-semibold shadow-xs"
+                : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+            }`}
+          >
+            <Users className="w-4 h-4 shrink-0 text-slate-600" />
+            {!sidebarCollapsed && <span>Vendedores ({salesReps.length})</span>}
+          </button>
+
+          {/* Comisiones */}
+          <button
+            onClick={() => setCurrentView("comisiones")}
+            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition cursor-pointer ${
+              currentView === "comisiones"
+                ? "bg-[#fff7ed] text-[#f6821f] font-semibold shadow-xs"
+                : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+            }`}
+          >
+            <svg className="w-4 h-4 shrink-0 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            {!sidebarCollapsed && <span>Esquema de Comisiones</span>}
+          </button>
+
+
+
           {/* Proveedores */}
           <button
             onClick={() => setCurrentView("proveedores")}
@@ -2820,51 +4173,108 @@ export default function AdminDashboard() {
             {!sidebarCollapsed && <span>Órdenes de compra</span>}
           </button>
 
-          {/* Inventario */}
+          {/* Facturas de compra (Entradas de Inventario) */}
           <button
-            onClick={() => setCurrentView("inventario")}
+            onClick={() => setCurrentView("factura-compra-lista")}
             className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition cursor-pointer ${
-              currentView === "inventario"
+              currentView === "factura-compra-lista" || currentView === "factura-compra-editor"
                 ? "bg-[#fff7ed] text-[#f6821f] font-semibold shadow-xs"
                 : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
             }`}
           >
-            <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-            </svg>
-            {!sidebarCollapsed && <span>Inventario ({inventory.length})</span>}
+            <FileText className="w-4 h-4 shrink-0 text-slate-600" />
+            {!sidebarCollapsed && <span>Facturas de compra</span>}
           </button>
 
-          {/* Reportes */}
+          {/* Devoluciones a Proveedores */}
           <button
-            onClick={() => setCurrentView("reportes")}
+            onClick={() => { setCurrentView("devoluciones-proveedor"); loadVendorReturns(); }}
             className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition cursor-pointer ${
-              currentView === "reportes"
+              currentView === "devoluciones-proveedor"
                 ? "bg-[#fff7ed] text-[#f6821f] font-semibold shadow-xs"
                 : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
             }`}
           >
             <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
             </svg>
-            {!sidebarCollapsed && <span>Reportes</span>}
+            {!sidebarCollapsed && (
+              <span className="flex items-center gap-1.5">
+                Devoluciones a Prov.
+                {vendorReturns.filter((r) => r.status === "BORRADOR").length > 0 && (
+                  <span className="bg-amber-100 text-amber-800 text-[10px] font-bold px-1.5 rounded-full">
+                    {vendorReturns.filter((r) => r.status === "BORRADOR").length}
+                  </span>
+                )}
+              </span>
+            )}
           </button>
 
-          {/* Configuración */}
-          <button
-            onClick={() => setCurrentView("configuracion")}
-            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition cursor-pointer ${
-              currentView === "configuracion"
-                ? "bg-[#fff7ed] text-[#f6821f] font-semibold shadow-xs"
-                : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
-            }`}
-          >
-            <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-            </svg>
-            {!sidebarCollapsed && <span>Configuración</span>}
-          </button>
+
+          {/* Inventario Collapsible Group */}
+          <div className="pt-1">
+            <button
+              onClick={() => setInventarioOpen(!inventarioOpen)}
+              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl transition cursor-pointer text-slate-700 hover:bg-slate-100 ${
+                currentView === "inventario" || currentView === "lotes" || currentView === "series"
+                  ? "font-semibold text-slate-900"
+                  : ""
+              }`}
+            >
+              <div className="flex items-center gap-3 truncate">
+                <Package className="w-4 h-4 shrink-0 text-slate-600" />
+                {!sidebarCollapsed && <span>Inventario ({inventory.length})</span>}
+              </div>
+              {!sidebarCollapsed && (
+                <svg className={`w-3.5 h-3.5 text-slate-400 transition-transform ${inventarioOpen ? "rotate-180" : "rotate-0"}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                </svg>
+              )}
+            </button>
+
+            {inventarioOpen && !sidebarCollapsed && (
+              <div className="ml-7 mt-1 pl-2 border-l border-slate-200 space-y-1 text-xs">
+                <button
+                  onClick={() => setCurrentView("inventario")}
+                  className={`w-full text-left px-2.5 py-1.5 rounded-lg transition cursor-pointer ${
+                    currentView === "inventario"
+                      ? "bg-[#fff7ed] text-[#f6821f] font-semibold"
+                      : "text-slate-500 hover:text-slate-900 hover:bg-slate-50"
+                  }`}
+                >
+                  <span>Catálogo de Productos</span>
+                </button>
+                <button
+                  onClick={() => setCurrentView("lotes")}
+                  className={`w-full text-left px-2.5 py-1.5 rounded-lg transition cursor-pointer flex items-center justify-between ${
+                    currentView === "lotes"
+                      ? "bg-[#fff7ed] text-[#f6821f] font-semibold"
+                      : "text-slate-500 hover:text-slate-900 hover:bg-slate-50"
+                  }`}
+                >
+                  <span>Control de Lotes</span>
+                  <span className="bg-amber-100 text-amber-800 text-[10px] font-bold px-1.5 py-0.2 rounded-full">
+                    {allLots.length}
+                  </span>
+                </button>
+                <button
+                  onClick={() => setCurrentView("series")}
+                  className={`w-full text-left px-2.5 py-1.5 rounded-lg transition cursor-pointer flex items-center justify-between ${
+                    currentView === "series"
+                      ? "bg-[#fff7ed] text-[#f6821f] font-semibold"
+                      : "text-slate-500 hover:text-slate-900 hover:bg-slate-50"
+                  }`}
+                >
+                  <span>Números de Serie</span>
+                  <span className="bg-purple-100 text-purple-800 text-[10px] font-bold px-1.5 py-0.2 rounded-full">
+                    {allSerials.length}
+                  </span>
+                </button>
+              </div>
+            )}
+          </div>
+
+
         </nav>
 
         {/* Footer / User Profile */}
@@ -2921,7 +4331,11 @@ export default function AdminDashboard() {
                   {currentView === "lista-facturas" && "Gestión de Facturas"}
                   {currentView === "proveedores" && "Directorio de Proveedores"}
                   {currentView === "lista-ordenes-compra" && "Gestión de Órdenes de Compra"}
+                  {currentView === "factura-compra-lista" && "Facturas de Compra & Entradas"}
+                  {currentView === "vendedores" && "Fuerza de Ventas"}
+                  {currentView === "comisiones" && "Control de Comisiones"}
                   {currentView === "inventario" && "Control Maestro de Inventario"}
+                  {currentView === "reportes" && "Centro de Reportes"}
                   {currentView === "configuracion" && "Configuración del Sistema"}
                 </span>
                 <span className="px-2 py-0.5 text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full flex items-center gap-1">
@@ -2933,8 +4347,8 @@ export default function AdminDashboard() {
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
-            <div className="relative w-64 hidden sm:block">
+          <div className="flex items-center gap-2.5">
+            <div className="relative w-56 hidden md:block">
               <input
                 type="text"
                 placeholder="Buscar registros..."
@@ -2942,20 +4356,91 @@ export default function AdminDashboard() {
                 onChange={(e) => setSearch(e.target.value)}
                 className="w-full pl-9 pr-4 py-1.5 text-xs rounded-xl bg-slate-50 border border-slate-200 text-slate-900 placeholder-slate-400 focus:outline-none focus:border-[#f6821f] focus:ring-2 focus:ring-[#f6821f]/20 shadow-xs"
               />
-              <svg className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
               </svg>
             </div>
 
+            {/* Sync Button */}
             <button
               onClick={loadDashboardData}
               title="Sincronizar datos"
-              className="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 transition cursor-pointer text-xs font-medium flex items-center gap-1.5 shadow-xs"
+              className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 transition cursor-pointer text-xs font-medium flex items-center gap-1.5 shadow-xs"
             >
               <svg className={`w-3.5 h-3.5 text-[#f6821f] ${loading ? "animate-spin" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
               </svg>
               <span>Sync</span>
+            </button>
+
+            {/* Acciones Dropdown Button (Al lado derecho de Sync) */}
+            <div className="relative" ref={accionesDropdownRef}>
+              <button
+                type="button"
+                onClick={() => setShowAccionesDropdown(!showAccionesDropdown)}
+                className="px-3.5 py-1.5 rounded-xl bg-[#f6821f] hover:bg-[#e07216] text-white font-bold text-xs transition cursor-pointer flex items-center gap-1.5 shadow-md shadow-[#f6821f]/20"
+              >
+                <span>Acciones</span>
+                <svg
+                  className={`w-3.5 h-3.5 transition-transform duration-150 ${showAccionesDropdown ? "rotate-180" : ""}`}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+
+              {/* Acciones Dropdown Menu */}
+              {showAccionesDropdown && (
+                <div className="absolute right-0 top-full mt-2 w-64 bg-white border border-slate-200 rounded-2xl shadow-xl z-50 p-2 text-xs space-y-0.5">
+                  <div className="px-3 py-1.5 font-bold text-[10px] uppercase tracking-wider text-slate-400 border-b border-slate-100 mb-1">
+                    Acciones Rápidas
+                  </div>
+                  {quickActions.map((action) => (
+                    <button
+                      key={action.id}
+                      type="button"
+                      onClick={() => handleQuickAction(action.id)}
+                      className="w-full text-left px-3 py-2 rounded-xl text-slate-700 hover:bg-[#fff7ed] hover:text-[#f6821f] font-semibold transition cursor-pointer flex items-center justify-between group"
+                    >
+                      <span>{action.label}</span>
+                      <span className="text-[#f6821f] font-bold text-sm group-hover:scale-110 transition-transform">+</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Reportes Button */}
+            <button
+              onClick={() => setCurrentView("reportes")}
+              title="Centro de Reportes"
+              className={`px-3 py-1.5 rounded-xl border transition cursor-pointer text-xs font-semibold flex items-center gap-1.5 shadow-xs ${
+                currentView === "reportes"
+                  ? "bg-[#fff7ed] text-[#f6821f] border-[#f6821f]/40"
+                  : "bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200"
+              }`}
+            >
+              <FileText className="w-3.5 h-3.5 text-slate-600" />
+              <span>Reportes</span>
+            </button>
+
+            {/* Configuración Button */}
+            <button
+              onClick={() => setCurrentView("configuracion")}
+              title="Configuración del Sistema"
+              className={`px-3 py-1.5 rounded-xl border transition cursor-pointer text-xs font-semibold flex items-center gap-1.5 shadow-xs ${
+                currentView === "configuracion"
+                  ? "bg-[#fff7ed] text-[#f6821f] border-[#f6821f]/40"
+                  : "bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200"
+              }`}
+            >
+              <svg className="w-3.5 h-3.5 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+              <span>Configuración</span>
             </button>
           </div>
         </header>
@@ -2965,27 +4450,6 @@ export default function AdminDashboard() {
           {/* ================= VIEW: DASHBOARD ================= */}
           {currentView === "dashboard" && (
             <>
-              {/* Quick Actions Bar (Acciones) */}
-              <div className="bg-white border border-slate-200/90 rounded-2xl p-3.5 shadow-xs w-full">
-                <div className="flex items-center gap-3 overflow-x-auto no-scrollbar py-0.5">
-                  <span className="font-bold text-slate-800 text-xs shrink-0 tracking-tight flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full bg-[#f6821f]"></span>
-                    Acciones
-                  </span>
-                  <div className="h-4 w-px bg-slate-200 shrink-0"></div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    {quickActions.map((action) => (
-                      <button
-                        key={action.id}
-                        onClick={() => handleQuickAction(action.id)}
-                        className="px-3.5 py-1.5 rounded-full border border-slate-200 hover:border-[#f6821f] text-slate-700 hover:text-[#f6821f] hover:bg-[#fff7ed]/50 text-xs font-medium transition cursor-pointer shadow-2xs whitespace-nowrap bg-white"
-                      >
-                        {action.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
 
               {/* Metric Cards Row */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 max-w-6xl">
@@ -4749,6 +6213,7 @@ export default function AdminDashboard() {
                       <tr>
                         <th className="p-3.5">SKU</th>
                         <th className="p-3.5">Descripción del Artículo</th>
+                        <th className="p-3.5">Rastreo</th>
                         <th className="p-3.5 text-right">Existencias</th>
                         <th className="p-3.5 text-right">Costo Unitario</th>
                         <th className="p-3.5 text-right">Precio de Venta</th>
@@ -4782,6 +6247,38 @@ export default function AdminDashboard() {
                               {item.description}
                             </button>
                           </td>
+                          <td className="p-3.5">
+                            {item.trackingType === "LOT" ? (
+                              <button
+                                type="button"
+                                onClick={() => openLotManagementModal(item)}
+                                className="px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200 font-semibold text-[11px] hover:bg-amber-100 transition cursor-pointer flex items-center gap-1.5 w-fit"
+                              >
+                                <Package className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                                <span>Por Lote</span>
+                                <span className="bg-amber-200 text-amber-900 px-1.5 py-0.2 text-[10px] rounded-full font-bold">
+                                  {item.lots?.length || 0}
+                                </span>
+                              </button>
+                            ) : item.trackingType === "SERIAL" ? (
+                              <button
+                                type="button"
+                                onClick={() => openSerialManagementModal(item)}
+                                className="px-2.5 py-1 rounded-full bg-purple-50 text-purple-700 border border-purple-200 font-semibold text-[11px] hover:bg-purple-100 transition cursor-pointer flex items-center gap-1.5 w-fit"
+                              >
+                                <Tag className="w-3.5 h-3.5 text-purple-600 shrink-0" />
+                                <span>Por N.º Serie</span>
+                                <span className="bg-purple-200 text-purple-900 px-1.5 py-0.2 text-[10px] rounded-full font-bold">
+                                  {item.serials?.length || 0}
+                                </span>
+                              </button>
+
+                            ) : (
+                              <span className="px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-500 font-medium text-[11px]">
+                                Sin rastreo
+                              </span>
+                            )}
+                          </td>
                           <td className="p-3.5 text-right font-mono font-medium">{item.quantity}</td>
                           <td className="p-3.5 text-right font-mono font-medium">{formatCurrency(item.cost)}</td>
                           <td className="p-3.5 text-right font-mono font-medium">{formatCurrency(item.price)}</td>
@@ -4789,23 +6286,45 @@ export default function AdminDashboard() {
                             {formatCurrency(item.quantity * item.cost)}
                           </td>
                           <td className="p-3.5 text-right font-sans">
-                            <button
-                              type="button"
-                              onClick={() => handleOpenEditProduct(item)}
-                              className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-[#fff7ed] hover:text-[#f6821f] text-slate-700 font-semibold cursor-pointer transition text-[11px] inline-flex items-center gap-1 border border-slate-200"
-                              title="Haz clic para editar producto"
-                            >
-                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                              </svg>
-                              <span>Editar</span>
-                            </button>
+                            <div className="flex items-center justify-end gap-1.5">
+                              {item.trackingType === "LOT" ? (
+                                <button
+                                  type="button"
+                                  onClick={() => openLotManagementModal(item)}
+                                  className="px-2.5 py-1 rounded-lg bg-amber-500 hover:bg-amber-600 text-white font-semibold cursor-pointer transition text-[11px] inline-flex items-center gap-1 shadow-xs"
+                                  title="Gestionar Lotes y Vencimientos"
+                                >
+                                  <span>Lotes</span>
+                                </button>
+                              ) : item.trackingType === "SERIAL" ? (
+                                <button
+                                  type="button"
+                                  onClick={() => openSerialManagementModal(item)}
+                                  className="px-2.5 py-1 rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-semibold cursor-pointer transition text-[11px] inline-flex items-center gap-1 shadow-xs"
+                                  title="Gestionar Números de Serie"
+                                >
+                                  <span>Series</span>
+                                </button>
+                              ) : null}
+
+                              <button
+                                type="button"
+                                onClick={() => handleOpenEditProduct(item)}
+                                className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-[#fff7ed] hover:text-[#f6821f] text-slate-700 font-semibold cursor-pointer transition text-[11px] inline-flex items-center gap-1 border border-slate-200"
+                                title="Haz clic para editar producto"
+                              >
+                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                </svg>
+                                <span>Editar</span>
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       ))}
                       {filteredInventory.length === 0 && (
                         <tr>
-                          <td colSpan={6} className="p-8 text-center text-slate-400">No se encontraron artículos en inventario</td>
+                          <td colSpan={8} className="p-8 text-center text-slate-400">No se encontraron artículos en inventario</td>
                         </tr>
                       )}
                     </tbody>
@@ -4815,8 +6334,1266 @@ export default function AdminDashboard() {
             </div>
           )}
 
+          {/* ================= VIEW: CONTROL DE LOTES Y VENCIMIENTOS ================= */}
+          {currentView === "lotes" && (
+            <div className="space-y-5">
+              {/* Header Action Bar */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <button
+                  type="button"
+                  onClick={() => setCurrentView("inventario")}
+                  className="text-xs font-semibold text-slate-600 hover:text-slate-900 transition flex items-center gap-1.5 cursor-pointer w-fit"
+                >
+                  <svg className="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
+                  </svg>
+                  <span>Regresar a Catálogo</span>
+                </button>
+
+                <div className="flex items-center gap-3 self-end sm:self-auto">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      alert("Generando reporte de lotes y vencimientos...");
+                      window.print();
+                    }}
+                    className="px-4 py-2 rounded-full border border-[#f6821f] text-[#f6821f] hover:bg-[#fff7ed] text-xs font-semibold transition cursor-pointer shadow-xs flex items-center gap-1.5"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    <span>Exportar Reporte FEFO</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Title & Description */}
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white border border-slate-200 rounded-2xl p-5 shadow-xs">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <Package className="w-5 h-5 text-amber-600" />
+                    <h2 className="font-bold text-lg text-slate-900">Control Maestro de Lotes & Vencimientos</h2>
+                  </div>
+                  <p className="text-xs text-slate-500 mt-1">
+                    Monitoreo centralizado de frescura de insumos, caducidad por fecha de vencimiento y gestión de lotes.
+                  </p>
+                </div>
+              </div>
+
+              {/* KPI Summary Cards */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-xs">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Lotes</span>
+                    <span className="p-2 rounded-xl bg-amber-50 text-amber-600">
+                      <Package className="w-4 h-4" />
+                    </span>
+                  </div>
+                  <div className="text-3xl font-bold text-slate-900">{allLots.length}</div>
+                  <p className="text-xs text-slate-500 mt-1">Lotes en catálogo activo</p>
+                </div>
+
+                <div
+                  onClick={() => setLotesFilter("vencidos")}
+                  className={`p-5 rounded-2xl bg-white border transition cursor-pointer shadow-xs hover:shadow-sm ${
+                    lotesFilter === "vencidos" ? "border-red-500 ring-2 ring-red-200" : "border-slate-200 hover:border-red-300"
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-semibold text-red-600 uppercase tracking-wider">Lotes Vencidos</span>
+                    <span className="p-2 rounded-xl bg-red-50 text-red-600">
+                      <AlertCircle className="w-4 h-4" />
+                    </span>
+                  </div>
+                  <div className="text-3xl font-bold text-red-600">
+                    {allLots.filter((l) => l.status === "vencido").length}
+                  </div>
+                  <p className="text-xs text-red-500 font-medium mt-1">Acción inmediata requerida</p>
+                </div>
+
+                <div
+                  onClick={() => setLotesFilter("por-vencer")}
+                  className={`p-5 rounded-2xl bg-white border transition cursor-pointer shadow-xs hover:shadow-sm ${
+                    lotesFilter === "por-vencer" ? "border-amber-500 ring-2 ring-amber-200" : "border-slate-200 hover:border-amber-300"
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-semibold text-amber-700 uppercase tracking-wider">Por Vencer (&lt;30d)</span>
+                    <span className="p-2 rounded-xl bg-amber-50 text-amber-600">
+                      <Clock className="w-4 h-4" />
+                    </span>
+                  </div>
+                  <div className="text-3xl font-bold text-amber-600">
+                    {allLots.filter((l) => l.status === "por-vencer").length}
+                  </div>
+                  <p className="text-xs text-amber-600 font-medium mt-1">Priorizar salida (FEFO)</p>
+                </div>
+
+                <div
+                  onClick={() => setLotesFilter("vigentes")}
+                  className={`p-5 rounded-2xl bg-white border transition cursor-pointer shadow-xs hover:shadow-sm ${
+                    lotesFilter === "vigentes" ? "border-emerald-500 ring-2 ring-emerald-200" : "border-slate-200 hover:border-emerald-300"
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-semibold text-emerald-700 uppercase tracking-wider">Lotes Vigentes</span>
+                    <span className="p-2 rounded-xl bg-emerald-50 text-emerald-600">
+                      <CheckCircle2 className="w-4 h-4" />
+                    </span>
+                  </div>
+                  <div className="text-3xl font-bold text-emerald-600">
+                    {allLots.filter((l) => l.status === "vigente").length}
+                  </div>
+                  <p className="text-xs text-emerald-600 font-medium mt-1">Con vida útil adecuada</p>
+                </div>
+              </div>
+
+
+              {/* Filter Tabs & Search Bar */}
+              <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-xs flex flex-col md:flex-row items-center justify-between gap-3">
+                <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl w-full md:w-auto text-xs font-medium">
+                  <button
+                    type="button"
+                    onClick={() => setLotesFilter("todos")}
+                    className={`px-3.5 py-1.5 rounded-lg transition cursor-pointer ${
+                      lotesFilter === "todos" ? "bg-white text-slate-900 font-bold shadow-xs" : "text-slate-600 hover:text-slate-900"
+                    }`}
+                  >
+                    Todos ({allLots.length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setLotesFilter("vencidos")}
+                    className={`px-3.5 py-1.5 rounded-lg transition cursor-pointer flex items-center gap-1 ${
+                      lotesFilter === "vencidos" ? "bg-red-600 text-white font-bold shadow-xs" : "text-red-700 hover:bg-red-50"
+                    }`}
+                  >
+                    <AlertCircle className="w-3.5 h-3.5" />
+                    <span>Vencidos ({allLots.filter((l) => l.status === "vencido").length})</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setLotesFilter("por-vencer")}
+                    className={`px-3.5 py-1.5 rounded-lg transition cursor-pointer flex items-center gap-1 ${
+                      lotesFilter === "por-vencer" ? "bg-amber-500 text-white font-bold shadow-xs" : "text-amber-800 hover:bg-amber-50"
+                    }`}
+                  >
+                    <Clock className="w-3.5 h-3.5" />
+                    <span>Por Vencer ({allLots.filter((l) => l.status === "por-vencer").length})</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setLotesFilter("vigentes")}
+                    className={`px-3.5 py-1.5 rounded-lg transition cursor-pointer flex items-center gap-1 ${
+                      lotesFilter === "vigentes" ? "bg-emerald-600 text-white font-bold shadow-xs" : "text-emerald-800 hover:bg-emerald-50"
+                    }`}
+                  >
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    <span>Vigentes ({allLots.filter((l) => l.status === "vigente").length})</span>
+                  </button>
+                </div>
+
+                <div className="relative w-full md:w-72">
+                  <input
+                    type="text"
+                    placeholder="Buscar por lote, SKU o producto..."
+                    value={lotesSearch}
+                    onChange={(e) => setLotesSearch(e.target.value)}
+                    className="w-full pl-9 pr-4 py-2 text-xs rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:border-[#f6821f] text-slate-900"
+                  />
+                  <svg className="w-4 h-4 text-slate-400 absolute left-3 top-2.5 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                </div>
+              </div>
+
+              {/* Master Lots Table */}
+              <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xs">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-slate-50 border-b border-slate-200 text-slate-700 font-semibold uppercase tracking-wider">
+                      <tr>
+                        <th className="p-3.5">N° de Lote</th>
+                        <th className="p-3.5">Producto & SKU</th>
+                        <th className="p-3.5 text-right">Cantidad en Lote</th>
+                        <th className="p-3.5">Fabricación</th>
+                        <th className="p-3.5">Expiración</th>
+                        <th className="p-3.5 text-center">Estado Vencimiento</th>
+                        <th className="p-3.5 text-right">Acción</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {filteredAllLots.map(({ lot, item, daysLeft, status }) => (
+                        <tr key={lot.id} className="hover:bg-slate-50 transition">
+                          <td className="p-3.5 font-mono font-bold text-slate-900">
+                            <span className="px-2 py-1 rounded-lg bg-amber-50 text-amber-900 border border-amber-200">
+                              {lot.lotNumber}
+                            </span>
+                          </td>
+                          <td className="p-3.5">
+                            <span className="font-bold text-slate-900 block">{item.description}</span>
+                            <span className="text-[11px] font-mono text-slate-500">{item.sku}</span>
+                          </td>
+                          <td className="p-3.5 text-right font-mono font-bold text-slate-900">
+                            {lot.quantity} uds
+                          </td>
+                          <td className="p-3.5 text-slate-500 font-mono">
+                            {lot.manufactureDate ? new Date(lot.manufactureDate).toISOString().split("T")[0] : "—"}
+                          </td>
+                          <td className="p-3.5 font-mono font-semibold text-slate-800">
+                            {lot.expirationDate ? new Date(lot.expirationDate).toISOString().split("T")[0] : "—"}
+                          </td>
+                          <td className="p-3.5 text-center">
+                            {status === "vencido" && (
+                              <span className="px-2.5 py-1 rounded-full bg-red-100 text-red-700 font-bold text-[11px] inline-flex items-center gap-1">
+                                <AlertCircle className="w-3 h-3 text-red-600" />
+                                <span>Vencido ({Math.abs(daysLeft || 0)}d)</span>
+                              </span>
+                            )}
+                            {status === "por-vencer" && (
+                              <span className="px-2.5 py-1 rounded-full bg-amber-100 text-amber-800 font-bold text-[11px] inline-flex items-center gap-1">
+                                <Clock className="w-3 h-3 text-amber-600" />
+                                <span>Por Vencer ({daysLeft}d)</span>
+                              </span>
+                            )}
+                            {status === "vigente" && (
+                              <span className="px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 font-semibold text-[11px] inline-flex items-center gap-1">
+                                <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                                <span>Vigente ({daysLeft}d)</span>
+                              </span>
+                            )}
+                            {status === "sin-fecha" && (
+                              <span className="px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-500 font-medium text-[11px]">
+                                Sin Fecha Expiración
+                              </span>
+                            )}
+                          </td>
+                          <td className="p-3.5 text-right">
+                            <button
+                              type="button"
+                              onClick={() => openLotManagementModal(item)}
+                              className="px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold transition cursor-pointer text-xs shadow-xs"
+                            >
+                              Gestionar Lotes
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                      {filteredAllLots.length === 0 && (
+                        <tr>
+                          <td colSpan={7} className="p-8 text-center text-slate-400">
+                            No se encontraron lotes con los filtros seleccionados.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ================= VIEW: CONTROL DE NÚMEROS DE SERIE ================= */}
+          {currentView === "series" && (
+            <div className="space-y-5">
+              {/* Header Action Bar */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <button
+                  type="button"
+                  onClick={() => setCurrentView("inventario")}
+                  className="text-xs font-semibold text-slate-600 hover:text-slate-900 transition flex items-center gap-1.5 cursor-pointer w-fit"
+                >
+                  <svg className="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
+                  </svg>
+                  <span>Regresar a Catálogo</span>
+                </button>
+
+                <div className="flex items-center gap-3 self-end sm:self-auto">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      alert("Generando reporte de trazabilidad de números de serie...");
+                      window.print();
+                    }}
+                    className="px-4 py-2 rounded-full border border-[#f6821f] text-[#f6821f] hover:bg-[#fff7ed] text-xs font-semibold transition cursor-pointer shadow-xs flex items-center gap-1.5"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    <span>Exportar Trazabilidad</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Title & Description */}
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white border border-slate-200 rounded-2xl p-5 shadow-xs">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <Tag className="w-5 h-5 text-purple-600" />
+                    <h2 className="font-bold text-lg text-slate-900">Control de Números de Serie & Trazabilidad</h2>
+                  </div>
+                  <p className="text-xs text-slate-500 mt-1">
+                    Búsqueda rápida por código de barras/serie, garantía y seguimiento del ciclo de vida del producto.
+                  </p>
+                </div>
+              </div>
+
+              {/* KPI Summary Cards */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-xs">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Series</span>
+                    <span className="p-2 rounded-xl bg-purple-50 text-purple-600">
+                      <Tag className="w-4 h-4" />
+                    </span>
+                  </div>
+                  <div className="text-3xl font-bold text-slate-900">{allSerials.length}</div>
+                  <p className="text-xs text-slate-500 mt-1">en historial de inventario</p>
+                </div>
+
+                <div
+                  onClick={() => setSeriesFilterView("DISPONIBLE")}
+                  className={`p-5 rounded-2xl bg-white border transition cursor-pointer shadow-xs hover:shadow-sm ${
+                    seriesFilterView === "DISPONIBLE" ? "border-emerald-500 ring-2 ring-emerald-200" : "border-slate-200 hover:border-emerald-300"
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-semibold text-emerald-700 uppercase tracking-wider">Disponibles</span>
+                    <span className="p-2 rounded-xl bg-emerald-50 text-emerald-600">
+                      <CheckCircle2 className="w-4 h-4" />
+                    </span>
+                  </div>
+                  <div className="text-3xl font-bold text-emerald-600">
+                    {allSerials.filter((s) => s.serial.status === "DISPONIBLE").length}
+                  </div>
+                  <p className="text-xs text-emerald-600 font-medium mt-1">Listas para venta/despacho</p>
+                </div>
+
+                <div
+                  onClick={() => setSeriesFilterView("VENDIDO")}
+                  className={`p-5 rounded-2xl bg-white border transition cursor-pointer shadow-xs hover:shadow-sm ${
+                    seriesFilterView === "VENDIDO" ? "border-blue-500 ring-2 ring-blue-200" : "border-slate-200 hover:border-blue-300"
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-semibold text-blue-700 uppercase tracking-wider">Vendidas</span>
+                    <span className="p-2 rounded-xl bg-blue-50 text-blue-600">
+                      <Tag className="w-4 h-4" />
+                    </span>
+                  </div>
+                  <div className="text-3xl font-bold text-blue-600">
+                    {allSerials.filter((s) => s.serial.status === "VENDIDO").length}
+                  </div>
+                  <p className="text-xs text-blue-600 font-medium mt-1">En garantía activa</p>
+                </div>
+
+                <div
+                  onClick={() => setSeriesFilterView("DEFECTUOSO")}
+                  className={`p-5 rounded-2xl bg-white border transition cursor-pointer shadow-xs hover:shadow-sm ${
+                    seriesFilterView === "DEFECTUOSO" ? "border-red-500 ring-2 ring-red-200" : "border-slate-200 hover:border-red-300"
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-semibold text-red-600 uppercase tracking-wider">Defectuosas</span>
+                    <span className="p-2 rounded-xl bg-red-50 text-red-600">
+                      <AlertCircle className="w-4 h-4" />
+                    </span>
+                  </div>
+                  <div className="text-3xl font-bold text-red-600">
+                    {allSerials.filter((s) => s.serial.status === "DEFECTUOSO").length}
+                  </div>
+                  <p className="text-xs text-red-500 font-medium mt-1">Aisladas de despacho</p>
+                </div>
+              </div>
+
+
+              {/* Search & Scanner Bar */}
+              <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-xs flex flex-col md:flex-row items-center justify-between gap-3">
+                <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl w-full md:w-auto text-xs font-medium overflow-x-auto">
+                  {["TODOS", "DISPONIBLE", "VENDIDO", "RESERVADO", "DEFECTUOSO"].map((st) => (
+                    <button
+                      key={st}
+                      type="button"
+                      onClick={() => setSeriesFilterView(st)}
+                      className={`px-3 py-1.5 rounded-lg transition cursor-pointer whitespace-nowrap ${
+                        seriesFilterView === st ? "bg-purple-600 text-white font-bold shadow-xs" : "text-slate-600 hover:text-slate-900"
+                      }`}
+                    >
+                      {st} ({st === "TODOS" ? allSerials.length : allSerials.filter((s) => s.serial.status === st).length})
+                    </button>
+                  ))}
+                </div>
+
+                <div className="relative w-full md:w-80">
+                  <input
+                    type="text"
+                    placeholder="Escribe o escanea N.º de Serie..."
+                    value={seriesSearchView}
+                    onChange={(e) => setSeriesSearchView(e.target.value)}
+                    className="w-full pl-9 pr-4 py-2 text-xs rounded-xl bg-purple-50/40 border border-purple-200 focus:outline-none focus:border-purple-600 text-slate-900 font-mono"
+                  />
+                  <svg className="w-4 h-4 text-purple-500 absolute left-3 top-2.5 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
+                  </svg>
+                </div>
+              </div>
+
+              {/* Master Serials Table */}
+              <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xs">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-slate-50 border-b border-slate-200 text-slate-700 font-semibold uppercase tracking-wider">
+                      <tr>
+                        <th className="p-3.5">N° de Serie</th>
+                        <th className="p-3.5">Producto / Artículo</th>
+                        <th className="p-3.5">Estado Interactivo</th>
+                        <th className="p-3.5">Notas / Historial</th>
+                        <th className="p-3.5 text-right">Acción</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {filteredAllSerials.map(({ serial, item }) => (
+                        <tr key={serial.id} className="hover:bg-slate-50 transition">
+                          <td className="p-3.5 font-mono font-bold text-slate-900">
+                            <span className="px-2.5 py-1 rounded-lg bg-purple-50 text-purple-900 border border-purple-200 inline-flex items-center gap-1.5">
+                              <Tag className="w-3 h-3 text-purple-600" />
+                              <span>{serial.serialNumber}</span>
+                            </span>
+                          </td>
+                          <td className="p-3.5">
+                            <span className="font-bold text-slate-900 block">{item.description}</span>
+                            <span className="text-[11px] font-mono text-slate-500">{item.sku}</span>
+                          </td>
+                          <td className="p-3.5">
+                            <select
+                              value={serial.status}
+                              onChange={async (e) => {
+                                const newSt = e.target.value;
+                                try {
+                                  await fetch(`/api/inventory/serials/${serial.id}`, {
+                                    method: "PATCH",
+                                    headers: { "Content-Type": "application/json" },
+                                    body: JSON.stringify({ status: newSt }),
+                                  });
+                                  await loadDashboardData();
+                                } catch (err) {
+                                  console.error("Error updating serial status:", err);
+                                }
+                              }}
+                              className={`px-2.5 py-1 text-xs font-bold rounded-xl border cursor-pointer focus:outline-none ${
+                                serial.status === "DISPONIBLE"
+                                  ? "bg-emerald-50 text-emerald-800 border-emerald-300"
+                                  : serial.status === "VENDIDO"
+                                  ? "bg-blue-50 text-blue-800 border-blue-300"
+                                  : serial.status === "DEFECTUOSO"
+                                  ? "bg-red-50 text-red-800 border-red-300"
+                                  : "bg-purple-50 text-purple-800 border-purple-300"
+                              }`}
+                            >
+                              <option value="DISPONIBLE">DISPONIBLE</option>
+                              <option value="VENDIDO">VENDIDO</option>
+                              <option value="RESERVADO">RESERVADO</option>
+                              <option value="DEFECTUOSO">DEFECTUOSO</option>
+                            </select>
+                          </td>
+                          <td className="p-3.5 text-slate-500">
+                            {serial.notes || "Garantía estándar activada"}
+                          </td>
+                          <td className="p-3.5 text-right">
+                            <button
+                              type="button"
+                              onClick={() => openSerialManagementModal(item)}
+                              className="px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold transition cursor-pointer text-xs shadow-xs"
+                            >
+                              Gestionar Series
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                      {filteredAllSerials.length === 0 && (
+                        <tr>
+                          <td colSpan={5} className="p-8 text-center text-slate-400">
+                            No se encontraron números de serie con el filtro seleccionado.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ================= VIEW: NOTAS DE CRÉDITO Y DÉBITO ================= */}
+          {currentView === "notas-credito-debito" && (
+            <div className="space-y-5">
+              {/* Header Action Bar */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <button
+                  type="button"
+                  onClick={() => setCurrentView("dashboard")}
+                  className="text-xs font-semibold text-slate-600 hover:text-slate-900 transition flex items-center gap-1.5 cursor-pointer w-fit"
+                >
+                  <svg className="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
+                  </svg>
+                  <span>Regresar al Dashboard</span>
+                </button>
+
+                <div className="flex items-center gap-3 self-end sm:self-auto">
+                  <button
+                    type="button"
+                    onClick={openCreateNoteModal}
+                    className="px-5 py-2.5 rounded-full bg-[#f6821f] hover:bg-[#e07216] text-white font-bold text-xs transition cursor-pointer shadow-md flex items-center gap-2"
+                  >
+                    <span>+ Nueva Nota de Crédito / Débito</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Title & Description */}
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white border border-slate-200 rounded-2xl p-5 shadow-xs">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <FileText className="w-5 h-5 text-[#f6821f]" />
+                    <h2 className="font-bold text-lg text-slate-900">Gestión de Notas de Crédito & Débito</h2>
+                  </div>
+                  <p className="text-xs text-slate-500 mt-1">
+                    Ajustes contables de saldo, devoluciones de mercadería, bonificaciones e intereses (Integración Macola ERP & SAR).
+                  </p>
+                </div>
+              </div>
+
+              {/* KPI Summary Cards (Matching Dashboard Typography text-3xl font-bold) */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-xs">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Notas</span>
+                    <span className="p-2 rounded-xl bg-slate-100 text-slate-700">
+                      <FileText className="w-4 h-4" />
+                    </span>
+                  </div>
+                  <div className="text-3xl font-bold text-slate-900">{creditDebitNotes.length}</div>
+                  <p className="text-xs text-slate-500 mt-1">documentos registrados</p>
+                </div>
+
+                <div
+                  onClick={() => setNotasFilter("CREDITO")}
+                  className={`p-5 rounded-2xl bg-white border transition cursor-pointer shadow-xs hover:shadow-sm ${
+                    notasFilter === "CREDITO" ? "border-emerald-500 ring-2 ring-emerald-200" : "border-slate-200 hover:border-emerald-300"
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-semibold text-emerald-700 uppercase tracking-wider">Notas de Crédito</span>
+                    <span className="p-2 rounded-xl bg-emerald-50 text-emerald-600">
+                      <CheckCircle2 className="w-4 h-4" />
+                    </span>
+                  </div>
+                  <div className="text-3xl font-bold text-emerald-600">
+                    ${creditDebitNotes
+                      .filter((n) => n.type === "CREDIT" && n.status === "APLICADA")
+                      .reduce((acc, n) => acc + n.total, 0)
+                      .toLocaleString("es-HN", { minimumFractionDigits: 2 })}
+                  </div>
+                  <p className="text-xs text-emerald-600 font-medium mt-1">
+                    {creditDebitNotes.filter((n) => n.type === "CREDIT").length} créditos aplicados
+                  </p>
+                </div>
+
+                <div
+                  onClick={() => setNotasFilter("DEBITO")}
+                  className={`p-5 rounded-2xl bg-white border transition cursor-pointer shadow-xs hover:shadow-sm ${
+                    notasFilter === "DEBITO" ? "border-blue-500 ring-2 ring-blue-200" : "border-slate-200 hover:border-blue-300"
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-semibold text-blue-700 uppercase tracking-wider">Notas de Débito</span>
+                    <span className="p-2 rounded-xl bg-blue-50 text-blue-600">
+                      <FileText className="w-4 h-4" />
+                    </span>
+                  </div>
+                  <div className="text-3xl font-bold text-blue-600">
+                    ${creditDebitNotes
+                      .filter((n) => n.type === "DEBIT" && n.status === "APLICADA")
+                      .reduce((acc, n) => acc + n.total, 0)
+                      .toLocaleString("es-HN", { minimumFractionDigits: 2 })}
+                  </div>
+                  <p className="text-xs text-blue-600 font-medium mt-1">
+                    {creditDebitNotes.filter((n) => n.type === "DEBIT").length} débitos aplicados
+                  </p>
+                </div>
+
+                <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-xs">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-semibold text-[#f6821f] uppercase tracking-wider">Facturas Afectadas</span>
+                    <span className="p-2 rounded-xl bg-[#fff7ed] text-[#f6821f]">
+                      <FileText className="w-4 h-4" />
+                    </span>
+                  </div>
+                  <div className="text-3xl font-bold text-slate-900">
+                    {new Set(creditDebitNotes.map((n) => n.targetDocNum).filter(Boolean)).size}
+                  </div>
+                  <p className="text-xs text-slate-500 mt-1">documentos de origen</p>
+                </div>
+              </div>
+
+              {/* Filter Tabs & Search Bar */}
+              <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-xs flex flex-col md:flex-row items-center justify-between gap-3">
+                <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl w-full md:w-auto text-xs font-medium overflow-x-auto">
+                  <button
+                    type="button"
+                    onClick={() => setNotasFilter("TODAS")}
+                    className={`px-3 py-1.5 rounded-lg transition cursor-pointer whitespace-nowrap ${
+                      notasFilter === "TODAS" ? "bg-white text-slate-900 font-bold shadow-xs" : "text-slate-600 hover:text-slate-900"
+                    }`}
+                  >
+                    Todas ({creditDebitNotes.length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setNotasFilter("CREDITO")}
+                    className={`px-3 py-1.5 rounded-lg transition cursor-pointer whitespace-nowrap flex items-center gap-1 ${
+                      notasFilter === "CREDITO" ? "bg-emerald-600 text-white font-bold shadow-xs" : "text-emerald-700 hover:bg-emerald-50"
+                    }`}
+                  >
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    <span>Créditos ({creditDebitNotes.filter((n) => n.type === "CREDIT").length})</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setNotasFilter("DEBITO")}
+                    className={`px-3 py-1.5 rounded-lg transition cursor-pointer whitespace-nowrap flex items-center gap-1 ${
+                      notasFilter === "DEBITO" ? "bg-blue-600 text-white font-bold shadow-xs" : "text-blue-700 hover:bg-blue-50"
+                    }`}
+                  >
+                    <FileText className="w-3.5 h-3.5" />
+                    <span>Débitos ({creditDebitNotes.filter((n) => n.type === "DEBIT").length})</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setNotasFilter("APLICADAS")}
+                    className={`px-3 py-1.5 rounded-lg transition cursor-pointer whitespace-nowrap ${
+                      notasFilter === "APLICADAS" ? "bg-slate-900 text-white font-bold shadow-xs" : "text-slate-600 hover:text-slate-900"
+                    }`}
+                  >
+                    Aplicadas ({creditDebitNotes.filter((n) => n.status === "APLICADA").length})
+                  </button>
+                </div>
+
+                <div className="relative w-full md:w-80">
+                  <input
+                    type="text"
+                    placeholder="Buscar por N.º nota, cliente, factura o motivo..."
+                    value={notasSearch}
+                    onChange={(e) => setNotasSearch(e.target.value)}
+                    className="w-full pl-9 pr-4 py-2 text-xs rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:border-[#f6821f] text-slate-900"
+                  />
+                  <svg className="w-4 h-4 text-slate-400 absolute left-3 top-2.5 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                </div>
+              </div>
+
+              {/* Master Credit / Debit Notes Table */}
+              <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xs">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-slate-50 border-b border-slate-200 text-slate-700 font-semibold uppercase tracking-wider">
+                      <tr>
+                        <th className="p-3.5">N° Documento</th>
+                        <th className="p-3.5">Tipo</th>
+                        <th className="p-3.5">Beneficiario / Entidad</th>
+                        <th className="p-3.5">Doc. Afectado</th>
+                        <th className="p-3.5">Motivo / Concepto</th>
+                        <th className="p-3.5">Fecha</th>
+                        <th className="p-3.5 text-right">Monto Total</th>
+                        <th className="p-3.5 text-center">Estado</th>
+                        <th className="p-3.5 text-right">Acción</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {filteredCreditDebitNotes.map((note) => (
+                        <tr key={note.id} className="hover:bg-slate-50 transition">
+                          <td className="p-3.5 font-mono font-bold text-slate-900">
+                            <span className={`px-2.5 py-1 rounded-lg border font-mono font-bold text-xs ${
+                              note.type === "CREDIT" ? "bg-emerald-50 text-emerald-900 border-emerald-200" : "bg-blue-50 text-blue-900 border-blue-200"
+                            }`}>
+                              {note.noteNumber}
+                            </span>
+                          </td>
+                          <td className="p-3.5">
+                            {note.type === "CREDIT" ? (
+                              <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[11px] font-bold inline-flex items-center gap-1">
+                                <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                                <span>NOTA DE CRÉDITO</span>
+                              </span>
+                            ) : (
+                              <span className="px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-800 text-[11px] font-bold inline-flex items-center gap-1">
+                                <FileText className="w-3 h-3 text-blue-600" />
+                                <span>NOTA DE DÉBITO</span>
+                              </span>
+                            )}
+                          </td>
+                          <td className="p-3.5 font-bold text-slate-900">
+                            {note.entityName}
+                            <span className="text-[10px] text-slate-400 block font-normal">
+                              {note.entityType === "CUSTOMER" ? "Cliente" : "Proveedor"}
+                            </span>
+                          </td>
+                          <td className="p-3.5 font-mono font-semibold text-slate-700">
+                            {note.targetDocNum || "—"}
+                          </td>
+                          <td className="p-3.5 text-slate-600 font-medium">
+                            {note.reason}
+                          </td>
+                          <td className="p-3.5 text-slate-500 font-mono">
+                            {note.issueDate}
+                          </td>
+                          <td className="p-3.5 text-right font-bold text-slate-900 text-sm">
+                            ${note.total.toLocaleString("es-HN", { minimumFractionDigits: 2 })} USD
+                          </td>
+                          <td className="p-3.5 text-center">
+                            {note.status === "APLICADA" && (
+                              <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 font-semibold text-[10px]">
+                                APLICADA
+                              </span>
+                            )}
+                            {note.status === "BORRADOR" && (
+                              <span className="px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 font-semibold text-[10px]">
+                                BORRADOR
+                              </span>
+                            )}
+                            {note.status === "ANULADA" && (
+                              <span className="px-2 py-0.5 rounded-full bg-red-50 text-red-700 border border-red-200 font-semibold text-[10px]">
+                                ANULADA
+                              </span>
+                            )}
+                          </td>
+                          <td className="p-3.5 text-right">
+                            <button
+                              type="button"
+                              onClick={() => handlePrintNote(note)}
+                              className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-[#fff7ed] hover:text-[#f6821f] text-slate-700 font-semibold cursor-pointer transition text-[11px] border border-slate-200"
+                            >
+                              Imprimir PDF
+                            </button>
+
+                          </td>
+                        </tr>
+                      ))}
+                      {filteredCreditDebitNotes.length === 0 && (
+                        <tr>
+                          <td colSpan={9} className="p-8 text-center text-slate-400">
+                            No se encontraron notas de crédito o débito registradas.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ================= VIEW: VENDEDORES (Fuerza de Ventas & Zonas) ================= */}
+          {currentView === "vendedores" && (
+            <div className="space-y-6 animate-in fade-in duration-150">
+              {/* Header Action Bar */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <button
+                  type="button"
+                  onClick={() => setCurrentView("dashboard")}
+                  className="text-xs font-semibold text-slate-600 hover:text-slate-900 transition flex items-center gap-1.5 cursor-pointer w-fit"
+                >
+                  <svg className="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
+                  </svg>
+                  <span>Regresar al Dashboard</span>
+                </button>
+
+                <div className="flex items-center gap-3 self-end sm:self-auto">
+                  <button
+                    type="button"
+                    onClick={() => setCurrentView("comisiones")}
+                    className="px-4 py-2.5 rounded-full border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-semibold text-xs transition cursor-pointer flex items-center gap-2 shadow-xs"
+                  >
+                    <span>Ver Histórico de Comisiones</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={openCreateSalesRepModal}
+                    className="px-5 py-2.5 rounded-full bg-[#f6821f] hover:bg-[#e07216] text-white font-bold text-xs transition cursor-pointer shadow-md flex items-center gap-2"
+                  >
+                    <span>+ Registrar Nuevo Vendedor</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Title & Description */}
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white border border-slate-200 rounded-2xl p-5 shadow-xs">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <Users className="w-5 h-5 text-[#f6821f]" />
+                    <h2 className="font-bold text-lg text-slate-900">Fuerza de Ventas & Ejecutivos Comerciales</h2>
+                  </div>
+                  <p className="text-xs text-slate-500 mt-1">
+                    Administra representantes de ventas, asignación de zonas geográficas y metas mensuales para Wayne Trademark Honduras.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 bg-slate-50 px-3.5 py-2 rounded-xl border border-slate-200 text-xs text-slate-600 font-medium">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                  <span>{salesReps.filter((r) => r.status === "ACTIVO").length} Ejecutivos Activos</span>
+                </div>
+              </div>
+
+              {/* KPI Summary Cards */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-xs flex items-center justify-between">
+                  <div>
+                    <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider block mb-1">
+                      Fuerza de Ventas Total
+                    </span>
+                    <span className="text-3xl font-bold text-slate-900">{salesReps.length}</span>
+                    <span className="text-[11px] text-slate-500 block mt-1">Ejecutivos comerciales</span>
+                  </div>
+                  <div className="p-3 rounded-xl bg-blue-50 text-blue-600">
+                    <Users className="w-6 h-6" />
+                  </div>
+                </div>
+
+                <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-xs flex items-center justify-between">
+                  <div>
+                    <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider block mb-1">
+                      Meta General Mensual
+                    </span>
+                    <span className="text-3xl font-bold text-slate-900">
+                      ${salesReps.reduce((acc, r) => acc + (r.monthlyTarget || 0), 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                    </span>
+                    <span className="text-[11px] text-slate-500 block mt-1">USD acumulado objetivo</span>
+                  </div>
+                  <div className="p-3 rounded-xl bg-emerald-50 text-emerald-600">
+                    <CheckCircle2 className="w-6 h-6" />
+                  </div>
+                </div>
+
+                <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-xs flex items-center justify-between">
+                  <div>
+                    <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider block mb-1">
+                      Tasa Base Promedio
+                    </span>
+                    <span className="text-3xl font-bold text-slate-900">
+                      {(
+                        salesReps.reduce((acc, r) => acc + (r.commissionRate || 0), 0) /
+                        (salesReps.length || 1)
+                      ).toFixed(1)}%
+                    </span>
+                    <span className="text-[11px] text-slate-500 block mt-1">% comisión sobre factura</span>
+                  </div>
+                  <div className="p-3 rounded-xl bg-amber-50 text-amber-600">
+                    <Clock className="w-6 h-6" />
+                  </div>
+                </div>
+
+                <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-xs flex items-center justify-between">
+                  <div>
+                    <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider block mb-1">
+                      Comisiones del Mes
+                    </span>
+                    <span className="text-3xl font-bold text-[#f6821f]">
+                      ${commissionRecords.reduce((acc, c) => acc + (c.commissionAmount || 0), 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                    </span>
+                    <span className="text-[11px] text-slate-500 block mt-1">USD liquidados y por liquidar</span>
+                  </div>
+                  <div className="p-3 rounded-xl bg-orange-50 text-[#f6821f]">
+                    <FileText className="w-6 h-6" />
+                  </div>
+                </div>
+              </div>
+
+              {/* Toolbar: Filters & Search */}
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-slate-200 shadow-xs">
+                <div className="flex items-center gap-2 overflow-x-auto w-full sm:w-auto">
+                  <button
+                    type="button"
+                    onClick={() => setVendedoresFilter("TODOS")}
+                    className={`px-3.5 py-1.5 rounded-xl font-bold text-xs transition cursor-pointer ${
+                      vendedoresFilter === "TODOS"
+                        ? "bg-[#f6821f] text-white shadow-xs"
+                        : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                    }`}
+                  >
+                    TODOS ({salesReps.length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setVendedoresFilter("ACTIVOS")}
+                    className={`px-3.5 py-1.5 rounded-xl font-bold text-xs transition cursor-pointer ${
+                      vendedoresFilter === "ACTIVOS"
+                        ? "bg-emerald-600 text-white shadow-xs"
+                        : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                    }`}
+                  >
+                    ACTIVOS ({salesReps.filter((r) => r.status === "ACTIVO").length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setVendedoresFilter("INACTIVOS")}
+                    className={`px-3.5 py-1.5 rounded-xl font-bold text-xs transition cursor-pointer ${
+                      vendedoresFilter === "INACTIVOS"
+                        ? "bg-slate-700 text-white shadow-xs"
+                        : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                    }`}
+                  >
+                    INACTIVOS ({salesReps.filter((r) => r.status === "INACTIVO").length})
+                  </button>
+                </div>
+
+                <div className="relative w-full sm:w-72">
+                  <input
+                    type="text"
+                    placeholder="Buscar vendedor, código o zona..."
+                    value={vendedoresSearch}
+                    onChange={(e) => setVendedoresSearch(e.target.value)}
+                    className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-[#f6821f] transition"
+                  />
+                  <svg className="w-4 h-4 text-slate-400 absolute left-3 top-2.5 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                </div>
+              </div>
+
+              {/* Master Sales Reps Table */}
+              <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xs">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-slate-50 border-b border-slate-200 text-slate-700 font-semibold uppercase tracking-wider">
+                      <tr>
+                        <th className="p-3.5">Código</th>
+                        <th className="p-3.5">Vendedor / Ejecutivo</th>
+                        <th className="p-3.5">Zona Asignada</th>
+                        <th className="p-3.5">Contacto</th>
+                        <th className="p-3.5">Esquema Comisión</th>
+                        <th className="p-3.5 text-right">Meta Mensual</th>
+                        <th className="p-3.5 text-center">Estado</th>
+                        <th className="p-3.5 text-right">Acción</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {filteredSalesReps.map((rep) => (
+                        <tr key={rep.id} className="hover:bg-slate-50 transition">
+                          <td className="p-3.5 font-mono font-bold text-slate-900">
+                            <span className="px-2.5 py-1 rounded-lg bg-slate-100 border border-slate-200 font-mono font-bold text-xs text-slate-800">
+                              {rep.code}
+                            </span>
+                          </td>
+                          <td className="p-3.5 font-bold text-slate-900">
+                            <div>{rep.name}</div>
+                            <div className="text-[11px] text-slate-500 font-normal">{rep.email || "Sin correo"}</div>
+                          </td>
+                          <td className="p-3.5 text-slate-700 font-medium">
+                            {rep.zone || "Sin asignación"}
+                          </td>
+                          <td className="p-3.5 text-slate-600 font-mono">
+                            {rep.phone || "—"}
+                          </td>
+                          <td className="p-3.5">
+                            <span className="px-2.5 py-1 rounded-full bg-orange-50 border border-orange-200 text-[#f6821f] font-bold text-[11px]">
+                              {rep.commissionRate}% ({rep.commissionType === "PERCENTAGE" ? "Fijo" : rep.commissionType === "TIERED" ? "Escalonado" : "Por Metas"})
+                            </span>
+                          </td>
+                          <td className="p-3.5 text-right font-bold text-slate-900">
+                            ${(rep.monthlyTarget || 0).toLocaleString("en-US", { minimumFractionDigits: 2 })} USD
+                          </td>
+                          <td className="p-3.5 text-center">
+                            <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
+                              rep.status === "ACTIVO" ? "bg-emerald-100 text-emerald-800" : "bg-slate-100 text-slate-600"
+                            }`}>
+                              {rep.status}
+                            </span>
+                          </td>
+                          <td className="p-3.5 text-right space-x-2">
+                            <button
+                              type="button"
+                              onClick={() => openEditSalesRepModal(rep)}
+                              className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-[#fff7ed] hover:text-[#f6821f] text-slate-700 font-semibold cursor-pointer transition text-[11px] border border-slate-200"
+                            >
+                              Editar Esquema
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                      {filteredSalesReps.length === 0 && (
+                        <tr>
+                          <td colSpan={8} className="p-8 text-center text-slate-400">
+                            No se encontraron vendedores o ejecutivos comerciales registrados.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ================= VIEW: ESQUEMA DE COMISIONES ================= */}
+          {currentView === "comisiones" && (
+            <div className="space-y-6 animate-in fade-in duration-150">
+              {/* Header Action Bar */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <button
+                  type="button"
+                  onClick={() => setCurrentView("vendedores")}
+                  className="text-xs font-semibold text-slate-600 hover:text-slate-900 transition flex items-center gap-1.5 cursor-pointer w-fit"
+                >
+                  <svg className="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
+                  </svg>
+                  <span>Volver a Fuerza de Ventas</span>
+                </button>
+
+                <div className="flex items-center gap-3 self-end sm:self-auto">
+                  <button
+                    type="button"
+                    onClick={openCreateCommissionModal}
+                    className="px-5 py-2.5 rounded-full bg-[#f6821f] hover:bg-[#e07216] text-white font-bold text-xs transition cursor-pointer shadow-md flex items-center gap-2"
+                  >
+                    <span>+ Registrar Cálculo de Comisión</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Title & Description */}
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white border border-slate-200 rounded-2xl p-5 shadow-xs">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <svg className="w-5 h-5 text-[#f6821f]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <h2 className="font-bold text-lg text-slate-900">Control & Liquidación de Comisiones</h2>
+                  </div>
+                  <p className="text-xs text-slate-500 mt-1">
+                    Cálculo automático de comisiones sobre ventas facturadas, estados de aprobación y reporte de pago.
+                  </p>
+                </div>
+              </div>
+
+              {/* KPI Summary Cards */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-xs flex items-center justify-between">
+                  <div>
+                    <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider block mb-1">
+                      Total Comisiones
+                    </span>
+                    <span className="text-3xl font-bold text-slate-900">
+                      ${commissionRecords.reduce((acc, c) => acc + (c.commissionAmount || 0), 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                    </span>
+                    <span className="text-[11px] text-slate-500 block mt-1">USD acumulados</span>
+                  </div>
+                  <div className="p-3 rounded-xl bg-blue-50 text-blue-600">
+                    <FileText className="w-6 h-6" />
+                  </div>
+                </div>
+
+                <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-xs flex items-center justify-between">
+                  <div>
+                    <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider block mb-1">
+                      Por Aprobar / Liquidar
+                    </span>
+                    <span className="text-3xl font-bold text-amber-600">
+                      ${commissionRecords.filter((c) => c.status === "PENDIENTE").reduce((acc, c) => acc + (c.commissionAmount || 0), 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                    </span>
+                    <span className="text-[11px] text-slate-500 block mt-1">USD pendientes de pago</span>
+                  </div>
+                  <div className="p-3 rounded-xl bg-amber-50 text-amber-600">
+                    <Clock className="w-6 h-6" />
+                  </div>
+                </div>
+
+                <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-xs flex items-center justify-between">
+                  <div>
+                    <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider block mb-1">
+                      Comisiones Aprobadas
+                    </span>
+                    <span className="text-3xl font-bold text-blue-600">
+                      ${commissionRecords.filter((c) => c.status === "APROBADO").reduce((acc, c) => acc + (c.commissionAmount || 0), 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                    </span>
+                    <span className="text-[11px] text-slate-500 block mt-1">USD listos para pago</span>
+                  </div>
+                  <div className="p-3 rounded-xl bg-blue-50 text-blue-600">
+                    <CheckCircle2 className="w-6 h-6" />
+                  </div>
+                </div>
+
+                <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-xs flex items-center justify-between">
+                  <div>
+                    <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider block mb-1">
+                      Comisiones Liquidadas
+                    </span>
+                    <span className="text-3xl font-bold text-emerald-600">
+                      ${commissionRecords.filter((c) => c.status === "PAGADO").reduce((acc, c) => acc + (c.commissionAmount || 0), 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                    </span>
+                    <span className="text-[11px] text-slate-500 block mt-1">USD pagados a ejecutivos</span>
+                  </div>
+                  <div className="p-3 rounded-xl bg-emerald-50 text-emerald-600">
+                    <CheckCircle2 className="w-6 h-6" />
+                  </div>
+                </div>
+              </div>
+
+              {/* Toolbar: Filters & Search */}
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-slate-200 shadow-xs">
+                <div className="flex items-center gap-2 overflow-x-auto w-full sm:w-auto">
+                  <button
+                    type="button"
+                    onClick={() => setComisionesStatusFilter("TODOS")}
+                    className={`px-3.5 py-1.5 rounded-xl font-bold text-xs transition cursor-pointer ${
+                      comisionesStatusFilter === "TODOS"
+                        ? "bg-[#f6821f] text-white shadow-xs"
+                        : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                    }`}
+                  >
+                    TODAS ({commissionRecords.length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setComisionesStatusFilter("PENDIENTE")}
+                    className={`px-3.5 py-1.5 rounded-xl font-bold text-xs transition cursor-pointer ${
+                      comisionesStatusFilter === "PENDIENTE"
+                        ? "bg-amber-500 text-white shadow-xs"
+                        : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                    }`}
+                  >
+                    PENDIENTES ({commissionRecords.filter((c) => c.status === "PENDIENTE").length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setComisionesStatusFilter("APROBADO")}
+                    className={`px-3.5 py-1.5 rounded-xl font-bold text-xs transition cursor-pointer ${
+                      comisionesStatusFilter === "APROBADO"
+                        ? "bg-blue-600 text-white shadow-xs"
+                        : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                    }`}
+                  >
+                    APROBADAS ({commissionRecords.filter((c) => c.status === "APROBADO").length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setComisionesStatusFilter("PAGADO")}
+                    className={`px-3.5 py-1.5 rounded-xl font-bold text-xs transition cursor-pointer ${
+                      comisionesStatusFilter === "PAGADO"
+                        ? "bg-emerald-600 text-white shadow-xs"
+                        : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                    }`}
+                  >
+                    PAGADAS ({commissionRecords.filter((c) => c.status === "PAGADO").length})
+                  </button>
+                </div>
+
+                <div className="relative w-full sm:w-72">
+                  <input
+                    type="text"
+                    placeholder="Buscar por vendedor, factura o cliente..."
+                    value={comisionesSearch}
+                    onChange={(e) => setComisionesSearch(e.target.value)}
+                    className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-[#f6821f] transition"
+                  />
+                  <svg className="w-4 h-4 text-slate-400 absolute left-3 top-2.5 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                </div>
+              </div>
+
+              {/* Master Commissions Table */}
+              <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xs">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-slate-50 border-b border-slate-200 text-slate-700 font-semibold uppercase tracking-wider">
+                      <tr>
+                        <th className="p-3.5">Período</th>
+                        <th className="p-3.5">Vendedor / Ejecutivo</th>
+                        <th className="p-3.5">Factura Afectada</th>
+                        <th className="p-3.5">Cliente</th>
+                        <th className="p-3.5 text-right">Monto Venta</th>
+                        <th className="p-3.5 text-center">% Aplicado</th>
+                        <th className="p-3.5 text-right">Comisión Ganada</th>
+                        <th className="p-3.5 text-center">Estado</th>
+                        <th className="p-3.5 text-right">Acción</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {filteredCommissions.map((comm) => (
+                        <tr key={comm.id} className="hover:bg-slate-50 transition">
+                          <td className="p-3.5 font-mono font-bold text-slate-800">
+                            {comm.period}
+                          </td>
+                          <td className="p-3.5 font-bold text-slate-900">
+                            {comm.salesRepName}
+                          </td>
+                          <td className="p-3.5 font-mono text-slate-700">
+                            {comm.invoiceNumber || "—"}
+                          </td>
+                          <td className="p-3.5 text-slate-700 font-medium">
+                            {comm.customerName || "Venta Directa"}
+                          </td>
+                          <td className="p-3.5 text-right font-bold text-slate-900">
+                            ${(comm.saleAmount || 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                          </td>
+                          <td className="p-3.5 text-center font-mono font-bold text-[#f6821f]">
+                            {comm.commissionRate}%
+                          </td>
+                          <td className="p-3.5 text-right font-bold text-emerald-700">
+                            ${(comm.commissionAmount || 0).toLocaleString("en-US", { minimumFractionDigits: 2 })} USD
+                          </td>
+                          <td className="p-3.5 text-center">
+                            <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
+                              comm.status === "PAGADO"
+                                ? "bg-emerald-100 text-emerald-800"
+                                : comm.status === "APROBADO"
+                                ? "bg-blue-100 text-blue-800"
+                                : "bg-amber-100 text-amber-800"
+                            }`}>
+                              {comm.status}
+                            </span>
+                          </td>
+                          <td className="p-3.5 text-right space-x-1.5">
+                            {comm.status === "PENDIENTE" && (
+                              <button
+                                type="button"
+                                onClick={() => handleUpdateCommissionStatus(comm.id, "APROBADO")}
+                                className="px-2.5 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 font-semibold cursor-pointer transition text-[11px] border border-blue-200"
+                              >
+                                Aprobar
+                              </button>
+                            )}
+                            {comm.status !== "PAGADO" && (
+                              <button
+                                type="button"
+                                onClick={() => handleUpdateCommissionStatus(comm.id, "PAGADO")}
+                                className="px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-semibold cursor-pointer transition text-[11px] border border-emerald-200"
+                              >
+                                Pagar
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                      {filteredCommissions.length === 0 && (
+                        <tr>
+                          <td colSpan={9} className="p-8 text-center text-slate-400">
+                            No se encontraron registros de comisiones.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+
+
           {/* ================= VIEW: REPORTES ================= */}
           {currentView === "reportes" && (
+
+
             <div className="space-y-6">
               <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-5">
@@ -8996,6 +11773,529 @@ export default function AdminDashboard() {
             </div>
           )}
 
+          {/* ================= VIEW: LISTA DE FACTURAS DE COMPRA ================= */}
+          {currentView === "factura-compra-lista" && (
+            <div className="space-y-6 animate-in fade-in duration-150 p-6">
+              {/* Header Bar */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-slate-200 shadow-xs">
+                <div>
+                  <h1 className="font-extrabold text-xl text-slate-900 tracking-tight">Facturas de Compra (Entradas de Inventario)</h1>
+                  <p className="text-xs text-slate-500 mt-1">
+                    Registro de comprobantes fiscales de proveedores con incremento automático de existencias en almacén.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={openCreatePurchaseInvoice}
+                  className="px-5 py-2.5 rounded-xl bg-[#f6821f] hover:bg-[#e07216] text-white text-xs font-bold transition cursor-pointer shadow-md shadow-[#f6821f]/20 flex items-center gap-2 shrink-0"
+                >
+                  <span className="text-base leading-none">+</span>
+                  <span>Registrar Factura de Compra</span>
+                </button>
+              </div>
+
+              {/* Stats Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-xs">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Facturado</span>
+                    <span className="p-2 rounded-xl bg-blue-50 text-blue-600">
+                      <FileText className="w-4 h-4" />
+                    </span>
+                  </div>
+                  <div className="text-3xl font-bold text-slate-900">
+                    ${purchaseInvoices.reduce((acc, inv) => acc + (inv.total || 0), 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                  </div>
+                  <div className="text-[11px] text-slate-500 mt-1">Monto bruto acumulado USD</div>
+                </div>
+
+                <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-xs">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Cuentas por Pagar</span>
+                    <span className="p-2 rounded-xl bg-amber-50 text-amber-600">
+                      <Clock className="w-4 h-4" />
+                    </span>
+                  </div>
+                  <div className="text-3xl font-bold text-amber-600">
+                    ${purchaseInvoices.filter((inv) => inv.paymentStatus === "PENDIENTE").reduce((acc, inv) => acc + (inv.total || 0), 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                  </div>
+                  <div className="text-[11px] text-slate-500 mt-1">Pendiente de pago a proveedores</div>
+                </div>
+
+                <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-xs">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Facturas Pagadas</span>
+                    <span className="p-2 rounded-xl bg-emerald-50 text-emerald-600">
+                      <CheckCircle2 className="w-4 h-4" />
+                    </span>
+                  </div>
+                  <div className="text-3xl font-bold text-emerald-600">
+                    ${purchaseInvoices.filter((inv) => inv.paymentStatus === "PAGADA").reduce((acc, inv) => acc + (inv.total || 0), 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                  </div>
+                  <div className="text-[11px] text-slate-500 mt-1">Total abonado / liquidado</div>
+                </div>
+
+                <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-xs">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Entradas a Inventario</span>
+                    <span className="p-2 rounded-xl bg-purple-50 text-purple-600">
+                      <Package className="w-4 h-4" />
+                    </span>
+                  </div>
+                  <div className="text-3xl font-bold text-slate-900">
+                    {purchaseInvoices.filter((inv) => inv.inventoryStatus === "INGRESADO").length}
+                  </div>
+                  <div className="text-[11px] text-slate-500 mt-1">Comprobantes procesados</div>
+                </div>
+              </div>
+
+              {/* Table Container */}
+              <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xs">
+                <div className="p-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex items-center gap-2 overflow-x-auto w-full sm:w-auto">
+                    <button
+                      type="button"
+                      onClick={() => setPurchaseInvoicesFilter("TODAS")}
+                      className={`px-3.5 py-1.5 rounded-xl font-bold text-xs transition cursor-pointer ${
+                        purchaseInvoicesFilter === "TODAS"
+                          ? "bg-[#f6821f] text-white shadow-xs"
+                          : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                      }`}
+                    >
+                      TODAS ({purchaseInvoices.length})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPurchaseInvoicesFilter("PENDIENTES")}
+                      className={`px-3.5 py-1.5 rounded-xl font-bold text-xs transition cursor-pointer ${
+                        purchaseInvoicesFilter === "PENDIENTES"
+                          ? "bg-amber-500 text-white shadow-xs"
+                          : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                      }`}
+                    >
+                      PENDIENTES ({purchaseInvoices.filter((i) => i.paymentStatus === "PENDIENTE").length})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPurchaseInvoicesFilter("PAGADAS")}
+                      className={`px-3.5 py-1.5 rounded-xl font-bold text-xs transition cursor-pointer ${
+                        purchaseInvoicesFilter === "PAGADAS"
+                          ? "bg-emerald-600 text-white shadow-xs"
+                          : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                      }`}
+                    >
+                      PAGADAS ({purchaseInvoices.filter((i) => i.paymentStatus === "PAGADA").length})
+                    </button>
+                  </div>
+
+                  <div className="relative flex-1 max-w-sm">
+                    <input
+                      type="text"
+                      placeholder="Buscar por N° factura proveedor, OC o proveedor..."
+                      value={purchaseInvoicesSearch}
+                      onChange={(e) => setPurchaseInvoicesSearch(e.target.value)}
+                      className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:outline-none focus:border-[#f6821f]"
+                    />
+                    <svg className="w-4 h-4 text-slate-400 absolute left-3 top-2.5 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                  </div>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead>
+                      <tr className="bg-slate-50 border-b border-slate-200 text-slate-700 font-bold">
+                        <th className="py-3.5 px-4">N° Factura Proveedor</th>
+                        <th className="py-3.5 px-4">OC Relacionada</th>
+                        <th className="py-3.5 px-4">Proveedor</th>
+                        <th className="py-3.5 px-4">Fecha Emisión</th>
+                        <th className="py-3.5 px-4 text-right">Total ($ USD)</th>
+                        <th className="py-3.5 px-4 text-center">Estado Pago</th>
+                        <th className="py-3.5 px-4 text-center">Entrada Stock</th>
+                        <th className="py-3.5 px-4 text-right">Acciones</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {filteredPurchaseInvoices.map((inv) => (
+                        <tr key={inv.id} className="hover:bg-slate-50 transition">
+                          <td className="py-3.5 px-4 font-mono font-bold text-slate-900">
+                            {inv.invoiceNumber}
+                          </td>
+                          <td className="py-3.5 px-4 font-mono text-slate-600">
+                            {inv.purchaseOrderNumber || "—"}
+                          </td>
+                          <td className="py-3.5 px-4 font-bold text-slate-900">
+                            {inv.vendorName}
+                          </td>
+                          <td className="py-3.5 px-4 text-slate-600">
+                            {inv.issueDate}
+                          </td>
+                          <td className="py-3.5 px-4 text-right font-bold text-slate-900">
+                            ${(inv.total || 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                          </td>
+                          <td className="py-3.5 px-4 text-center">
+                            <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
+                              inv.paymentStatus === "PAGADA" ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"
+                            }`}>
+                              {inv.paymentStatus}
+                            </span>
+                          </td>
+                          <td className="py-3.5 px-4 text-center">
+                            <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center justify-center gap-1 w-fit mx-auto">
+                              <CheckCircle2 className="w-3 h-3" />
+                              <span>STOCK INGRESADO</span>
+                            </span>
+                          </td>
+                          <td className="py-3.5 px-4 text-right space-x-1.5">
+                            {inv.paymentStatus === "PENDIENTE" && (
+                              <button
+                                type="button"
+                                onClick={() => handleUpdatePurchaseInvoiceStatus(inv.id, "PAGADA")}
+                                className="px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-semibold cursor-pointer transition text-[11px] border border-emerald-200"
+                              >
+                                Marcar Pagada
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => setSelectedDetailPurchaseInvoice(inv)}
+                              className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold cursor-pointer transition text-[11px] border border-slate-200"
+                            >
+                              Ver Detalle
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                      {filteredPurchaseInvoices.length === 0 && (
+                        <tr>
+                          <td colSpan={8} className="p-8 text-center text-slate-400">
+                            No se encontraron facturas de compra registradas.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ================= VIEW: CREAR FACTURA DE COMPRA (Formal Registry) ================= */}
+          {currentView === "factura-compra-editor" && (
+            <div className="fixed inset-0 z-40 flex flex-col bg-slate-100 text-slate-800 animate-in fade-in duration-150 overflow-hidden">
+              {/* Header Bar */}
+              <div className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between shadow-xs shrink-0">
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setCurrentView("factura-compra-lista")}
+                    className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 transition cursor-pointer"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
+                    </svg>
+                  </button>
+                  <div>
+                    <h1 className="font-bold text-lg text-slate-900">Registrar Factura de Compra (Entrada de Inventario)</h1>
+                    <p className="text-xs text-slate-500">Ingreso automático de productos a stock y creación de lotes en base de datos.</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setCurrentView("factura-compra-lista")}
+                    className="px-4 py-2 rounded-xl border border-slate-300 hover:bg-slate-100 text-slate-700 font-semibold text-xs transition cursor-pointer"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSavePurchaseInvoice}
+                    disabled={purchaseInvoiceLoading}
+                    className="px-6 py-2 rounded-xl bg-[#f6821f] hover:bg-[#e07216] text-white font-bold text-xs transition cursor-pointer shadow-md disabled:opacity-50 flex items-center gap-2"
+                  >
+                    <span>{purchaseInvoiceLoading ? "Procesando..." : "Registrar Factura & Ingresar a Inventario"}</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Form Content Body */}
+              <div className="flex-1 overflow-y-auto p-6 max-w-5xl mx-auto w-full space-y-6">
+                {purchaseInvoiceError && (
+                  <div className="p-4 bg-red-50 border border-red-200 text-red-700 rounded-xl text-xs font-semibold">
+                    {purchaseInvoiceError}
+                  </div>
+                )}
+                {purchaseInvoiceSuccess && (
+                  <div className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-xl text-xs font-semibold">
+                    {purchaseInvoiceSuccess}
+                  </div>
+                )}
+
+                {/* General Data Card */}
+                <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs space-y-4 text-xs">
+                  <h2 className="font-bold text-sm text-slate-900 border-b border-slate-100 pb-2">
+                    Datos del Comprobante Fiscal del Proveedor
+                  </h2>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block font-bold text-slate-700 mb-1">N° Factura de Proveedor *</label>
+                      <input
+                        type="text"
+                        value={purchaseInvoiceForm.invoiceNumber}
+                        onChange={(e) => setPurchaseInvoiceForm({ ...purchaseInvoiceForm, invoiceNumber: e.target.value })}
+                        placeholder="FPROV-2026-089"
+                        className="w-full px-3 py-2 text-xs rounded-xl bg-slate-50 border border-slate-300 font-mono font-bold text-slate-900 focus:outline-none focus:border-[#f6821f]"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block font-bold text-slate-700 mb-1">N° Orden de Compra Relacionada</label>
+                      <input
+                        type="text"
+                        value={purchaseInvoiceForm.purchaseOrderNumber}
+                        onChange={(e) => setPurchaseInvoiceForm({ ...purchaseInvoiceForm, purchaseOrderNumber: e.target.value })}
+                        placeholder="OC-2026-012"
+                        className="w-full px-3 py-2 text-xs rounded-xl bg-slate-50 border border-slate-300 font-mono text-slate-800 focus:outline-none focus:border-[#f6821f]"
+                      />
+                    </div>
+                    <div>
+                      <label className="block font-bold text-slate-700 mb-1">Proveedor Emitente *</label>
+                      <select
+                        value={purchaseInvoiceForm.vendorName}
+                        onChange={(e) => setPurchaseInvoiceForm({ ...purchaseInvoiceForm, vendorName: e.target.value })}
+                        className="w-full px-3 py-2 text-xs rounded-xl bg-slate-50 border border-slate-300 font-bold text-slate-900 focus:outline-none focus:border-[#f6821f]"
+                        required
+                      >
+                        {vendors.map((v) => (
+                          <option key={v.id} value={v.name}>
+                            {v.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
+                    <div>
+                      <label className="block font-semibold text-slate-700 mb-1">Fecha de Emisión</label>
+                      <input
+                        type="date"
+                        value={purchaseInvoiceForm.issueDate}
+                        onChange={(e) => setPurchaseInvoiceForm({ ...purchaseInvoiceForm, issueDate: e.target.value })}
+                        className="w-full px-3 py-2 text-xs rounded-xl bg-slate-50 border border-slate-300 font-medium text-slate-800 focus:outline-none focus:border-[#f6821f]"
+                      />
+                    </div>
+                    <div>
+                      <label className="block font-semibold text-slate-700 mb-1">Fecha de Vencimiento</label>
+                      <input
+                        type="date"
+                        value={purchaseInvoiceForm.dueDate}
+                        onChange={(e) => setPurchaseInvoiceForm({ ...purchaseInvoiceForm, dueDate: e.target.value })}
+                        className="w-full px-3 py-2 text-xs rounded-xl bg-slate-50 border border-slate-300 font-medium text-slate-800 focus:outline-none focus:border-[#f6821f]"
+                      />
+                    </div>
+                    <div>
+                      <label className="block font-semibold text-slate-700 mb-1">Moneda</label>
+                      <select
+                        value={purchaseInvoiceForm.currency}
+                        onChange={(e) => setPurchaseInvoiceForm({ ...purchaseInvoiceForm, currency: e.target.value })}
+                        className="w-full px-3 py-2 text-xs rounded-xl bg-slate-50 border border-slate-300 font-semibold text-slate-800 focus:outline-none focus:border-[#f6821f]"
+                      >
+                        <option value="USD">USD ($ - Dólar Estadounidense)</option>
+                        <option value="HNL">HNL (L - Lempira Hondureño)</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Received Items Card (Inventory Stock Update) */}
+                <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs space-y-4 text-xs">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                    <div>
+                      <h2 className="font-bold text-sm text-slate-900">Insumos y Productos a Ingresar a Stock</h2>
+                      <p className="text-[11px] text-slate-500">Selecciona el artículo para incrementar automáticamente su existencia actual.</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const first = inventory[0];
+                        setPurchaseInvoiceForm({
+                          ...purchaseInvoiceForm,
+                          items: [
+                            ...purchaseInvoiceForm.items,
+                            {
+                              sku: first?.sku || `MAT-${Math.floor(100+Math.random()*900)}`,
+                              description: first?.description || "Insumo Industrial",
+                              quantity: 1,
+                              unitCost: first?.cost || 50.0,
+                              lotNumber: "",
+                            },
+                          ],
+                        });
+                      }}
+                      className="px-3.5 py-1.5 rounded-xl bg-[#fff7ed] text-[#f6821f] border border-[#f6821f]/30 font-bold hover:bg-[#f6821f] hover:text-white transition cursor-pointer"
+                    >
+                      + Agregar Insumo
+                    </button>
+                  </div>
+
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs">
+                      <thead>
+                        <tr className="bg-slate-50 border-b border-slate-200 text-slate-700 font-bold">
+                          <th className="py-2.5 px-3">Artículo / SKU</th>
+                          <th className="py-2.5 px-3">Descripción</th>
+                          <th className="py-2.5 px-3 w-28">Cant. Recibida</th>
+                          <th className="py-2.5 px-3 w-32">Costo Unit. ($)</th>
+                          <th className="py-2.5 px-3 w-36">N° de Lote</th>
+                          <th className="py-2.5 px-3 text-right w-32">Total ($)</th>
+                          <th className="py-2.5 px-3 text-center w-12">Action</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {purchaseInvoiceForm.items.map((it, index) => (
+                          <tr key={index}>
+                            <td className="py-2.5 px-3">
+                              <select
+                                value={it.sku}
+                                onChange={(e) => {
+                                  const sel = inventory.find((inv) => inv.sku === e.target.value);
+                                  const updatedItems = [...purchaseInvoiceForm.items];
+                                  updatedItems[index] = {
+                                    ...updatedItems[index],
+                                    sku: e.target.value,
+                                    description: sel ? sel.description : updatedItems[index].description,
+                                    unitCost: sel ? sel.cost : updatedItems[index].unitCost,
+                                  };
+                                  setPurchaseInvoiceForm({ ...purchaseInvoiceForm, items: updatedItems });
+                                }}
+                                className="w-full px-2 py-1.5 text-xs rounded-lg bg-slate-50 border border-slate-300 font-mono font-bold text-slate-900 focus:outline-none"
+                              >
+                                {inventory.map((inv) => (
+                                  <option key={inv.id} value={inv.sku}>
+                                    {inv.sku} - {inv.description.slice(0, 30)}
+                                  </option>
+                                ))}
+                              </select>
+                            </td>
+                            <td className="py-2.5 px-3">
+                              <input
+                                type="text"
+                                value={it.description}
+                                onChange={(e) => {
+                                  const updatedItems = [...purchaseInvoiceForm.items];
+                                  updatedItems[index].description = e.target.value;
+                                  setPurchaseInvoiceForm({ ...purchaseInvoiceForm, items: updatedItems });
+                                }}
+                                className="w-full px-2 py-1.5 text-xs rounded-lg bg-white border border-slate-200 text-slate-800 focus:outline-none"
+                              />
+                            </td>
+                            <td className="py-2.5 px-3">
+                              <input
+                                type="number"
+                                step="1"
+                                min="1"
+                                value={it.quantity}
+                                onChange={(e) => {
+                                  const updatedItems = [...purchaseInvoiceForm.items];
+                                  updatedItems[index].quantity = Number(e.target.value) || 0;
+                                  setPurchaseInvoiceForm({ ...purchaseInvoiceForm, items: updatedItems });
+                                }}
+                                className="w-full px-2 py-1.5 text-xs rounded-lg bg-white border border-slate-300 font-bold text-slate-900 focus:outline-none"
+                              />
+                            </td>
+                            <td className="py-2.5 px-3">
+                              <input
+                                type="number"
+                                step="0.01"
+                                value={it.unitCost}
+                                onChange={(e) => {
+                                  const updatedItems = [...purchaseInvoiceForm.items];
+                                  updatedItems[index].unitCost = Number(e.target.value) || 0;
+                                  setPurchaseInvoiceForm({ ...purchaseInvoiceForm, items: updatedItems });
+                                }}
+                                className="w-full px-2 py-1.5 text-xs rounded-lg bg-white border border-slate-300 font-bold text-slate-900 focus:outline-none"
+                              />
+                            </td>
+                            <td className="py-2.5 px-3">
+                              <input
+                                type="text"
+                                placeholder="OPCIONAL LOTE"
+                                value={it.lotNumber}
+                                onChange={(e) => {
+                                  const updatedItems = [...purchaseInvoiceForm.items];
+                                  updatedItems[index].lotNumber = e.target.value;
+                                  setPurchaseInvoiceForm({ ...purchaseInvoiceForm, items: updatedItems });
+                                }}
+                                className="w-full px-2 py-1.5 text-xs rounded-lg bg-amber-50/50 border border-amber-200 font-mono text-amber-900 focus:outline-none"
+                              />
+                            </td>
+                            <td className="py-2.5 px-3 text-right font-bold text-slate-900">
+                              ${((it.quantity || 0) * (it.unitCost || 0)).toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                            </td>
+                            <td className="py-2.5 px-3 text-center">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const updatedItems = purchaseInvoiceForm.items.filter((_, i) => i !== index);
+                                  setPurchaseInvoiceForm({ ...purchaseInvoiceForm, items: updatedItems });
+                                }}
+                                className="text-slate-400 hover:text-red-600 font-bold p-1 cursor-pointer"
+                              >
+                                ✕
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Calculations Box */}
+                  <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 flex flex-col items-end space-y-1 text-xs">
+                    <div className="flex justify-between w-64 text-slate-600">
+                      <span>Subtotal:</span>
+                      <span className="font-mono font-bold">
+                        ${purchaseInvoiceForm.items.reduce((acc, it) => acc + (it.quantity || 0) * (it.unitCost || 0), 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                    <div className="flex justify-between w-64 text-slate-600">
+                      <span>ISV 15%:</span>
+                      <span className="font-mono font-bold">
+                        ${(purchaseInvoiceForm.items.reduce((acc, it) => acc + (it.quantity || 0) * (it.unitCost || 0), 0) * 0.15).toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                    <div className="flex justify-between w-64 text-slate-900 font-bold text-sm border-t border-slate-300 pt-1 mt-1">
+                      <span>TOTAL FACTURA COMPRA:</span>
+                      <span className="font-mono text-[#f6821f]">
+                        ${(purchaseInvoiceForm.items.reduce((acc, it) => acc + (it.quantity || 0) * (it.unitCost || 0), 0) * 1.15).toLocaleString("en-US", { minimumFractionDigits: 2 })} USD
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Notes Textarea */}
+                <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs text-xs space-y-2">
+                  <label className="block font-bold text-slate-700">Observaciones y Notas de Entrada</label>
+                  <textarea
+                    rows={3}
+                    value={purchaseInvoiceForm.notes}
+                    onChange={(e) => setPurchaseInvoiceForm({ ...purchaseInvoiceForm, notes: e.target.value })}
+                    placeholder="Detalles sobre estado de empaque, transporte o inspección de calidad al recibir insumos..."
+                    className="w-full p-3 text-xs rounded-xl bg-slate-50 border border-slate-300 text-slate-800 focus:outline-none focus:border-[#f6821f] resize-none"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+
+
+
           {/* ================= VIEW: CREAR FACTURA (Match screenshot) ================= */}
           {currentView === "factura-editor" && (
             <div className="fixed inset-0 z-40 flex flex-col bg-slate-100 text-slate-800 animate-in fade-in duration-150 overflow-hidden">
@@ -9071,16 +12371,17 @@ export default function AdminDashboard() {
                       <p><strong>Nota:</strong> {invoiceForm.customerNote}</p>
                     )}
                   </div>
-                  <div className="w-64 space-y-2 text-right font-mono text-xs">
-                    <div className="flex justify-between text-slate-600">
+                  <div className="w-64 space-y-2 text-right text-xs font-sans">
+                    <div className="flex justify-between text-slate-600 font-medium">
                       <span>Subtotal:</span>
                       <span className="font-bold text-slate-900">${invoiceSubtotal.toFixed(2)}</span>
                     </div>
-                    <div className="flex justify-between text-base font-black text-[#f6821f] border-t-2 border-slate-900 pt-2">
-                      <span>TOTAL A PAGAR:</span>
-                      <span>${invoiceTotal.toFixed(2)} USD</span>
+                    <div className="flex justify-between items-baseline text-[#f6821f] border-t-2 border-slate-900 pt-2">
+                      <span className="text-xs font-bold uppercase tracking-wider">TOTAL A PAGAR:</span>
+                      <span className="text-2xl font-bold">${invoiceTotal.toFixed(2)} USD</span>
                     </div>
                   </div>
+
                 </div>
 
                 {/* Signatures & Footer */}
@@ -9866,7 +13167,7 @@ export default function AdminDashboard() {
                   </button>
 
                   {/* Split Button 1: Guardar v */}
-                  <div className="relative inline-flex rounded-lg shadow-sm">
+                  <div data-dropdown="true" className="relative inline-flex rounded-lg shadow-sm">
                     <button
                       type="button"
                       onClick={() => {
@@ -9923,7 +13224,7 @@ export default function AdminDashboard() {
                   </div>
 
                   {/* Split Button 2: Revisar y enviar v */}
-                  <div className="relative inline-flex rounded-lg shadow-sm">
+                  <div data-dropdown="true" className="relative inline-flex rounded-lg shadow-sm">
                     <button
                       type="button"
                       disabled={sendingInvoiceEmail}
@@ -9979,16 +13280,114 @@ export default function AdminDashboard() {
                       </div>
                     )}
                   </div>
-
                 </div>
               </footer>
 
             </div>
           )}
 
-          {/* ================= VIEW: EDITAR ORDEN DE COMPRA (PÁGINA COMPLETA COMO CREAR FACTURA) ================= */}
-          {currentView === "orden-compra-editor" && (
-            <div className="fixed inset-0 z-40 flex flex-col bg-slate-100 text-slate-800 animate-in fade-in duration-150 overflow-hidden">
+
+          {/* OFFICIAL PRINTABLE CREDIT / DEBIT NOTE DOCUMENT */}
+          <div id="printable-note-document" className="hidden print:block p-8 bg-white text-slate-900 text-xs">
+
+                {/* Header */}
+                <div className="flex justify-between items-start border-b-2 border-slate-900 pb-6 mb-6">
+                  <div>
+                    <h1 className="text-2xl font-black text-[#f6821f] tracking-tight">WAYNE TRADEMARK</h1>
+                    <p className="font-bold text-slate-900 text-sm mt-1">{companySettings.nombre}</p>
+                    <p className="text-slate-600 text-xs">{companySettings.direccion}</p>
+                    <p className="text-slate-600 text-xs">RTN: {companySettings.taxId} | Tel: {companySettings.telefono}</p>
+                    <p className="text-slate-600 text-xs">Correo: {companySettings.email}</p>
+                  </div>
+                  <div className="text-right">
+                    <h2 className="text-2xl font-black text-slate-900">
+                      {selectedPrintNote?.type === "CREDIT" ? "NOTA DE CRÉDITO" : "NOTA DE DÉBITO"}
+                    </h2>
+                    <p className="font-mono font-bold text-slate-800 text-base">N.º {selectedPrintNote?.noteNumber || "NC-2026-001"}</p>
+                    <p className="text-slate-600 text-xs mt-1"><strong>Fecha de emisión:</strong> {selectedPrintNote?.issueDate || new Date().toISOString().split("T")[0]}</p>
+                    <p className="text-slate-600 text-xs"><strong>Estado:</strong> {selectedPrintNote?.status || "APLICADA"}</p>
+                  </div>
+                </div>
+
+                {/* Entity Details Box */}
+                <div className="bg-slate-50 p-4 rounded-xl border border-slate-300 mb-6 flex justify-between items-center">
+                  <div>
+                    <span className="text-[10px] font-bold text-slate-500 uppercase block">
+                      {selectedPrintNote?.entityType === "CUSTOMER" ? "Emitido a Cliente:" : "Emitido a Proveedor:"}
+                    </span>
+                    <span className="font-bold text-slate-900 text-sm">{selectedPrintNote?.entityName || "Cliente / Proveedor"}</span>
+                    {selectedPrintNote?.targetDocNum && (
+                      <p className="text-slate-600 text-xs mt-0.5"><strong>Documento Afectado:</strong> {selectedPrintNote.targetDocNum}</p>
+                    )}
+                  </div>
+                  <div className="text-right">
+                    <span className="text-xs text-slate-500 block">Moneda oficial:</span>
+                    <span className="font-bold text-slate-900 text-sm">USD ($)</span>
+                  </div>
+                </div>
+
+                {/* Adjustment Details Table */}
+                <table className="w-full text-left border-collapse mb-6">
+                  <thead>
+                    <tr className="border-b-2 border-slate-900 bg-slate-100 text-slate-900 font-bold">
+                      <th className="py-2.5 px-3">#</th>
+                      <th className="py-2.5 px-3">Concepto / Motivo de Ajuste</th>
+                      <th className="py-2.5 px-3">Doc. Afectado</th>
+                      <th className="py-2.5 px-3 text-right">Subtotal</th>
+                      <th className="py-2.5 px-3 text-right">ISV 15%</th>
+                      <th className="py-2.5 px-3 text-right">Total ($ USD)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr className="border-b border-slate-200">
+                      <td className="py-3 px-3 font-mono text-slate-500">1</td>
+                      <td className="py-3 px-3 font-bold text-slate-900">{selectedPrintNote?.reason || "Ajuste Contable"}</td>
+                      <td className="py-3 px-3 font-mono text-slate-600">{selectedPrintNote?.targetDocNum || "—"}</td>
+                      <td className="py-3 px-3 text-right font-bold">${(selectedPrintNote?.amount || 0).toFixed(2)}</td>
+                      <td className="py-3 px-3 text-right font-medium">${(selectedPrintNote?.tax || 0).toFixed(2)}</td>
+                      <td className="py-3 px-3 text-right font-bold text-slate-900">${(selectedPrintNote?.total || 0).toFixed(2)}</td>
+                    </tr>
+                  </tbody>
+                </table>
+
+                {/* Summary & Totals */}
+                <div className="flex justify-between items-start border-t border-slate-300 pt-4 mb-8">
+                  <div className="max-w-md text-xs text-slate-600">
+                    <p><strong>Observaciones:</strong> {selectedPrintNote?.notes || "Ajuste registrado en el sistema contable Macola ERP."}</p>
+                  </div>
+                  <div className="w-64 space-y-2 text-right text-xs font-sans">
+                    <div className="flex justify-between text-slate-600 font-medium">
+                      <span>Subtotal Ajustado:</span>
+                      <span className="font-bold text-slate-900">${(selectedPrintNote?.amount || 0).toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between text-slate-600 font-medium">
+                      <span>ISV (15%):</span>
+                      <span className="font-bold text-slate-900">${(selectedPrintNote?.tax || 0).toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between items-baseline text-[#f6821f] border-t-2 border-slate-900 pt-2">
+                      <span className="text-xs font-bold uppercase tracking-wider">TOTAL AJUSTADO:</span>
+                      <span className="text-2xl font-bold">${(selectedPrintNote?.total || 0).toFixed(2)} USD</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Signatures & Footer */}
+                <div className="mt-16 pt-8 border-t border-slate-200 grid grid-cols-2 gap-12 text-center text-xs text-slate-500">
+                  <div>
+                    <div className="border-b border-slate-400 w-48 mx-auto mb-2" />
+                    <p className="font-semibold text-slate-700">Autorizado por (Wayne Trademark)</p>
+                  </div>
+                  <div>
+                    <div className="border-b border-slate-400 w-48 mx-auto mb-2" />
+                    <p className="font-semibold text-slate-700">Recibido / Conformidad Beneficiario</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* ================= VIEW: EDITAR ORDEN DE COMPRA (PÁGINA COMPLETA COMO CREAR FACTURA) ================= */}
+              {currentView === "orden-compra-editor" && (
+                <div className="fixed inset-0 z-40 flex flex-col bg-slate-100 text-slate-800 animate-in fade-in duration-150 overflow-hidden">
+
               
               {/* OFFICIAL PRINTABLE PURCHASE ORDER DOCUMENT */}
               <div id="printable-po-document" className="hidden print:block p-8 bg-white text-slate-900 text-xs">
@@ -10491,7 +13890,7 @@ export default function AdminDashboard() {
                     Cancelar
                   </button>
 
-                  <div className="relative inline-flex rounded-lg shadow-sm">
+                  <div data-dropdown="true" className="relative inline-flex rounded-lg shadow-sm">
                     <button
                       type="button"
                       onClick={() => handleSavePOEditor()}
@@ -10543,7 +13942,7 @@ export default function AdminDashboard() {
                   </div>
 
                   {/* Split Button 2: Revisar y enviar (al proveedor por email) */}
-                  <div className="relative inline-flex rounded-lg shadow-sm">
+                  <div data-dropdown="true" className="relative inline-flex rounded-lg shadow-sm">
                     <button
                       type="button"
                       disabled={sendingPOEmail}
@@ -11140,7 +14539,7 @@ export default function AdminDashboard() {
                   Cancelar
                 </button>
 
-                <div className="relative inline-flex rounded-lg shadow-sm">
+                <div data-dropdown="true" className="relative inline-flex rounded-lg shadow-sm">
                   <button
                     type="button"
                     onClick={() => handleSaveDeposit(false)}
@@ -11489,7 +14888,7 @@ export default function AdminDashboard() {
                   Cancelar
                 </button>
 
-                <div className="relative inline-flex rounded-lg shadow-sm">
+                <div data-dropdown="true" className="relative inline-flex rounded-lg shadow-sm">
                   <button
                     type="button"
                     onClick={() => handleSaveGasto(false)}
@@ -11872,9 +15271,10 @@ export default function AdminDashboard() {
                     <span className="font-bold text-slate-900">{selectedBillIds.length} de {vendorBills.length}</span>
                   </div>
                   <div className="border-l border-slate-200 pl-6">
-                    <span className="text-slate-500 font-medium uppercase text-[10px] tracking-wider block">TOTAL A PAGAR</span>
-                    <span className="text-lg font-bold text-[#f6821f] font-mono">${totalPagarSum.toLocaleString("es-HN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD</span>
+                    <span className="text-slate-500 font-semibold uppercase text-xs tracking-wider block">TOTAL A PAGAR</span>
+                    <span className="text-3xl font-bold text-[#f6821f]">${totalPagarSum.toLocaleString("es-HN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD</span>
                   </div>
+
                 </div>
 
                 <div className="flex items-center gap-3">
@@ -11886,7 +15286,7 @@ export default function AdminDashboard() {
                     Cancelar
                   </button>
 
-                  <div className="relative inline-flex rounded-lg shadow-sm">
+                  <div data-dropdown="true" className="relative inline-flex rounded-lg shadow-sm">
                     <button
                       type="button"
                       disabled={selectedBillIds.length === 0}
@@ -12271,7 +15671,7 @@ export default function AdminDashboard() {
                 </button>
 
                 {/* Guardar y cerrar split-button */}
-                <div className="relative inline-flex rounded-lg shadow-sm">
+                <div data-dropdown="true" className="relative inline-flex rounded-lg shadow-sm">
                   <button
                     type="button"
                     disabled={recibirPagoLoading}
@@ -13189,6 +16589,22 @@ export default function AdminDashboard() {
                     </div>
                   </div>
 
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">
+                      Tipo de Rastreo de Inventario *
+                    </label>
+                    <select
+                      value={productForm.trackingType}
+                      onChange={(e) => setProductForm({ ...productForm, trackingType: e.target.value })}
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-amber-50/50 border border-amber-300 focus:outline-none focus:border-[#f6821f] text-slate-900 font-semibold cursor-pointer"
+                    >
+                      <option value="NONE">Sin rastreo (Inventario Estándar)</option>
+                      <option value="LOT">Control por Lotes y Vencimientos</option>
+                      <option value="SERIAL">Control por Números de Serie</option>
+
+                    </select>
+                  </div>
+
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="block font-semibold text-slate-700 mb-1">Costo Unitario ($)</label>
@@ -13213,6 +16629,7 @@ export default function AdminDashboard() {
                       />
                     </div>
                   </div>
+
 
                   <div className="pt-2 flex justify-end gap-2">
                     <button
@@ -13602,7 +17019,7 @@ export default function AdminDashboard() {
                   Cancelar
                 </button>
 
-                <div className="relative inline-flex rounded-lg shadow-sm">
+                <div data-dropdown="true" className="relative inline-flex rounded-lg shadow-sm">
                   <button
                     type="submit"
                     disabled={accountModalLoading}
@@ -13936,7 +17353,7 @@ export default function AdminDashboard() {
                 Cancelar
               </button>
 
-              <div className="relative inline-flex rounded-lg shadow-sm">
+              <div data-dropdown="true" className="relative inline-flex rounded-lg shadow-sm">
                 <button
                   type="submit"
                   disabled={productDrawerLoading}
@@ -14205,7 +17622,7 @@ export default function AdminDashboard() {
                 Cancelar
               </button>
 
-              <div className="relative inline-flex rounded-lg shadow-sm">
+              <div data-dropdown="true" className="relative inline-flex rounded-lg shadow-sm">
                 <button
                   type="submit"
                   disabled={customerDrawerLoading}
@@ -14479,7 +17896,7 @@ export default function AdminDashboard() {
                 Cancelar
               </button>
 
-              <div className="relative inline-flex rounded-lg shadow-sm">
+              <div data-dropdown="true" className="relative inline-flex rounded-lg shadow-sm">
                 <button
                   type="button"
                   disabled={vendorDrawerLoading}
@@ -15081,6 +18498,1110 @@ export default function AdminDashboard() {
           </div>
         </div>
       )}
+
+      {/* ================= MODAL: GESTIÓN DE LOTES Y VENCIMIENTOS ================= */}
+
+      {showLotModal && activeLotItem && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-2xl border border-slate-200 space-y-5">
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-700 font-bold text-xs border border-amber-200 inline-flex items-center gap-1.5">
+                    <Package className="w-3.5 h-3.5 text-amber-600" />
+                    <span>Lotes & Vencimientos</span>
+                  </span>
+                  <h3 className="text-base font-bold text-slate-900">{activeLotItem.sku}</h3>
+                </div>
+                <p className="text-xs text-slate-500 mt-1">{activeLotItem.description}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowLotModal(false)}
+                className="text-slate-400 hover:text-slate-700 text-lg cursor-pointer p-1 font-bold"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Notification Banners */}
+            {lotSuccess && (
+              <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs rounded-xl font-semibold">
+                {lotSuccess}
+              </div>
+            )}
+            {lotError && (
+              <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl font-semibold">
+                {lotError}
+              </div>
+            )}
+
+            {/* Add New Lot Form */}
+            <form onSubmit={handleCreateLot} className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3 text-xs">
+              <h4 className="font-bold text-slate-800">Registrar Nuevo Lote</h4>
+              <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-700 mb-1">N° de Lote *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="ej. LOT-2026-001"
+                    value={newLotForm.lotNumber}
+                    onChange={(e) => setNewLotForm({ ...newLotForm, lotNumber: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 font-mono text-slate-900 focus:outline-none focus:border-[#f6821f]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-700 mb-1">Cantidad *</label>
+                  <input
+                    type="number"
+                    required
+                    min="1"
+                    step="1"
+                    placeholder="0"
+                    value={newLotForm.quantity}
+                    onChange={(e) => setNewLotForm({ ...newLotForm, quantity: Number(e.target.value) })}
+                    className="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 font-mono text-slate-900 focus:outline-none focus:border-[#f6821f]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-700 mb-1">Fecha Fabricación</label>
+                  <input
+                    type="date"
+                    value={newLotForm.manufactureDate}
+                    onChange={(e) => setNewLotForm({ ...newLotForm, manufactureDate: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 text-slate-900 focus:outline-none focus:border-[#f6821f]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-700 mb-1">Fecha Vencimiento</label>
+                  <input
+                    type="date"
+                    value={newLotForm.expirationDate}
+                    onChange={(e) => setNewLotForm({ ...newLotForm, expirationDate: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 text-slate-900 focus:outline-none focus:border-[#f6821f]"
+                  />
+                </div>
+              </div>
+              <div className="flex items-center justify-between pt-1">
+                <input
+                  type="text"
+                  placeholder="Notas adicionales (opcional)..."
+                  value={newLotForm.notes}
+                  onChange={(e) => setNewLotForm({ ...newLotForm, notes: e.target.value })}
+                  className="flex-1 max-w-md px-3 py-1.5 rounded-xl bg-white border border-slate-300 text-slate-900 focus:outline-none focus:border-[#f6821f] text-xs"
+                />
+                <button
+                  type="submit"
+                  disabled={lotLoading}
+                  className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs transition cursor-pointer shadow-xs disabled:opacity-50"
+                >
+                  {lotLoading ? "Guardando..." : "+ Guardar Lote"}
+                </button>
+              </div>
+            </form>
+
+            {/* Lots List Table */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-xs font-semibold text-slate-700">
+                <span>Lotes Registrados ({lotList.length})</span>
+                <span className="font-mono text-slate-900 font-bold">
+                  Total Stock en Lotes: {lotList.reduce((acc, l) => acc + l.quantity, 0)} uds
+                </span>
+              </div>
+              <div className="max-h-60 overflow-y-auto border border-slate-200 rounded-xl">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-50 border-b border-slate-200 text-slate-700 font-semibold sticky top-0">
+                    <tr>
+                      <th className="p-2.5">N° Lote</th>
+                      <th className="p-2.5 text-right">Existencia</th>
+                      <th className="p-2.5">Fabricación</th>
+                      <th className="p-2.5">Vencimiento</th>
+                      <th className="p-2.5 text-center">Estado Vencimiento</th>
+                      <th className="p-2.5 text-right">Acción</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {lotList.map((lot) => {
+                      const expDate = lot.expirationDate ? new Date(lot.expirationDate) : null;
+                      const today = new Date();
+                      const daysLeft = expDate ? Math.ceil((expDate.getTime() - today.getTime()) / (1000 * 3600 * 24)) : null;
+
+                      let statusBadge = <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[10px]">Sin Vencimiento</span>;
+                      if (daysLeft !== null) {
+                        if (daysLeft < 0) {
+                          statusBadge = (
+                            <span className="px-2 py-0.5 rounded-full bg-red-100 text-red-700 font-bold text-[10px] inline-flex items-center gap-1">
+                              <AlertCircle className="w-3 h-3 text-red-600" />
+                              <span>Vencido ({Math.abs(daysLeft)}d)</span>
+                            </span>
+                          );
+                        } else if (daysLeft <= 30) {
+                          statusBadge = (
+                            <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 font-bold text-[10px] inline-flex items-center gap-1">
+                              <Clock className="w-3 h-3 text-amber-600" />
+                              <span>Por Vencer ({daysLeft}d)</span>
+                            </span>
+                          );
+                        } else {
+                          statusBadge = (
+                            <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-semibold text-[10px] inline-flex items-center gap-1">
+                              <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                              <span>Vigente ({daysLeft}d)</span>
+                            </span>
+                          );
+                        }
+                      }
+
+
+                      return (
+                        <tr key={lot.id} className="hover:bg-slate-50">
+                          <td className="p-2.5 font-mono font-bold text-slate-900">{lot.lotNumber}</td>
+                          <td className="p-2.5 text-right font-mono font-bold text-slate-800">{lot.quantity}</td>
+                          <td className="p-2.5 text-slate-500">{lot.manufactureDate ? new Date(lot.manufactureDate).toISOString().split("T")[0] : "—"}</td>
+                          <td className="p-2.5 font-medium text-slate-800">{lot.expirationDate ? new Date(lot.expirationDate).toISOString().split("T")[0] : "—"}</td>
+                          <td className="p-2.5 text-center">{statusBadge}</td>
+                          <td className="p-2.5 text-right">
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteLot(lot.id)}
+                              className="text-slate-400 hover:text-red-600 font-bold p-1 transition cursor-pointer"
+                              title="Eliminar lote"
+                            >
+                              ✕
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                    {lotList.length === 0 && (
+                      <tr>
+                        <td colSpan={6} className="p-6 text-center text-slate-400">
+                          No hay lotes registrados para este producto. Agrega uno usando el formulario arriba.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="flex justify-end pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setShowLotModal(false)}
+                className="px-5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs transition cursor-pointer"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ================= MODAL: GESTIÓN DE NÚMEROS DE SERIE ================= */}
+      {showSerialModal && activeSerialItem && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-2xl border border-slate-200 space-y-5">
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="px-2.5 py-0.5 rounded-full bg-purple-50 text-purple-700 font-bold text-xs border border-purple-200 inline-flex items-center gap-1.5">
+                    <Tag className="w-3.5 h-3.5 text-purple-600" />
+                    <span>Números de Serie</span>
+                  </span>
+
+                  <h3 className="text-base font-bold text-slate-900">{activeSerialItem.sku}</h3>
+                </div>
+                <p className="text-xs text-slate-500 mt-1">{activeSerialItem.description}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowSerialModal(false)}
+                className="text-slate-400 hover:text-slate-700 text-lg cursor-pointer p-1 font-bold"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Notifications */}
+            {serialSuccess && (
+              <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs rounded-xl font-semibold">
+                {serialSuccess}
+              </div>
+            )}
+            {serialError && (
+              <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl font-semibold">
+                {serialError}
+              </div>
+            )}
+
+            {/* Input Mode Toggle */}
+            <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3 text-xs">
+              <div className="flex items-center justify-between">
+                <h4 className="font-bold text-slate-800">Registrar Números de Serie</h4>
+                <div className="flex bg-slate-200 p-0.5 rounded-lg text-[11px] font-semibold">
+                  <button
+                    type="button"
+                    onClick={() => setSerialInputMode("single")}
+                    className={`px-3 py-1 rounded-md transition cursor-pointer ${
+                      serialInputMode === "single" ? "bg-white text-purple-700 shadow-xs" : "text-slate-600"
+                    }`}
+                  >
+                    Individual
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSerialInputMode("bulk")}
+                    className={`px-3 py-1 rounded-md transition cursor-pointer ${
+                      serialInputMode === "bulk" ? "bg-white text-purple-700 shadow-xs" : "text-slate-600"
+                    }`}
+                  >
+                    Carga Masiva (Varias Líneas)
+                  </button>
+                </div>
+              </div>
+
+              <form onSubmit={handleCreateSerial} className="space-y-3">
+                {serialInputMode === "single" ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-700 mb-1">N° de Serie *</label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="ej. SN-88492019"
+                        value={singleSerialForm.serialNumber}
+                        onChange={(e) => setSingleSerialForm({ ...singleSerialForm, serialNumber: e.target.value })}
+                        className="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 font-mono text-slate-900 focus:outline-none focus:border-purple-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-700 mb-1">Estado</label>
+                      <select
+                        value={singleSerialForm.status}
+                        onChange={(e) => setSingleSerialForm({ ...singleSerialForm, status: e.target.value })}
+                        className="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 text-slate-900 focus:outline-none focus:border-purple-500 cursor-pointer"
+                      >
+                        <option value="DISPONIBLE">DISPONIBLE</option>
+                        <option value="RESERVADO">RESERVADO</option>
+                        <option value="DEFECTUOSO">DEFECTUOSO</option>
+                      </select>
+                    </div>
+                    <div>
+                      <button
+                        type="submit"
+                        disabled={serialLoading}
+                        className="w-full py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs transition cursor-pointer shadow-xs disabled:opacity-50"
+                      >
+                        {serialLoading ? "Guardando..." : "+ Guardar Serie"}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <label className="block text-[11px] font-semibold text-slate-700">
+                      Ingresa o pega un listado de números de serie (un serie por línea o separado por comas):
+                    </label>
+                    <textarea
+                      rows={3}
+                      placeholder="SN-1001&#10;SN-1002&#10;SN-1003"
+                      value={bulkSerialText}
+                      onChange={(e) => setBulkSerialText(e.target.value)}
+                      className="w-full p-3 font-mono text-xs rounded-xl bg-white border border-slate-300 text-slate-900 focus:outline-none focus:border-purple-500"
+                    />
+                    <div className="flex justify-end">
+                      <button
+                        type="submit"
+                        disabled={serialLoading || !bulkSerialText.trim()}
+                        className="px-5 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs transition cursor-pointer shadow-xs disabled:opacity-50"
+                      >
+                        {serialLoading ? "Procesando masivo..." : "+ Registrar Lista de Series"}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </form>
+            </div>
+
+            {/* Filter Pills and List */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-xs">
+                <span className="font-semibold text-slate-700">Series Registradas ({serialList.length})</span>
+                <div className="flex gap-1">
+                  {["TODOS", "DISPONIBLE", "VENDIDO", "DEFECTUOSO"].map((st) => (
+                    <button
+                      key={st}
+                      type="button"
+                      onClick={() => setSerialFilterStatus(st)}
+                      className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold cursor-pointer transition ${
+                        serialFilterStatus === st
+                          ? "bg-purple-600 text-white"
+                          : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                      }`}
+                    >
+                      {st}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="max-h-60 overflow-y-auto border border-slate-200 rounded-xl">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-50 border-b border-slate-200 text-slate-700 font-semibold sticky top-0">
+                    <tr>
+                      <th className="p-2.5">Número de Serie</th>
+                      <th className="p-2.5 text-center">Estado</th>
+                      <th className="p-2.5 text-right">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {serialList
+                      .filter((s) => serialFilterStatus === "TODOS" || s.status === serialFilterStatus)
+                      .map((ser) => (
+                        <tr key={ser.id} className="hover:bg-slate-50">
+                          <td className="p-2.5 font-mono font-bold text-slate-900">{ser.serialNumber}</td>
+                          <td className="p-2.5 text-center">
+                            <select
+                              value={ser.status}
+                              onChange={(e) => handleUpdateSerialStatus(ser.id, e.target.value)}
+                              className={`px-2 py-0.5 rounded-full text-[10px] font-bold cursor-pointer border appearance-none outline-none ${
+                                ser.status === "DISPONIBLE"
+                                  ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                                  : ser.status === "VENDIDO"
+                                  ? "bg-blue-50 text-blue-700 border-blue-200"
+                                  : ser.status === "DEFECTUOSO"
+                                  ? "bg-red-50 text-red-700 border-red-200"
+                                  : "bg-amber-50 text-amber-700 border-amber-200"
+                              }`}
+                            >
+                              <option value="DISPONIBLE">DISPONIBLE</option>
+                              <option value="RESERVADO">RESERVADO</option>
+                              <option value="VENDIDO">VENDIDO</option>
+                              <option value="DEFECTUOSO">DEFECTUOSO</option>
+                            </select>
+                          </td>
+                          <td className="p-2.5 text-right">
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteSerial(ser.id)}
+                              className="text-slate-400 hover:text-red-600 font-bold p-1 transition cursor-pointer"
+                              title="Eliminar número de serie"
+                            >
+                              ✕
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    {serialList.length === 0 && (
+                      <tr>
+                        <td colSpan={3} className="p-6 text-center text-slate-400">
+                          No hay números de serie registrados para este producto.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="flex justify-end pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setShowSerialModal(false)}
+                className="px-5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs transition cursor-pointer"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ================= MODAL / DRAWER: NUEVA NOTA DE CRÉDITO / DÉBITO ================= */}
+      {showNoteModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs">
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6 space-y-5 animate-in zoom-in-95 duration-150">
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <span className="p-2 rounded-xl bg-[#fff7ed] text-[#f6821f]">
+                  <FileText className="w-5 h-5" />
+                </span>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">
+                    Emitir {noteForm.type === "CREDIT" ? "Nota de Crédito" : "Nota de Débito"}
+                  </h3>
+                  <p className="text-xs text-slate-500">Ajuste de saldo, devoluciones e intereses para Macola & SAR</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowNoteModal(false)}
+                className="text-slate-400 hover:text-slate-700 text-lg cursor-pointer p-1 font-bold"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Notifications */}
+            {noteSuccess && (
+              <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs rounded-xl font-bold">
+                ✓ {noteSuccess}
+              </div>
+            )}
+            {noteError && (
+              <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl font-bold">
+                ⚠ {noteError}
+              </div>
+            )}
+
+            <form onSubmit={handleSaveNote} className="space-y-4 text-xs">
+              {/* Type Toggle: Nota de Crédito vs Nota de Débito */}
+              <div className="grid grid-cols-2 gap-3 bg-slate-100 p-1 rounded-2xl font-bold">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const nextNum = `NC-2026-00${creditDebitNotes.length + 1}`;
+                    setNoteForm({ ...noteForm, type: "CREDIT", noteNumber: nextNum });
+                  }}
+                  className={`py-2.5 rounded-xl transition cursor-pointer flex items-center justify-center gap-2 ${
+                    noteForm.type === "CREDIT"
+                      ? "bg-emerald-600 text-white shadow-xs"
+                      : "text-slate-600 hover:text-slate-900"
+                  }`}
+                >
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span>Nota de Crédito (Reduce Saldo)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const nextNum = `ND-2026-00${creditDebitNotes.length + 1}`;
+                    setNoteForm({ ...noteForm, type: "DEBIT", noteNumber: nextNum });
+                  }}
+                  className={`py-2.5 rounded-xl transition cursor-pointer flex items-center justify-center gap-2 ${
+                    noteForm.type === "DEBIT"
+                      ? "bg-blue-600 text-white shadow-xs"
+                      : "text-slate-600 hover:text-slate-900"
+                  }`}
+                >
+                  <FileText className="w-4 h-4" />
+                  <span>Nota de Débito (Aumenta Saldo)</span>
+                </button>
+              </div>
+
+              {/* Entity Type & Note Number */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Dirigido a *</label>
+                  <select
+                    value={noteForm.entityType}
+                    onChange={(e) => {
+                      const et = e.target.value as "CUSTOMER" | "VENDOR";
+                      setNoteForm({ ...noteForm, entityType: et, entityName: "" });
+                    }}
+                    className="w-full px-3 py-2 text-xs rounded-xl bg-slate-50 border border-slate-300 font-semibold text-slate-800 focus:outline-none focus:border-[#f6821f]"
+                  >
+                    <option value="CUSTOMER">Cliente (Cuentas por Cobrar)</option>
+                    <option value="VENDOR">Proveedor (Cuentas por Pagar)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">N.º de Nota *</label>
+                  <input
+                    type="text"
+                    value={noteForm.noteNumber}
+                    onChange={(e) => setNoteForm({ ...noteForm, noteNumber: e.target.value })}
+                    className="w-full px-3 py-2 text-xs rounded-xl bg-slate-50 border border-slate-300 font-mono font-bold text-slate-900 focus:outline-none focus:border-[#f6821f]"
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* Beneficiary Name & Target Invoice */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">
+                    {noteForm.entityType === "CUSTOMER" ? "Seleccionar Cliente *" : "Seleccionar Proveedor *"}
+                  </label>
+                  <select
+                    value={noteForm.entityName}
+                    onChange={(e) => setNoteForm({ ...noteForm, entityName: e.target.value })}
+                    className="w-full px-3 py-2 text-xs rounded-xl bg-slate-50 border border-slate-300 font-bold text-slate-900 focus:outline-none focus:border-[#f6821f]"
+                    required
+                  >
+                    <option value="">Selecciona beneficiario...</option>
+                    {noteForm.entityType === "CUSTOMER"
+                      ? customers.map((c) => <option key={c.id} value={c.name}>{c.name}</option>)
+                      : vendors.map((v) => <option key={v.id} value={v.name}>{v.name}</option>)}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Factura o Documento Afectado</label>
+                  <input
+                    type="text"
+                    placeholder="Ej. FAC-2026-004 o OC-2026-012"
+                    value={noteForm.targetDocNum || ""}
+                    onChange={(e) => setNoteForm({ ...noteForm, targetDocNum: e.target.value })}
+                    className="w-full px-3 py-2 text-xs rounded-xl bg-slate-50 border border-slate-300 font-mono text-slate-800 focus:outline-none focus:border-[#f6821f]"
+                  />
+                </div>
+              </div>
+
+              {/* Reason / Motivo & Issue Date */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Motivo / Concepto del Ajuste *</label>
+                  <select
+                    value={noteForm.reason}
+                    onChange={(e) => setNoteForm({ ...noteForm, reason: e.target.value })}
+                    className="w-full px-3 py-2 text-xs rounded-xl bg-slate-50 border border-slate-300 font-medium text-slate-800 focus:outline-none focus:border-[#f6821f]"
+                  >
+                    <option value="Devolución de Insumos / Mercadería Defectuosa">Devolución de Insumos / Mercadería Defectuosa</option>
+                    <option value="Descuento por Volumen en Facturación">Descuento por Volumen en Facturación</option>
+                    <option value="Ajuste por Error en Precio Unitario">Ajuste por Error en Precio Unitario</option>
+                    <option value="Cargo por Flete Especial y Despacho">Cargo por Flete Especial y Despacho</option>
+                    <option value="Intereses por Pago Fuera de Plazo (Mora)">Intereses por Pago Fuera de Plazo (Mora)</option>
+                    <option value="Otros Ajustes Contables SAR/Macola">Otros Ajustes Contables SAR/Macola</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Fecha de Emisión *</label>
+                  <input
+                    type="date"
+                    value={noteForm.issueDate}
+                    onChange={(e) => setNoteForm({ ...noteForm, issueDate: e.target.value })}
+                    className="w-full px-3 py-2 text-xs rounded-xl bg-slate-50 border border-slate-300 font-mono text-slate-800 focus:outline-none focus:border-[#f6821f]"
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* Amounts Calculation (Subtotal, ISV 15%, Total) */}
+              <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 grid grid-cols-3 gap-3">
+                <div>
+                  <label className="block font-semibold text-slate-600 mb-1">Monto Subtotal ($)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={noteForm.amount || ""}
+                    onChange={(e) => {
+                      const amt = Number(e.target.value) || 0;
+                      const isv = amt * 0.15;
+                      setNoteForm({ ...noteForm, amount: amt, tax: isv, total: amt + isv });
+                    }}
+                    className="w-full px-3 py-2 text-xs rounded-xl bg-white border border-slate-300 font-bold text-slate-900 focus:outline-none focus:border-[#f6821f]"
+                    placeholder="0.00"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-600 mb-1">ISV 15% ($)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={noteForm.tax || ""}
+                    onChange={(e) => {
+                      const isv = Number(e.target.value) || 0;
+                      setNoteForm({ ...noteForm, tax: isv, total: (noteForm.amount || 0) + isv });
+                    }}
+                    className="w-full px-3 py-2 text-xs rounded-xl bg-white border border-slate-300 font-medium text-slate-800 focus:outline-none focus:border-[#f6821f]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Total Final ($ USD)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={noteForm.total || ""}
+                    readOnly
+                    className="w-full px-3 py-2 text-xs rounded-xl bg-emerald-50 border border-emerald-300 font-bold text-emerald-900 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              {/* Notes / Comentarios */}
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Notas / Observaciones del Ajuste</label>
+                <textarea
+                  rows={2}
+                  value={noteForm.notes || ""}
+                  onChange={(e) => setNoteForm({ ...noteForm, notes: e.target.value })}
+                  placeholder="Detalles adicionales para auditoría contable..."
+                  className="w-full p-3 text-xs rounded-xl bg-slate-50 border border-slate-300 text-slate-800 focus:outline-none focus:border-[#f6821f] resize-none"
+                />
+              </div>
+
+              {/* Form Buttons */}
+              <div className="flex justify-end gap-3 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setShowNoteModal(false)}
+                  className="px-5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs transition cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={noteLoading}
+                  className="px-6 py-2 rounded-xl bg-[#f6821f] hover:bg-[#e07216] text-white font-bold text-xs transition cursor-pointer shadow-md disabled:opacity-50"
+                >
+                  {noteLoading ? "Guardando..." : `Emitir ${noteForm.type === "CREDIT" ? "Nota de Crédito" : "Nota de Débito"}`}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ================= MODAL: REGISTRAR / EDITAR VENDEDOR ================= */}
+      {showSalesRepDrawer && (
+        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-lg w-full overflow-hidden animate-in zoom-in-95 duration-150">
+            <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+              <div className="flex items-center gap-2">
+                <Users className="w-5 h-5 text-[#f6821f]" />
+                <h3 className="font-bold text-base text-slate-900">
+                  {editingRepId ? "Editar Vendedor / Esquema" : "Registrar Nuevo Vendedor"}
+                </h3>
+              </div>
+              <button
+                onClick={() => setShowSalesRepDrawer(false)}
+                className="text-slate-400 hover:text-slate-600 transition cursor-pointer p-1"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveSalesRep} className="p-6 space-y-4 text-xs">
+              {salesRepError && (
+                <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-xl font-medium">
+                  {salesRepError}
+                </div>
+              )}
+              {salesRepSuccess && (
+                <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-xl font-medium">
+                  {salesRepSuccess}
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Código de Vendedor *</label>
+                  <input
+                    type="text"
+                    value={salesRepForm.code}
+                    onChange={(e) => setSalesRepForm({ ...salesRepForm, code: e.target.value })}
+                    placeholder="VEND-001"
+                    className="w-full px-3 py-2 text-xs rounded-xl bg-slate-50 border border-slate-300 font-mono font-bold text-slate-900 focus:outline-none focus:border-[#f6821f]"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Estado de Cuenta</label>
+                  <select
+                    value={salesRepForm.status}
+                    onChange={(e) => setSalesRepForm({ ...salesRepForm, status: e.target.value })}
+                    className="w-full px-3 py-2 text-xs rounded-xl bg-slate-50 border border-slate-300 font-semibold text-slate-800 focus:outline-none focus:border-[#f6821f]"
+                  >
+                    <option value="ACTIVO">ACTIVO</option>
+                    <option value="INACTIVO">INACTIVO</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Nombre Completo del Ejecutivo *</label>
+                <input
+                  type="text"
+                  value={salesRepForm.name}
+                  onChange={(e) => setSalesRepForm({ ...salesRepForm, name: e.target.value })}
+                  placeholder="Ej. Carlos Roberto Mendoza"
+                  className="w-full px-3 py-2 text-xs rounded-xl bg-white border border-slate-300 font-bold text-slate-900 focus:outline-none focus:border-[#f6821f]"
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Correo Electrónico</label>
+                  <input
+                    type="email"
+                    value={salesRepForm.email}
+                    onChange={(e) => setSalesRepForm({ ...salesRepForm, email: e.target.value })}
+                    placeholder="ejecutivo@waynetrademarkhn.com"
+                    className="w-full px-3 py-2 text-xs rounded-xl bg-slate-50 border border-slate-300 font-medium text-slate-800 focus:outline-none focus:border-[#f6821f]"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Teléfono Móvil</label>
+                  <input
+                    type="text"
+                    value={salesRepForm.phone}
+                    onChange={(e) => setSalesRepForm({ ...salesRepForm, phone: e.target.value })}
+                    placeholder="+504 9900-1122"
+                    className="w-full px-3 py-2 text-xs rounded-xl bg-slate-50 border border-slate-300 font-medium text-slate-800 focus:outline-none focus:border-[#f6821f]"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Zona Comercial Asignada</label>
+                <select
+                  value={salesRepForm.zone}
+                  onChange={(e) => setSalesRepForm({ ...salesRepForm, zone: e.target.value })}
+                  className="w-full px-3 py-2 text-xs rounded-xl bg-slate-50 border border-slate-300 font-semibold text-slate-800 focus:outline-none focus:border-[#f6821f]"
+                >
+                  <option value="San Pedro Sula / Zona Norte">San Pedro Sula / Zona Norte</option>
+                  <option value="Tegucigalpa / Zona Central">Tegucigalpa / Zona Central</option>
+                  <option value="La Ceiba / Zona Atlántica">La Ceiba / Zona Atlántica</option>
+                  <option value="Choluteca / Zona Sur">Choluteca / Zona Sur</option>
+                  <option value="Exportaciones / Internacional">Exportaciones / Internacional</option>
+                </select>
+              </div>
+
+              {/* Commission Config Box */}
+              <div className="bg-orange-50/50 p-4 rounded-xl border border-orange-200/80 space-y-3">
+                <span className="font-bold text-[#f6821f] text-xs uppercase tracking-wider block">
+                  Configuración del Esquema de Comisión
+                </span>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">Porcentaje Base (%)</label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      value={salesRepForm.commissionRate}
+                      onChange={(e) => setSalesRepForm({ ...salesRepForm, commissionRate: Number(e.target.value) })}
+                      className="w-full px-3 py-2 text-xs rounded-xl bg-white border border-slate-300 font-bold text-[#f6821f] focus:outline-none focus:border-[#f6821f]"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">Tipo de Estructura</label>
+                    <select
+                      value={salesRepForm.commissionType}
+                      onChange={(e) => setSalesRepForm({ ...salesRepForm, commissionType: e.target.value })}
+                      className="w-full px-3 py-2 text-xs rounded-xl bg-white border border-slate-300 font-semibold text-slate-800 focus:outline-none focus:border-[#f6821f]"
+                    >
+                      <option value="PERCENTAGE">Porcentaje Fijo sobre Venta</option>
+                      <option value="TIERED">Escalonado por Metas</option>
+                      <option value="TARGET_BONUS">Bono por Cuota Mensual</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Meta Mensual de Ventas ($ USD)</label>
+                  <input
+                    type="number"
+                    step="500"
+                    value={salesRepForm.monthlyTarget}
+                    onChange={(e) => setSalesRepForm({ ...salesRepForm, monthlyTarget: Number(e.target.value) })}
+                    className="w-full px-3 py-2 text-xs rounded-xl bg-white border border-slate-300 font-bold text-slate-900 focus:outline-none focus:border-[#f6821f]"
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* Form Buttons */}
+              <div className="flex justify-end gap-3 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setShowSalesRepDrawer(false)}
+                  className="px-5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs transition cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={salesRepLoading}
+                  className="px-6 py-2 rounded-xl bg-[#f6821f] hover:bg-[#e07216] text-white font-bold text-xs transition cursor-pointer shadow-md disabled:opacity-50"
+                >
+                  {salesRepLoading ? "Guardando..." : editingRepId ? "Guardar Cambios" : "Registrar Vendedor"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ================= MODAL: REGISTRAR CÁLCULO DE COMISIÓN ================= */}
+      {showCommissionModal && (
+        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-lg w-full overflow-hidden animate-in zoom-in-95 duration-150">
+            <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+              <div className="flex items-center gap-2">
+                <FileText className="w-5 h-5 text-[#f6821f]" />
+                <h3 className="font-bold text-base text-slate-900">Registrar Cálculo de Comisión</h3>
+              </div>
+              <button
+                onClick={() => setShowCommissionModal(false)}
+                className="text-slate-400 hover:text-slate-600 transition cursor-pointer p-1"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveCommission} className="p-6 space-y-4 text-xs">
+              {commError && (
+                <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-xl font-medium">
+                  {commError}
+                </div>
+              )}
+              {commSuccess && (
+                <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-xl font-medium">
+                  {commSuccess}
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Vendedor / Ejecutivo *</label>
+                  <select
+                    value={commissionForm.salesRepId}
+                    onChange={(e) => {
+                      const rep = salesReps.find((r) => r.id === e.target.value);
+                      const rate = rep ? rep.commissionRate : 5.0;
+                      const saleAmount = commissionForm.saleAmount || 0;
+                      setCommissionForm({
+                        ...commissionForm,
+                        salesRepId: e.target.value,
+                        commissionRate: rate,
+                        commissionAmount: (saleAmount * rate) / 100,
+                      });
+                    }}
+                    className="w-full px-3 py-2 text-xs rounded-xl bg-slate-50 border border-slate-300 font-bold text-slate-900 focus:outline-none focus:border-[#f6821f]"
+                    required
+                  >
+                    <option value="">Seleccione Vendedor...</option>
+                    {salesReps.map((r) => (
+                      <option key={r.id} value={r.id}>
+                        {r.code} - {r.name} ({r.commissionRate}%)
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Período Fiscal</label>
+                  <input
+                    type="month"
+                    value={commissionForm.period}
+                    onChange={(e) => setCommissionForm({ ...commissionForm, period: e.target.value })}
+                    className="w-full px-3 py-2 text-xs rounded-xl bg-slate-50 border border-slate-300 font-mono font-bold text-slate-800 focus:outline-none focus:border-[#f6821f]"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">N° Factura Afectada</label>
+                  <input
+                    type="text"
+                    value={commissionForm.invoiceNumber}
+                    onChange={(e) => setCommissionForm({ ...commissionForm, invoiceNumber: e.target.value })}
+                    placeholder="FAC-2026-004"
+                    className="w-full px-3 py-2 text-xs rounded-xl bg-white border border-slate-300 font-mono text-slate-900 focus:outline-none focus:border-[#f6821f]"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Nombre del Cliente</label>
+                  <input
+                    type="text"
+                    value={commissionForm.customerName}
+                    onChange={(e) => setCommissionForm({ ...commissionForm, customerName: e.target.value })}
+                    placeholder="Embotelladora de Sula S.A."
+                    className="w-full px-3 py-2 text-xs rounded-xl bg-white border border-slate-300 font-medium text-slate-900 focus:outline-none focus:border-[#f6821f]"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-3 bg-emerald-50/50 p-4 rounded-xl border border-emerald-200/80">
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Monto Venta ($)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={commissionForm.saleAmount || ""}
+                    onChange={(e) => {
+                      const amount = Number(e.target.value) || 0;
+                      const rate = commissionForm.commissionRate || 5.0;
+                      setCommissionForm({
+                        ...commissionForm,
+                        saleAmount: amount,
+                        commissionAmount: (amount * rate) / 100,
+                      });
+                    }}
+                    className="w-full px-3 py-2 text-xs rounded-xl bg-white border border-slate-300 font-bold text-slate-900 focus:outline-none focus:border-[#f6821f]"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">% Comisión</label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    value={commissionForm.commissionRate}
+                    onChange={(e) => {
+                      const rate = Number(e.target.value) || 0;
+                      const amount = commissionForm.saleAmount || 0;
+                      setCommissionForm({
+                        ...commissionForm,
+                        commissionRate: rate,
+                        commissionAmount: (amount * rate) / 100,
+                      });
+                    }}
+                    className="w-full px-3 py-2 text-xs rounded-xl bg-white border border-slate-300 font-bold text-[#f6821f] focus:outline-none focus:border-[#f6821f]"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-emerald-800 mb-1">Comisión ($)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={commissionForm.commissionAmount || ""}
+                    readOnly
+                    className="w-full px-3 py-2 text-xs rounded-xl bg-emerald-100 border border-emerald-300 font-bold text-emerald-900 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              {/* Form Buttons */}
+              <div className="flex justify-end gap-3 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setShowCommissionModal(false)}
+                  className="px-5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs transition cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={commLoading}
+                  className="px-6 py-2 rounded-xl bg-[#f6821f] hover:bg-[#e07216] text-white font-bold text-xs transition cursor-pointer shadow-md disabled:opacity-50"
+                >
+                  {commLoading ? "Guardando..." : "Registrar Comisión"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ================= MODAL: DETALLE DE FACTURA DE COMPRA ================= */}
+      {selectedDetailPurchaseInvoice && (
+
+        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-2xl w-full overflow-hidden animate-in zoom-in-95 duration-150">
+            <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+              <div>
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Factura de Compra</span>
+                <h3 className="font-bold text-base text-slate-900 font-mono">
+                  {selectedDetailPurchaseInvoice.invoiceNumber}
+                </h3>
+              </div>
+              <button
+                onClick={() => setSelectedDetailPurchaseInvoice(null)}
+                className="text-slate-400 hover:text-slate-600 transition cursor-pointer p-1"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-5 text-xs">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200">
+                <div>
+                  <span className="text-slate-500 text-[11px] block">Proveedor</span>
+                  <span className="font-bold text-slate-900 block mt-0.5">{selectedDetailPurchaseInvoice.vendorName}</span>
+                </div>
+                <div>
+                  <span className="text-slate-500 text-[11px] block">OC Relacionada</span>
+                  <span className="font-mono font-bold text-slate-800 block mt-0.5">{selectedDetailPurchaseInvoice.purchaseOrderNumber || "—"}</span>
+                </div>
+                <div>
+                  <span className="text-slate-500 text-[11px] block">Fecha Emisión</span>
+                  <span className="font-medium text-slate-800 block mt-0.5">{selectedDetailPurchaseInvoice.issueDate}</span>
+                </div>
+                <div>
+                  <span className="text-slate-500 text-[11px] block">Estado Pago</span>
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold inline-block mt-0.5 ${
+                    selectedDetailPurchaseInvoice.paymentStatus === "PAGADA" ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"
+                  }`}>
+                    {selectedDetailPurchaseInvoice.paymentStatus}
+                  </span>
+                </div>
+              </div>
+
+              <div>
+                <h4 className="font-bold text-slate-900 mb-2">Insumos y Productos Ingresados a Inventario</h4>
+                <div className="border border-slate-200 rounded-xl overflow-hidden">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-slate-50 border-b border-slate-200 text-slate-700 font-bold">
+                      <tr>
+                        <th className="p-2.5">SKU</th>
+                        <th className="p-2.5">Descripción</th>
+                        <th className="p-2.5 text-center">Cant.</th>
+                        <th className="p-2.5 text-right">Costo Unit.</th>
+                        <th className="p-2.5 text-center">Lote</th>
+                        <th className="p-2.5 text-right">Total ($)</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {selectedDetailPurchaseInvoice.items?.map((it, idx) => (
+                        <tr key={idx}>
+                          <td className="p-2.5 font-mono font-bold text-slate-800">{it.sku}</td>
+                          <td className="p-2.5 text-slate-700">{it.description}</td>
+                          <td className="p-2.5 text-center font-bold text-slate-900">+{it.quantity}</td>
+                          <td className="p-2.5 text-right font-mono">${it.unitCost.toFixed(2)}</td>
+                          <td className="p-2.5 text-center font-mono text-amber-800">{it.lotNumber || "—"}</td>
+                          <td className="p-2.5 text-right font-bold text-slate-900">${it.totalCost.toFixed(2)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 flex justify-between items-center font-bold text-slate-900">
+                <span>Total Factura Fiscal:</span>
+                <span className="text-base text-[#f6821f] font-mono">${selectedDetailPurchaseInvoice.total.toFixed(2)} USD</span>
+              </div>
+
+              {selectedDetailPurchaseInvoice.notes && (
+                <div className="text-[11px] text-slate-600 bg-amber-50/40 p-3 rounded-xl border border-amber-200/60">
+                  <span className="font-bold block mb-0.5">Observaciones:</span>
+                  {selectedDetailPurchaseInvoice.notes}
+                </div>
+              )}
+            </div>
+
+            <div className="p-4 border-t border-slate-100 flex justify-end bg-slate-50">
+              <button
+                type="button"
+                onClick={() => setSelectedDetailPurchaseInvoice(null)}
+                className="px-5 py-2 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold text-xs transition cursor-pointer"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
+
+
+

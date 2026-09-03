@@ -31,6 +31,14 @@ export async function GET(request: NextRequest) {
         orderBy: { sku: "asc" },
         skip,
         take: limit,
+        include: {
+          lots: {
+            orderBy: { expirationDate: "asc" },
+          },
+          serials: {
+            orderBy: { serialNumber: "asc" },
+          },
+        },
       }),
     ]);
 
@@ -55,7 +63,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { sku, description, quantity, cost, price } = body;
+    const { sku, description, quantity, cost, price, trackingType } = body;
 
     if (!sku || !description) {
       return NextResponse.json(
@@ -82,10 +90,16 @@ export async function POST(request: NextRequest) {
         quantity: quantity !== undefined ? Number(quantity) : 0,
         cost: cost !== undefined ? Number(cost) : 0,
         price: price !== undefined ? Number(price) : 0,
+        trackingType: trackingType || "NONE",
+      },
+      include: {
+        lots: true,
+        serials: true,
       },
     });
 
     return NextResponse.json({ success: true, data: item }, { status: 201 });
+
   } catch (error: unknown) {
     console.error("POST /api/inventory error:", error);
     const message = error instanceof Error ? error.message : "Internal Server Error";
