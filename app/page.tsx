@@ -69,8 +69,8 @@ export default function AdminDashboard() {
   const [newAccountForm, setNewAccountForm] = useState({
     code: "",
     name: "",
-    type: "ACTIVO",
-    detailType: "Efectivo y equivalentes de efectivo",
+    type: "Efectivo y equivalentes de efectivo",
+    detailType: "Banco",
     isSubAccount: false,
     parentAccountId: "",
     description: "",
@@ -263,7 +263,7 @@ export default function AdminDashboard() {
   };
 
   // Official Account Types and Subtypes Hierarchy
-  const ACCOUNT_HIERARCHY: Record<string, string[]> = {
+  const ACCOUNT_CATEGORIES: Record<string, string[]> = {
     ACTIVO: [
       "Efectivo y equivalentes de efectivo",
       "Cuentas por cobrar (C/C)",
@@ -291,13 +291,154 @@ export default function AdminDashboard() {
     ],
   };
 
-  const normalizeAccountType = (type: string): string => {
-    const t = (type || "").toUpperCase().trim();
-    if (t === "PASIVO") return "RESPONSABILIDAD";
-    if (t === "CAPITAL" || t === "PATRIMONIO") return "FONDOS PROPIOS";
-    if (t === "INGRESO") return "INGRESOS";
-    if (t === "GASTOS") return "GASTO";
-    return t;
+  const DETAIL_TYPES_MAP: Record<string, string[]> = {
+    "Efectivo y equivalentes de efectivo": [
+      "Banco",
+      "Caja chica",
+      "Dinero en efectivo",
+      "Dinero recibido sin depositar",
+    ],
+    "Cuentas por cobrar (C/C)": [
+      "Cuentas por cobrar",
+    ],
+    "Activos corrientes": [
+      "Inventario",
+      "Pagos anticipados",
+      "Gastos pagados por adelantado",
+      "Otros activos corrientes",
+    ],
+    "Activos fijos": [
+      "Maquinaria y equipo",
+      "Mobiliario y enseres",
+      "Vehículos",
+      "Edificios",
+      "Terrenos",
+      "Depreciación acumulada",
+    ],
+    "Activos no corrientes": [
+      "Activos intangibles",
+      "Depósitos de garantía",
+      "Inversiones a largo plazo",
+      "Otros activos no corrientes",
+    ],
+    "Tarjeta de crédito": [
+      "Tarjeta de crédito",
+    ],
+    "Cuentas por pagar (C/P)": [
+      "Cuentas por pagar",
+    ],
+    "Pasivos corrientes": [
+      "Nómina por pagar",
+      "Impuestos sobre ventas por pagar",
+      "Préstamos a corto plazo",
+      "Otros pasivos corrientes",
+    ],
+    "Pasivos no corrientes": [
+      "Hipotecas por pagar",
+      "Préstamos a largo plazo",
+      "Otros pasivos a largo plazo",
+    ],
+    "Fondos propios del propietario": [
+      "Capital del propietario",
+      "Aportaciones del propietario",
+      "Retiros del propietario",
+      "Ganancias retenidas",
+    ],
+    "Ingresos": [
+      "Ventas de productos",
+      "Ingresos por servicios",
+      "Descuentos sobre ventas",
+    ],
+    "Otros ingresos": [
+      "Ingresos por intereses",
+      "Dividendos",
+      "Ganancias cambiarias",
+      "Otros ingresos varios",
+    ],
+    "Costo de las ventas": [
+      "Costo de mercancía vendida",
+      "Mano de obra directa",
+      "Suministros y materiales",
+    ],
+    "Gastos": [
+      "Publicidad y promoción",
+      "Alquiler de oficinas",
+      "Reparación y mantenimiento",
+      "Sueldos y salarios",
+      "Servicios públicos",
+      "Seguros",
+      "Gastos de viaje",
+    ],
+    "Otros gastos": [
+      "Gastos por intereses",
+      "Pérdidas cambiarias",
+      "Cargos bancarios",
+      "Otros gastos varios",
+    ],
+  };
+
+  const getAccountClassification = (type: string, name: string) => {
+    const t = (type || "").trim();
+    const n = (name || "").toLowerCase();
+
+    for (const [cat, subTypes] of Object.entries(ACCOUNT_CATEGORIES)) {
+      if (subTypes.includes(t)) {
+        return { category: cat, accountType: t };
+      }
+    }
+
+    const upper = t.toUpperCase();
+    if (upper === "ASSET" || upper === "ACTIVO") {
+      if (n.includes("cash") || n.includes("checking") || n.includes("banco") || n.includes("caja")) {
+        return { category: "ACTIVO", accountType: "Efectivo y equivalentes de efectivo" };
+      }
+      if (n.includes("receivable") || n.includes("cobrar") || n.includes("cliente")) {
+        return { category: "ACTIVO", accountType: "Cuentas por cobrar (C/C)" };
+      }
+      if (n.includes("fijo") || n.includes("equipment") || n.includes("building") || n.includes("machinery")) {
+        return { category: "ACTIVO", accountType: "Activos fijos" };
+      }
+      if (n.includes("non-current") || n.includes("largo plazo") || n.includes("no corriente")) {
+        return { category: "ACTIVO", accountType: "Activos no corrientes" };
+      }
+      return { category: "ACTIVO", accountType: "Activos corrientes" };
+    }
+
+    if (upper === "LIABILITY" || upper === "PASIVO" || upper === "RESPONSABILIDAD") {
+      if (n.includes("credit card") || n.includes("tarjeta")) {
+        return { category: "RESPONSABILIDAD", accountType: "Tarjeta de crédito" };
+      }
+      if (n.includes("payable") || n.includes("pagar") || n.includes("proveedor")) {
+        return { category: "RESPONSABILIDAD", accountType: "Cuentas por pagar (C/P)" };
+      }
+      if (n.includes("non-current") || n.includes("largo plazo") || n.includes("no corriente") || n.includes("mortgage")) {
+        return { category: "RESPONSABILIDAD", accountType: "Pasivos no corrientes" };
+      }
+      return { category: "RESPONSABILIDAD", accountType: "Pasivos corrientes" };
+    }
+
+    if (upper === "EQUITY" || upper === "CAPITAL" || upper === "PATRIMONIO" || upper === "FONDOS PROPIOS") {
+      return { category: "FONDOS PROPIOS", accountType: "Fondos propios del propietario" };
+    }
+
+    if (upper === "INCOME" || upper === "REVENUE" || upper === "INGRESO" || upper === "INGRESOS") {
+      if (n.includes("other") || n.includes("otro") || n.includes("interest") || n.includes("interes")) {
+        return { category: "INGRESOS", accountType: "Otros ingresos" };
+      }
+      return { category: "INGRESOS", accountType: "Ingresos" };
+    }
+
+    if (upper === "EXPENSE" || upper === "GASTO" || upper === "GASTOS") {
+      if (n.includes("cost of") || n.includes("costo") || n.includes("cogs")) {
+        return { category: "GASTO", accountType: "Costo de las ventas" };
+      }
+      if (n.includes("other") || n.includes("otro")) {
+        return { category: "GASTO", accountType: "Otros gastos" };
+      }
+      return { category: "GASTO", accountType: "Gastos" };
+    }
+
+    return { category: "ACTIVO", accountType: "Activos corrientes" };
   };
 
   // Calculations
@@ -309,8 +450,11 @@ export default function AdminDashboard() {
     if (!showInactiveAccounts && !a.isActive) return false;
     const term = accountsSearch ? accountsSearch.toLowerCase() : search.toLowerCase();
     const matchesSearch = !term || a.code.toLowerCase().includes(term) || a.name.toLowerCase().includes(term);
-    const normType = normalizeAccountType(a.type);
-    const matchesType = accountsTypeFilter === "Todo" || normType === accountsTypeFilter.toUpperCase();
+    const { category, accountType } = getAccountClassification(a.type, a.name);
+    const matchesType =
+      accountsTypeFilter === "Todo" ||
+      category === accountsTypeFilter ||
+      accountType === accountsTypeFilter;
     return matchesSearch && matchesType;
   });
 
@@ -318,59 +462,10 @@ export default function AdminDashboard() {
 
   const getDetailType = (type: string, name: string): string => {
     const n = (name || "").toLowerCase();
-    const t = normalizeAccountType(type);
-
-    if (t === "ACTIVO") {
-      if (n.includes("banco") || n.includes("caja") || n.includes("efectivo") || n.includes("cash") || n.includes("petty")) {
-        return "Efectivo y equivalentes de efectivo";
-      }
-      if (n.includes("cobrar") || n.includes("cliente") || n.includes("receivable")) {
-        return "Cuentas por cobrar (C/C)";
-      }
-      if (n.includes("fijo") || n.includes("equipo") || n.includes("edificio") || n.includes("maquinaria") || n.includes("mueble") || n.includes("vehiculo")) {
-        return "Activos fijos";
-      }
-      if (n.includes("no corriente") || n.includes("largo plazo") || n.includes("intangible")) {
-        return "Activos no corrientes";
-      }
-      return "Activos corrientes";
-    }
-
-    if (t === "RESPONSABILIDAD") {
-      if (n.includes("tarjeta") || n.includes("credito") || n.includes("crédito") || n.includes("card")) {
-        return "Tarjeta de crédito";
-      }
-      if (n.includes("pagar") || n.includes("proveedor") || n.includes("payable")) {
-        return "Cuentas por pagar (C/P)";
-      }
-      if (n.includes("no corriente") || n.includes("largo plazo") || n.includes("hipoteca") || n.includes("prestamo l/p")) {
-        return "Pasivos no corrientes";
-      }
-      return "Pasivos corrientes";
-    }
-
-    if (t === "FONDOS PROPIOS") {
-      return "Fondos propios del propietario";
-    }
-
-    if (t === "INGRESOS") {
-      if (n.includes("otro") || n.includes("financiero") || n.includes("interes") || n.includes("interés") || n.includes("ganancia")) {
-        return "Otros ingresos";
-      }
-      return "Ingresos";
-    }
-
-    if (t === "GASTO") {
-      if (n.includes("costo") || n.includes("venta") || n.includes("mercader") || n.includes("materia prima")) {
-        return "Costo de las ventas";
-      }
-      if (n.includes("otro") || n.includes("financiero") || n.includes("pérdida") || n.includes("perdida")) {
-        return "Otros gastos";
-      }
-      return "Gastos";
-    }
-
-    return "Activos corrientes";
+    const { accountType } = getAccountClassification(type, name);
+    const list = DETAIL_TYPES_MAP[accountType] || [accountType];
+    const match = list.find((item) => n.includes(item.toLowerCase()));
+    return match || list[0];
   };
 
   const handleExportAccounts = () => {
@@ -402,15 +497,16 @@ export default function AdminDashboard() {
     setAccountModalSuccess("");
 
     try {
+      const { category } = getAccountClassification(newAccountForm.type, newAccountForm.name);
       const assignedCode =
         newAccountForm.code.trim() ||
-        (newAccountForm.type === "ACTIVO"
+        (category === "ACTIVO"
           ? `1${100 + accounts.length}`
-          : newAccountForm.type === "RESPONSABILIDAD"
+          : category === "RESPONSABILIDAD"
           ? `2${100 + accounts.length}`
-          : newAccountForm.type === "FONDOS PROPIOS"
+          : category === "FONDOS PROPIOS"
           ? `3${100 + accounts.length}`
-          : newAccountForm.type === "INGRESOS"
+          : category === "INGRESOS"
           ? `4${100 + accounts.length}`
           : `5${100 + accounts.length}`);
 
@@ -440,8 +536,8 @@ export default function AdminDashboard() {
           setNewAccountForm({
             code: "",
             name: "",
-            type: "ACTIVO",
-            detailType: "Efectivo y equivalentes de efectivo",
+            type: "Efectivo y equivalentes de efectivo",
+            detailType: "Banco",
             isSubAccount: false,
             parentAccountId: "",
             description: "",
@@ -457,8 +553,8 @@ export default function AdminDashboard() {
           setNewAccountForm({
             code: "",
             name: "",
-            type: "ACTIVO",
-            detailType: "Efectivo y equivalentes de efectivo",
+            type: "Efectivo y equivalentes de efectivo",
+            detailType: "Banco",
             isSubAccount: false,
             parentAccountId: "",
             description: "",
@@ -1198,11 +1294,22 @@ export default function AdminDashboard() {
                       className="pl-3 pr-8 py-1.5 text-xs rounded-xl bg-slate-50 border border-slate-200 text-slate-700 font-medium appearance-none focus:outline-none focus:border-[#f6821f] cursor-pointer"
                     >
                       <option value="Todo">Todos los tipos</option>
-                      <option value="ACTIVO">ACTIVO</option>
-                      <option value="RESPONSABILIDAD">RESPONSABILIDAD</option>
-                      <option value="FONDOS PROPIOS">FONDOS PROPIOS</option>
-                      <option value="INGRESOS">INGRESOS</option>
-                      <option value="GASTO">GASTO</option>
+                      <optgroup label="Categorías Principales">
+                        <option value="ACTIVO">ACTIVO (Todo)</option>
+                        <option value="RESPONSABILIDAD">RESPONSABILIDAD (Todo)</option>
+                        <option value="FONDOS PROPIOS">FONDOS PROPIOS (Todo)</option>
+                        <option value="INGRESOS">INGRESOS (Todo)</option>
+                        <option value="GASTO">GASTO (Todo)</option>
+                      </optgroup>
+                      {Object.entries(ACCOUNT_CATEGORIES).map(([cat, types]) => (
+                        <optgroup key={cat} label={cat}>
+                          {types.map((t) => (
+                            <option key={t} value={t}>
+                              {t}
+                            </option>
+                          ))}
+                        </optgroup>
+                      ))}
                     </select>
                     <svg className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-2.5 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
@@ -1339,23 +1446,23 @@ export default function AdminDashboard() {
                                     </td>
                                   );
                                 case "type": {
-                                    const normType = normalizeAccountType(acc.type);
-                                    const isER = normType === "INGRESOS" || normType === "GASTO";
-                                    return (
-                                      <td key="type" className={cellPadding}>
-                                        <div className="flex items-center gap-1.5">
-                                          <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-slate-100 border border-slate-200 text-slate-700">
-                                            {normType}
+                                  const { category, accountType } = getAccountClassification(acc.type, acc.name);
+                                  const isER = category === "INGRESOS" || category === "GASTO";
+                                  return (
+                                    <td key="type" className={cellPadding}>
+                                      <div className="flex items-center gap-1.5 flex-wrap">
+                                        <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-slate-100 border border-slate-200 text-slate-700">
+                                          {accountType}
+                                        </span>
+                                        {showReportBadges && (
+                                          <span className="px-1.5 py-0.5 text-[9px] rounded font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                                            {isER ? "ER" : "BG"}
                                           </span>
-                                          {showReportBadges && (
-                                            <span className="px-1.5 py-0.5 text-[9px] rounded font-bold bg-amber-50 text-amber-700 border border-amber-200">
-                                              {isER ? "ER" : "BG"}
-                                            </span>
-                                          )}
-                                        </div>
-                                      </td>
-                                    );
-                                  }
+                                        )}
+                                      </div>
+                                    </td>
+                                  );
+                                }
                                 case "detailType":
                                   return (
                                     <td key="detailType" className={`${cellPadding} text-slate-600 font-medium`}>
@@ -2225,7 +2332,7 @@ export default function AdminDashboard() {
                         value={newAccountForm.type}
                         onChange={(e) => {
                           const selectedType = e.target.value;
-                          const defaultDetail = ACCOUNT_HIERARCHY[selectedType]?.[0] || "";
+                          const defaultDetail = DETAIL_TYPES_MAP[selectedType]?.[0] || "";
                           setNewAccountForm({
                             ...newAccountForm,
                             type: selectedType,
@@ -2234,11 +2341,15 @@ export default function AdminDashboard() {
                         }}
                         className="w-full pl-3 pr-8 py-2 rounded-lg bg-white border border-slate-300 text-slate-700 text-xs appearance-none focus:outline-none focus:border-[#f6821f] cursor-pointer"
                       >
-                        <option value="ACTIVO">ACTIVO</option>
-                        <option value="RESPONSABILIDAD">RESPONSABILIDAD</option>
-                        <option value="FONDOS PROPIOS">FONDOS PROPIOS</option>
-                        <option value="INGRESOS">INGRESOS</option>
-                        <option value="GASTO">GASTO</option>
+                        {Object.entries(ACCOUNT_CATEGORIES).map(([cat, types]) => (
+                          <optgroup key={cat} label={cat} className="font-bold text-slate-900 bg-slate-50">
+                            {types.map((t) => (
+                              <option key={t} value={t} className="font-normal text-slate-800 bg-white">
+                                {t}
+                              </option>
+                            ))}
+                          </optgroup>
+                        ))}
                       </select>
                       <svg className="w-4 h-4 text-slate-400 absolute right-2.5 top-2.5 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
@@ -2256,7 +2367,7 @@ export default function AdminDashboard() {
                         onChange={(e) => setNewAccountForm({ ...newAccountForm, detailType: e.target.value })}
                         className="w-full pl-3 pr-8 py-2 rounded-lg bg-white border border-slate-300 text-slate-700 text-xs appearance-none focus:outline-none focus:border-[#f6821f] cursor-pointer"
                       >
-                        {(ACCOUNT_HIERARCHY[newAccountForm.type] || []).map((dt) => (
+                        {(DETAIL_TYPES_MAP[newAccountForm.type] || [newAccountForm.type]).map((dt) => (
                           <option key={dt} value={dt}>
                             {dt}
                           </option>
@@ -2291,7 +2402,11 @@ export default function AdminDashboard() {
                       >
                         <option value="">Seleccionar cuenta principal...</option>
                         {accounts
-                          .filter((a) => normalizeAccountType(a.type) === normalizeAccountType(newAccountForm.type))
+                          .filter(
+                            (a) =>
+                              getAccountClassification(a.type, a.name).category ===
+                              getAccountClassification(newAccountForm.type, newAccountForm.name).category
+                          )
                           .map((a) => (
                             <option key={a.id} value={a.id}>
                               {a.code} - {a.name}
