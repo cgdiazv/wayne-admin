@@ -62,6 +62,21 @@ export default function AdminDashboard() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [vendors, setVendors] = useState<Vendor[]>([]);
 
+  // Plan de cuentas dedicated states
+  const [accountsSearch, setAccountsSearch] = useState("");
+  const [accountsTypeFilter, setAccountsTypeFilter] = useState("Todo");
+  const [showNewAccountModal, setShowNewAccountModal] = useState(false);
+  const [newAccountForm, setNewAccountForm] = useState({
+    code: "",
+    name: "",
+    type: "ACTIVO",
+    currency: "USD",
+    isActive: true,
+  });
+  const [accountModalLoading, setAccountModalLoading] = useState(false);
+  const [accountModalError, setAccountModalError] = useState("");
+  const [accountModalSuccess, setAccountModalSuccess] = useState("");
+
   // Quick Actions Bar State & Config
   const quickActions = [
     { id: "crear-factura", label: "Crear factura" },
@@ -209,9 +224,70 @@ export default function AdminDashboard() {
   const totalInventoryValuation = inventory.reduce((sum, item) => sum + (item.quantity || 0) * (item.cost || 0), 0);
 
   // Filters
-  const filteredAccounts = accounts.filter(
-    (a) => a.code.toLowerCase().includes(search.toLowerCase()) || a.name.toLowerCase().includes(search.toLowerCase())
-  );
+  const filteredAccounts = accounts.filter((a) => {
+    const term = accountsSearch ? accountsSearch.toLowerCase() : search.toLowerCase();
+    const matchesSearch = !term || a.code.toLowerCase().includes(term) || a.name.toLowerCase().includes(term);
+    const matchesType = accountsTypeFilter === "Todo" || a.type.toUpperCase() === accountsTypeFilter.toUpperCase();
+    return matchesSearch && matchesType;
+  });
+
+  const handleExportAccounts = () => {
+    const headers = ["Codigo,Nombre,Tipo,Moneda,Estado"];
+    const rows = filteredAccounts.map(
+      (a) => `"${a.code}","${a.name.replace(/"/g, '""')}","${a.type}","${a.currency}","${a.isActive ? "Activa" : "Inactiva"}"`
+    );
+    const csvContent = "data:text/csv;charset=utf-8," + [headers, ...rows].join("\n");
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `plan_de_cuentas_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handlePrintAccounts = () => {
+    window.print();
+  };
+
+  const handleCreateAccount = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAccountModalLoading(true);
+    setAccountModalError("");
+    setAccountModalSuccess("");
+
+    try {
+      const res = await fetch("/api/accounts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newAccountForm),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "Error al crear la cuenta contable");
+      }
+
+      setAccounts((prev) => [...prev, data.data].sort((a, b) => a.code.localeCompare(b.code)));
+      setAccountModalSuccess("Cuenta contable creada exitosamente");
+      setTimeout(() => {
+        setShowNewAccountModal(false);
+        setAccountModalSuccess("");
+        setNewAccountForm({
+          code: "",
+          name: "",
+          type: "ACTIVO",
+          currency: "USD",
+          isActive: true,
+        });
+      }, 900);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Error inesperado";
+      setAccountModalError(msg);
+    } finally {
+      setAccountModalLoading(false);
+    }
+  };
 
   const filteredCustomers = customers.filter(
     (c) =>
@@ -877,49 +953,189 @@ export default function AdminDashboard() {
 
           {/* ================= VIEW: PLAN DE CUENTAS ================= */}
           {currentView === "plan-cuentas" && (
-            <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xs">
-              <div className="p-4 border-b border-slate-100 flex items-center justify-between">
-                <div>
-                  <h2 className="font-semibold text-sm text-slate-900">Plan de Cuentas Contables ({filteredAccounts.length})</h2>
-                  <p className="text-xs text-slate-500">Catálogo estándar con numeración 1000–6000</p>
+            <div className="space-y-4">
+              {/* Header Action Bar (Matching screenshot) */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <button
+                  onClick={() => setCurrentView("dashboard")}
+                  className="text-xs font-semibold text-slate-600 hover:text-slate-900 transition flex items-center gap-1.5 cursor-pointer w-fit"
+                >
+                  <svg className="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
+                  </svg>
+                  <span>Todas las listas</span>
+                </button>
+
+                <div className="flex items-center gap-3 self-end sm:self-auto">
+                  <button
+                    onClick={() => alert("Comentarios enviados al equipo de soporte.")}
+                    className="text-xs text-slate-600 hover:text-slate-900 font-medium flex items-center gap-1.5 transition cursor-pointer"
+                  >
+                    <svg className="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+                    </svg>
+                    <span>Enviar comentarios</span>
+                  </button>
+
+                  <button
+                    onClick={handleExportAccounts}
+                    className="px-4 py-2 rounded-xl border border-[#004d40] text-[#004d40] hover:bg-emerald-50 text-xs font-semibold transition cursor-pointer shadow-xs"
+                  >
+                    Generar informe
+                  </button>
+
+                  <button
+                    onClick={() => setShowNewAccountModal(true)}
+                    className="px-4 py-2 rounded-xl bg-[#004d40] hover:bg-[#00382f] text-white text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer shadow-xs"
+                  >
+                    <span>Nueva cuenta</span>
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
                 </div>
               </div>
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs text-slate-600">
-                  <thead className="bg-slate-50 text-slate-700 font-semibold border-b border-slate-200">
-                    <tr>
-                      <th className="p-3.5">Código</th>
-                      <th className="p-3.5">Nombre de la Cuenta</th>
-                      <th className="p-3.5">Tipo</th>
-                      <th className="p-3.5">Moneda</th>
-                      <th className="p-3.5">Estado</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {filteredAccounts.map((acc) => (
-                      <tr key={acc.id} className="hover:bg-slate-50/80 transition">
-                        <td className="p-3.5 font-mono text-[#f6821f] font-semibold">{acc.code}</td>
-                        <td className="p-3.5 font-medium text-slate-900">{acc.name}</td>
-                        <td className="p-3.5">
-                          <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-slate-100 border border-slate-200 text-slate-700">
-                            {acc.type}
-                          </span>
-                        </td>
-                        <td className="p-3.5 font-medium">{acc.currency}</td>
-                        <td className="p-3.5">
-                          <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-semibold ${acc.isActive ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-slate-100 text-slate-500"}`}>
-                            {acc.isActive ? "Activa" : "Inactiva"}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                    {filteredAccounts.length === 0 && (
+
+              {/* Toolbar Row (Filters, search, print, export - Matching screenshot) */}
+              <div className="bg-white border border-slate-200 rounded-2xl p-3.5 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-3">
+                <div className="flex flex-wrap items-center gap-3">
+                  {/* Search Input */}
+                  <div className="relative min-w-[240px]">
+                    <input
+                      type="text"
+                      placeholder="Filtrar por nombre o número"
+                      value={accountsSearch}
+                      onChange={(e) => setAccountsSearch(e.target.value)}
+                      className="w-full pl-8 pr-3 py-1.5 text-xs rounded-xl bg-slate-50 border border-slate-200 text-slate-900 placeholder-slate-400 focus:outline-none focus:border-[#004d40] focus:ring-1 focus:ring-[#004d40]"
+                    />
+                    <svg className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                  </div>
+
+                  {/* Type Filter Select */}
+                  <div className="relative">
+                    <select
+                      value={accountsTypeFilter}
+                      onChange={(e) => setAccountsTypeFilter(e.target.value)}
+                      className="pl-3 pr-8 py-1.5 text-xs rounded-xl bg-slate-50 border border-slate-200 text-slate-700 font-medium appearance-none focus:outline-none focus:border-[#004d40] cursor-pointer"
+                    >
+                      <option value="Todo">Todo</option>
+                      <option value="ACTIVO">Activo</option>
+                      <option value="PASIVO">Pasivo</option>
+                      <option value="CAPITAL">Capital / Patrimonio</option>
+                      <option value="INGRESO">Ingreso</option>
+                      <option value="GASTO">Gasto</option>
+                    </select>
+                    <svg className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-2.5 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </div>
+
+                  {(accountsSearch || accountsTypeFilter !== "Todo") && (
+                    <button
+                      onClick={() => {
+                        setAccountsSearch("");
+                        setAccountsTypeFilter("Todo");
+                      }}
+                      className="text-xs text-[#f6821f] hover:underline font-medium cursor-pointer"
+                    >
+                      Limpiar filtros
+                    </button>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-4 text-xs text-slate-600">
+                  <button
+                    onClick={() => alert("Modo de edición por lotes activado")}
+                    className="flex items-center gap-1.5 hover:text-slate-900 font-medium transition cursor-pointer"
+                  >
+                    <svg className="w-3.5 h-3.5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                    </svg>
+                    <span>Edición por lotes</span>
+                  </button>
+
+                  <div className="h-4 w-px bg-slate-200"></div>
+
+                  <button
+                    onClick={handleExportAccounts}
+                    title="Exportar a Excel / CSV"
+                    className="p-1.5 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition cursor-pointer"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                  </button>
+
+                  <button
+                    onClick={handlePrintAccounts}
+                    title="Imprimir plan de cuentas"
+                    className="p-1.5 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition cursor-pointer"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                    </svg>
+                  </button>
+
+                  <button
+                    onClick={() => alert("Opciones de columnas visibles del Plan de Cuentas")}
+                    title="Configuración"
+                    className="p-1.5 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition cursor-pointer"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+
+              {/* Accounts Table */}
+              <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xs">
+                <div className="p-4 border-b border-slate-100 flex items-center justify-between">
+                  <div>
+                    <h2 className="font-semibold text-sm text-slate-900">Catálogo Contable ({filteredAccounts.length})</h2>
+                    <p className="text-xs text-slate-500">Plan estándar con cuentas activas en Wayne Trademark Honduras</p>
+                  </div>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs text-slate-600">
+                    <thead className="bg-slate-50 text-slate-700 font-semibold border-b border-slate-200">
                       <tr>
-                        <td colSpan={5} className="p-8 text-center text-slate-400">No se encontraron cuentas</td>
+                        <th className="p-3.5">Código</th>
+                        <th className="p-3.5">Nombre de la Cuenta</th>
+                        <th className="p-3.5">Tipo</th>
+                        <th className="p-3.5">Moneda</th>
+                        <th className="p-3.5">Estado</th>
                       </tr>
-                    )}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {filteredAccounts.map((acc) => (
+                        <tr key={acc.id} className="hover:bg-slate-50/80 transition">
+                          <td className="p-3.5 font-mono text-[#f6821f] font-semibold">{acc.code}</td>
+                          <td className="p-3.5 font-medium text-slate-900">{acc.name}</td>
+                          <td className="p-3.5">
+                            <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-slate-100 border border-slate-200 text-slate-700">
+                              {acc.type}
+                            </span>
+                          </td>
+                          <td className="p-3.5 font-medium">{acc.currency}</td>
+                          <td className="p-3.5">
+                            <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-semibold ${acc.isActive ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-slate-100 text-slate-500"}`}>
+                              {acc.isActive ? "Activa" : "Inactiva"}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                      {filteredAccounts.length === 0 && (
+                        <tr>
+                          <td colSpan={5} className="p-8 text-center text-slate-400">No se encontraron cuentas contables</td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
           )}
@@ -1598,6 +1814,123 @@ export default function AdminDashboard() {
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+      {/* ================= MODAL: NUEVA CUENTA CONTABLE ================= */}
+      {showNewAccountModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs">
+          <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-lg p-6 shadow-2xl relative animate-in fade-in zoom-in-95 duration-150">
+            <button
+              onClick={() => setShowNewAccountModal(false)}
+              className="absolute top-4 right-4 p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition cursor-pointer"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+
+            <div className="mb-5">
+              <h3 className="text-base font-bold text-slate-900">Crear Nueva Cuenta Contable</h3>
+              <p className="text-xs text-slate-500 mt-0.5">Registra una nueva cuenta en el catálogo de Wayne Trademark Honduras</p>
+            </div>
+
+            {accountModalError && (
+              <div className="p-3 mb-4 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs font-medium">
+                {accountModalError}
+              </div>
+            )}
+            {accountModalSuccess && (
+              <div className="p-3 mb-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-medium">
+                {accountModalSuccess}
+              </div>
+            )}
+
+            <form onSubmit={handleCreateAccount} className="space-y-4 text-xs">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Código de Cuenta *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Ej. 1115 o 2120"
+                    value={newAccountForm.code}
+                    onChange={(e) => setNewAccountForm({ ...newAccountForm, code: e.target.value })}
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-mono focus:outline-none focus:border-[#004d40]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Tipo de Cuenta *</label>
+                  <select
+                    value={newAccountForm.type}
+                    onChange={(e) => setNewAccountForm({ ...newAccountForm, type: e.target.value })}
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-medium focus:outline-none focus:border-[#004d40]"
+                  >
+                    <option value="ACTIVO">ACTIVO</option>
+                    <option value="PASIVO">PASIVO</option>
+                    <option value="CAPITAL">CAPITAL / PATRIMONIO</option>
+                    <option value="INGRESO">INGRESO</option>
+                    <option value="GASTO">GASTO / COSTO</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Nombre de la Cuenta *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Ej. Banco Ficohsa USD o Gastos de Mantenimiento"
+                  value={newAccountForm.name}
+                  onChange={(e) => setNewAccountForm({ ...newAccountForm, name: e.target.value })}
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:border-[#004d40]"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Moneda</label>
+                  <select
+                    value={newAccountForm.currency}
+                    onChange={(e) => setNewAccountForm({ ...newAccountForm, currency: e.target.value })}
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-medium focus:outline-none focus:border-[#004d40]"
+                  >
+                    <option value="USD">USD ($)</option>
+                    <option value="HNL">HNL (L)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Estado</label>
+                  <select
+                    value={newAccountForm.isActive ? "true" : "false"}
+                    onChange={(e) => setNewAccountForm({ ...newAccountForm, isActive: e.target.value === "true" })}
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-medium focus:outline-none focus:border-[#004d40]"
+                  >
+                    <option value="true">Activa</option>
+                    <option value="false">Inactiva</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="border-t border-slate-200 pt-4 flex items-center justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowNewAccountModal(false)}
+                  className="px-5 py-2.5 rounded-xl border border-slate-300 text-slate-700 hover:bg-slate-50 font-semibold cursor-pointer transition"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={accountModalLoading}
+                  className="px-5 py-2.5 rounded-xl bg-[#004d40] hover:bg-[#00382f] text-white font-semibold cursor-pointer shadow-md transition disabled:opacity-50"
+                >
+                  {accountModalLoading ? "Guardando..." : "Guardar Cuenta"}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
