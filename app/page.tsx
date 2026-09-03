@@ -127,7 +127,7 @@ export default function AdminDashboard() {
                 Live &amp; Connected
               </span>
             </div>
-            <p className="text-xs text-slate-500">admin.waynetrademarkhn.com</p>
+            <p className="text-xs text-slate-500">Wayne Trademark Honduras</p>
           </div>
         </div>
 
@@ -327,9 +327,9 @@ export default function AdminDashboard() {
                 <div className="flex items-center justify-between p-3.5 rounded-xl bg-slate-50 border border-slate-200/80">
                   <div className="flex items-center gap-3">
                     <span className="w-2.5 h-2.5 rounded-full bg-blue-500"></span>
-                    <span className="text-slate-700 font-medium">Protected Admin Domain</span>
+                    <span className="text-slate-700 font-medium">Organization</span>
                   </div>
-                  <span className="text-xs text-slate-600 font-mono font-medium">admin.waynetrademarkhn.com</span>
+                  <span className="text-xs text-slate-600 font-medium">Wayne Trademark Honduras</span>
                 </div>
               </div>
 

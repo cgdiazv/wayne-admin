@@ -46,7 +46,7 @@ export default function LoginPage() {
             W
           </div>
           <h1 className="text-2xl font-bold tracking-tight text-slate-900">Wayne Admin</h1>
-          <p className="text-xs text-slate-500 mt-1 uppercase tracking-widest font-medium">admin.waynetrademarkhn.com</p>
+          <p className="text-xs text-slate-500 mt-1 uppercase tracking-widest font-medium">Wayne Trademark Honduras</p>
         </div>
 
         {error && (

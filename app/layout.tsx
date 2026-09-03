@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Wayne Admin | admin.waynetrademarkhn.com",
+  title: "Wayne Admin | Wayne Trademark Honduras",
   description: "Enterprise administration portal for Wayne Trademark HN",
 };
 
