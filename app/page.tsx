@@ -50,6 +50,7 @@ export default function AdminDashboard() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
+  const [showPnL, setShowPnL] = useState(true);
 
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -582,6 +583,118 @@ export default function AdminDashboard() {
                     ${totalInventoryValuation.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </div>
                   <p className="text-xs text-slate-500 mt-1">{totalInventoryUnits} unidades en stock</p>
+                </div>
+              </div>
+
+              {/* ================= SECTION: RESUMEN DE LA EMPRESA ================= */}
+              <div className="space-y-3 max-w-6xl">
+                <h2 className="text-sm font-bold text-slate-900 tracking-tight">Resumen de la empresa</h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Card 1: Pérdidas y Ganancias */}
+                  <div className="bg-white border border-slate-200/90 rounded-2xl p-6 shadow-xs flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">PÉRDIDAS Y GANANCIAS</span>
+                        <button
+                          onClick={() => setShowPnL(!showPnL)}
+                          className="text-xs font-medium text-emerald-800 hover:text-emerald-950 transition cursor-pointer"
+                        >
+                          {showPnL ? "Ocultar" : "Mostrar"}
+                        </button>
+                      </div>
+                      <h3 className="text-lg font-medium text-slate-900 leading-snug mb-8">
+                        Consulta lo que ganas y lo que gastas en todas tus cuentas
+                      </h3>
+
+                      {showPnL && (
+                        <div className="space-y-6 my-4">
+                          <div>
+                            <div className="text-xl font-bold text-slate-900 mb-1">$9.611</div>
+                            <div className="flex items-center gap-3">
+                              <span className="text-xs text-slate-600 font-medium w-16">Ingreso</span>
+                              <div className="flex-1">
+                                <div className="h-6 rounded-sm bg-[#00c853] w-[70%] transition-all"></div>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div>
+                            <div className="text-xl font-bold text-slate-900 mb-1">$6.611</div>
+                            <div className="flex items-center gap-3">
+                              <span className="text-xs text-slate-600 font-medium w-16">Gastos</span>
+                              <div className="flex-1">
+                                <div className="h-6 rounded-sm bg-[#00796b] w-[95%] transition-all"></div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="pt-6">
+                      <button className="w-full py-2.5 px-4 rounded-xl border border-slate-200 hover:border-slate-300 text-slate-700 hover:text-slate-900 text-xs font-medium transition cursor-pointer hover:bg-slate-50 text-center">
+                        Transfiere transacciones automática
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Card 2: Gastos */}
+                  <div className="bg-white border border-slate-200/90 rounded-2xl p-6 shadow-xs flex flex-col justify-between">
+                    <div>
+                      <div className="mb-2">
+                        <span className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">GASTOS</span>
+                      </div>
+                      <h3 className="text-lg font-medium text-slate-900 leading-snug mb-8">
+                        Ve a dónde va tu dinero
+                      </h3>
+
+                      <div className="flex items-center justify-center gap-8 my-6">
+                        {/* Donut Chart */}
+                        <div className="relative w-36 h-36 flex items-center justify-center">
+                          <svg className="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
+                            <circle
+                              cx="18"
+                              cy="18"
+                              r="13"
+                              fill="none"
+                              stroke="#e2e8f0"
+                              strokeWidth="5"
+                            />
+                          </svg>
+                        </div>
+
+                        {/* Legend */}
+                        <div className="space-y-2 text-xs text-slate-400 font-medium">
+                          <div className="flex items-center gap-2">
+                            <span className="w-2 h-2 rounded-full bg-slate-300"></span>
+                            <span>--</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="w-2 h-2 rounded-full bg-slate-300"></span>
+                            <span>--</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="w-2 h-2 rounded-full bg-slate-300"></span>
+                            <span>--</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="w-2 h-2 rounded-full bg-slate-300"></span>
+                            <span>--</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="w-2 h-2 rounded-full bg-slate-300"></span>
+                            <span>--</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="pt-6">
+                      <button className="w-full py-2.5 px-4 rounded-xl border border-slate-200 hover:border-slate-300 text-slate-700 hover:text-slate-900 text-xs font-medium transition cursor-pointer hover:bg-slate-50 text-center">
+                        Transfiere transacciones automática
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
 
