@@ -85,6 +85,48 @@ export default function AdminDashboard() {
   const [showSaveDropdown, setShowSaveDropdown] = useState(false);
   const [showAccountTypeTooltip, setShowAccountTypeTooltip] = useState(false);
 
+  // Configuration module states (Matching screenshot)
+  const [configSubTab, setConfigSubTab] = useState<
+    "empresa" | "uso" | "informes" | "contabilidad" | "ventas" | "gastos" | "horas" | "monedero" | "avanzadas"
+  >("empresa");
+
+  const [companySettings, setCompanySettings] = useState({
+    nombre: "WAYNE TRADEMARK PRINTING AND PACKAGING DE HONDURAS S DE RL",
+    direccion: "ZIP Búfalo, Villanueva, Cortés 21100",
+    email: "R.mondragon@waynetrademarkhn.com",
+    telefono: "+50494522666",
+    sitioWeb: "Ninguno indicado",
+    sector: "Manufacturing",
+    // Legal
+    nombreLegal: "WAYNE TRADEMARK PRINTING AND PACKAGING DE HONDURAS S DE RL",
+    taxId: "05019008183490",
+    tipoEmpresa: "Sociedad anónima (pequeña empresa) con dos o más propietarios",
+    domicilioLegal: "Zip Búfalo Edificio 1B, Villanueva, Cortés 21101",
+    // Contacto del cliente
+    emailCliente: "R.mondragon@waynetrademarkhn.com",
+    direccionCliente: "Ninguno indicado",
+  });
+
+  const [editingConfigKey, setEditingConfigKey] = useState<string | null>(null);
+  const [editingConfigLabel, setEditingConfigLabel] = useState<string>("");
+  const [editingConfigValue, setEditingConfigValue] = useState<string>("");
+
+  const startEditConfig = (key: keyof typeof companySettings, label: string) => {
+    setEditingConfigKey(key);
+    setEditingConfigLabel(label);
+    setEditingConfigValue(companySettings[key] === "Ninguno indicado" ? "" : companySettings[key]);
+  };
+
+  const saveConfigField = () => {
+    if (editingConfigKey) {
+      setCompanySettings((prev) => ({
+        ...prev,
+        [editingConfigKey]: editingConfigValue.trim() || "Ninguno indicado",
+      }));
+      setEditingConfigKey(null);
+    }
+  };
+
   // Plan de cuentas personalization sidebar states (Matching screenshot)
   const [showConfigSidebar, setShowConfigSidebar] = useState(false);
   const [pageSize, setPageSize] = useState<number>(75);
@@ -1856,45 +1898,627 @@ export default function AdminDashboard() {
 
           {/* ================= VIEW: CONFIGURACIÓN ================= */}
           {currentView === "configuracion" && (
-            <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs space-y-6">
-              <div>
-                <h2 className="font-bold text-base text-slate-900">Configuración General</h2>
-                <p className="text-xs text-slate-500">Parámetros de acceso y credenciales administrativas</p>
-              </div>
-
-              <div className="space-y-4 max-w-xl text-xs">
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Nombre de la Organización</label>
-                  <input
-                    type="text"
-                    disabled
-                    value="Wayne Trademark Honduras"
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-100 border border-slate-200 text-slate-700 font-medium"
-                  />
-                </div>
-
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Correo de Administrador</label>
-                  <input
-                    type="email"
-                    disabled
-                    value="admin@waynetrademarkhn.com"
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-100 border border-slate-200 text-slate-700 font-medium"
-                  />
-                </div>
-
-                <div className="pt-2">
+            <div className="bg-white border border-slate-200 rounded-2xl shadow-xs overflow-hidden">
+              {/* Top Header Bar matching screenshot */}
+              <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-white">
+                <h1 className="text-xl font-bold text-slate-900 tracking-tight">Configuración</h1>
+                <div className="flex items-center gap-2">
                   <button
-                    onClick={handleLogout}
-                    className="px-4 py-2.5 rounded-xl bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 font-semibold cursor-pointer transition flex items-center gap-2"
+                    type="button"
+                    onClick={() => alert("Comentarios enviados al equipo de Wayne Trademark Honduras.")}
+                    className="flex items-center gap-1.5 text-xs text-slate-600 hover:text-slate-900 font-medium px-3 py-1.5 rounded-lg hover:bg-slate-100 transition cursor-pointer"
                   >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                    <svg className="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 10h.01M12 10h.01M16 10h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                     </svg>
-                    <span>Cerrar Sesión</span>
+                    <span>Give feedback</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    title="Centro de ayuda y soporte técnico"
+                    onClick={() => alert("Centro de soporte de Wayne Trademark Honduras.")}
+                    className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-full transition cursor-pointer"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <circle cx="12" cy="12" r="9" strokeWidth="2" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3m.08 4h.01" />
+                    </svg>
+                  </button>
+
+                  <button
+                    type="button"
+                    title="Cerrar y volver al Dashboard"
+                    onClick={() => setCurrentView("dashboard")}
+                    className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-full transition cursor-pointer"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
                   </button>
                 </div>
               </div>
+
+              {/* Main Body with Left Nav & Content */}
+              <div className="flex flex-col md:flex-row min-h-[720px]">
+                {/* Left Submenu Navigation matching screenshot */}
+                <div className="w-full md:w-56 bg-slate-50/60 border-r border-slate-200 py-3 text-xs shrink-0">
+                  <div className="space-y-0.5">
+                    {[
+                      { id: "empresa", label: "Empresa" },
+                      { id: "uso", label: "Uso" },
+                      { id: "informes", label: "Informes" },
+                      { id: "contabilidad", label: "Contabilidad" },
+                      { id: "ventas", label: "Ventas" },
+                      { id: "gastos", label: "Gastos" },
+                      { id: "horas", label: "Horas trabajadas" },
+                      { id: "monedero", label: "Monedero" },
+                      { id: "avanzadas", label: "Opciones avanzadas" },
+                    ].map((tab) => {
+                      const isActive = configSubTab === tab.id;
+                      return (
+                        <button
+                          key={tab.id}
+                          onClick={() => setConfigSubTab(tab.id as any)}
+                          className={`w-full text-left px-5 py-3 transition font-medium cursor-pointer ${
+                            isActive
+                              ? "bg-[#fff7ed] text-[#f6821f] font-semibold border-l-4 border-[#f6821f]"
+                              : "text-slate-600 hover:text-slate-900 hover:bg-slate-100/70 border-l-4 border-transparent"
+                          }`}
+                        >
+                          {tab.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Right Content Panel */}
+                <div className="flex-1 p-6 md:p-8 bg-white overflow-y-auto">
+                  {/* SUBTAB 1: EMPRESA */}
+                  {configSubTab === "empresa" && (
+                    <div className="max-w-3xl space-y-6">
+                      {/* Company Logo Header matching screenshot */}
+                      <div className="flex flex-col items-center justify-center pb-2">
+                        <div className="flex items-center gap-2">
+                          <svg className="w-9 h-9 text-[#f6821f]" viewBox="0 0 100 100" fill="currentColor">
+                            <path d="M10 25 L35 75 L50 45 L65 75 L90 25 L75 25 L60 60 L50 40 L40 60 L25 25 Z" />
+                          </svg>
+                          <div className="flex flex-col">
+                            <span className="font-black text-2xl tracking-tight text-[#f6821f] leading-none">wayne</span>
+                            <span className="text-[7px] tracking-wider text-slate-500 font-bold uppercase">PRINTING & PACKAGING HONDURAS</span>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => alert("Para actualizar el logotipo oficial, selecciona una imagen PNG/SVG de alta resolución.")}
+                          className="mt-2.5 w-7 h-7 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center cursor-pointer shadow-xs transition"
+                          title="Editar logotipo de la empresa"
+                        >
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                          </svg>
+                        </button>
+                      </div>
+
+                      {/* Card 1: Información de la empresa */}
+                      <div className="border border-slate-200 rounded-xl p-5 bg-white shadow-xs">
+                        <div className="mb-4">
+                          <h2 className="font-bold text-sm text-slate-900">Información de la empresa</h2>
+                          <p className="text-xs text-slate-500 mt-0.5">Esta información puede usarse con fines de facturación.</p>
+                        </div>
+
+                        <div className="divide-y divide-slate-100 text-xs">
+                          <div className="py-3 flex items-start justify-between gap-4">
+                            <span className="w-40 font-semibold text-slate-800 shrink-0">Nombre</span>
+                            <span className="flex-1 text-slate-700 font-medium">{companySettings.nombre}</span>
+                            <button
+                              onClick={() => startEditConfig("nombre", "Nombre de la empresa")}
+                              className="text-xs font-semibold text-[#f6821f] hover:underline cursor-pointer shrink-0"
+                            >
+                              Editar
+                            </button>
+                          </div>
+
+                          <div className="py-3 flex items-start justify-between gap-4">
+                            <span className="w-40 font-semibold text-slate-800 shrink-0">Dirección</span>
+                            <span className="flex-1 text-slate-700 font-medium whitespace-pre-line">{companySettings.direccion}</span>
+                            <button
+                              onClick={() => startEditConfig("direccion", "Dirección de la empresa")}
+                              className="text-xs font-semibold text-[#f6821f] hover:underline cursor-pointer shrink-0"
+                            >
+                              Editar
+                            </button>
+                          </div>
+
+                          <div className="py-3 flex items-start justify-between gap-4">
+                            <span className="w-40 font-semibold text-slate-800 shrink-0">Correo electrónico</span>
+                            <span className="flex-1 text-slate-700 font-medium">{companySettings.email}</span>
+                            <button
+                              onClick={() => startEditConfig("email", "Correo electrónico")}
+                              className="text-xs font-semibold text-[#f6821f] hover:underline cursor-pointer shrink-0"
+                            >
+                              Editar
+                            </button>
+                          </div>
+
+                          <div className="py-3 flex items-start justify-between gap-4">
+                            <span className="w-40 font-semibold text-slate-800 shrink-0">Teléfono</span>
+                            <span className="flex-1 text-slate-700 font-medium font-mono">{companySettings.telefono}</span>
+                            <button
+                              onClick={() => startEditConfig("telefono", "Teléfono de contacto")}
+                              className="text-xs font-semibold text-[#f6821f] hover:underline cursor-pointer shrink-0"
+                            >
+                              Editar
+                            </button>
+                          </div>
+
+                          <div className="py-3 flex items-start justify-between gap-4">
+                            <span className="w-40 font-semibold text-slate-800 shrink-0">Sitio web</span>
+                            <span className={`flex-1 font-medium ${companySettings.sitioWeb === "Ninguno indicado" ? "text-slate-400 italic" : "text-slate-700"}`}>
+                              {companySettings.sitioWeb}
+                            </span>
+                            <button
+                              onClick={() => startEditConfig("sitioWeb", "Sitio web")}
+                              className="text-xs font-semibold text-[#f6821f] hover:underline cursor-pointer shrink-0"
+                            >
+                              Editar
+                            </button>
+                          </div>
+
+                          <div className="py-3 flex items-start justify-between gap-4">
+                            <span className="w-40 font-semibold text-slate-800 shrink-0">Sector</span>
+                            <span className="flex-1 text-slate-700 font-medium">{companySettings.sector}</span>
+                            <button
+                              onClick={() => startEditConfig("sector", "Sector de la empresa")}
+                              className="text-xs font-semibold text-[#f6821f] hover:underline cursor-pointer shrink-0"
+                            >
+                              Editar
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Card 2: Información legal */}
+                      <div className="border border-slate-200 rounded-xl p-5 bg-white shadow-xs">
+                        <div className="mb-4">
+                          <h2 className="font-bold text-sm text-slate-900">Información legal</h2>
+                          <p className="text-xs text-slate-500 mt-0.5">Esta es la información que tu empresa utiliza para fines fiscales.</p>
+                        </div>
+
+                        <div className="divide-y divide-slate-100 text-xs">
+                          <div className="py-3 flex items-start justify-between gap-4">
+                            <span className="w-40 font-semibold text-slate-800 shrink-0">Nombre legal de la empresa</span>
+                            <span className="flex-1 text-slate-700 font-medium">{companySettings.nombreLegal}</span>
+                            <button
+                              onClick={() => startEditConfig("nombreLegal", "Nombre legal")}
+                              className="text-xs font-semibold text-[#f6821f] hover:underline cursor-pointer shrink-0"
+                            >
+                              Editar
+                            </button>
+                          </div>
+
+                          <div className="py-3 flex items-start justify-between gap-4">
+                            <span className="w-40 font-semibold text-slate-800 shrink-0">VAT/GST/TAX ID number</span>
+                            <span className="flex-1 text-slate-700 font-mono font-medium">{companySettings.taxId}</span>
+                            <button
+                              onClick={() => startEditConfig("taxId", "Número de Identificación Fiscal (RTN)")}
+                              className="text-xs font-semibold text-[#f6821f] hover:underline cursor-pointer shrink-0"
+                            >
+                              Editar
+                            </button>
+                          </div>
+
+                          <div className="py-3 flex items-start justify-between gap-4">
+                            <span className="w-40 font-semibold text-slate-800 shrink-0">Tipo de empresa</span>
+                            <span className="flex-1 text-slate-700 font-medium">{companySettings.tipoEmpresa}</span>
+                            <button
+                              onClick={() => startEditConfig("tipoEmpresa", "Tipo de empresa")}
+                              className="text-xs font-semibold text-[#f6821f] hover:underline cursor-pointer shrink-0"
+                            >
+                              Editar
+                            </button>
+                          </div>
+
+                          <div className="py-3 flex items-start justify-between gap-4">
+                            <span className="w-40 font-semibold text-slate-800 shrink-0">Domicilio legal</span>
+                            <span className="flex-1 text-slate-700 font-medium whitespace-pre-line">{companySettings.domicilioLegal}</span>
+                            <button
+                              onClick={() => startEditConfig("domicilioLegal", "Domicilio legal")}
+                              className="text-xs font-semibold text-[#f6821f] hover:underline cursor-pointer shrink-0"
+                            >
+                              Editar
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Card 3: Información de contacto del cliente */}
+                      <div className="border border-slate-200 rounded-xl p-5 bg-white shadow-xs">
+                        <div className="mb-4">
+                          <h2 className="font-bold text-sm text-slate-900">Información de contacto del cliente</h2>
+                          <p className="text-xs text-slate-500 mt-0.5">Así es como los clientes se ponen en contacto contigo.</p>
+                        </div>
+
+                        <div className="divide-y divide-slate-100 text-xs">
+                          <div className="py-3 flex items-start justify-between gap-4">
+                            <span className="w-40 font-semibold text-slate-800 shrink-0">Correo electrónico del cliente</span>
+                            <span className="flex-1 text-slate-700 font-medium">{companySettings.emailCliente}</span>
+                            <button
+                              onClick={() => startEditConfig("emailCliente", "Correo de contacto del cliente")}
+                              className="text-xs font-semibold text-[#f6821f] hover:underline cursor-pointer shrink-0"
+                            >
+                              Editar
+                            </button>
+                          </div>
+
+                          <div className="py-3 flex items-start justify-between gap-4">
+                            <span className="w-40 font-semibold text-slate-800 shrink-0">Dirección del cliente</span>
+                            <span className={`flex-1 font-medium ${companySettings.direccionCliente === "Ninguno indicado" ? "text-slate-400 italic" : "text-slate-700"}`}>
+                              {companySettings.direccionCliente}
+                            </span>
+                            <button
+                              onClick={() => startEditConfig("direccionCliente", "Dirección del cliente")}
+                              className="text-xs font-semibold text-[#f6821f] hover:underline cursor-pointer shrink-0"
+                            >
+                              Editar
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* SUBTAB 2: USO */}
+                  {configSubTab === "uso" && (
+                    <div className="max-w-3xl space-y-6">
+                      <div className="border border-slate-200 rounded-xl p-5 bg-white shadow-xs">
+                        <div className="mb-4">
+                          <h2 className="font-bold text-sm text-slate-900">Límites de uso del sistema</h2>
+                          <p className="text-xs text-slate-500 mt-0.5">Consumo de recursos bajo el plan Wayne Enterprise Cloud.</p>
+                        </div>
+
+                        <div className="space-y-4 text-xs pt-1">
+                          <div>
+                            <div className="flex justify-between font-medium text-slate-700 mb-1.5">
+                              <span>Usuarios con acceso</span>
+                              <span className="font-semibold text-slate-900">3 de 5 usuarios</span>
+                            </div>
+                            <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+                              <div className="h-full bg-[#f6821f] rounded-full" style={{ width: "60%" }} />
+                            </div>
+                          </div>
+
+                          <div>
+                            <div className="flex justify-between font-medium text-slate-700 mb-1.5">
+                              <span>Cuentas contables en catálogo</span>
+                              <span className="font-semibold text-slate-900">{accounts.length} de 250 cuentas</span>
+                            </div>
+                            <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+                              <div className="h-full bg-[#f6821f] rounded-full" style={{ width: `${Math.min(100, (accounts.length / 250) * 100)}%` }} />
+                            </div>
+                          </div>
+
+                          <div>
+                            <div className="flex justify-between font-medium text-slate-700 mb-1.5">
+                              <span>Almacenamiento de comprobantes</span>
+                              <span className="font-semibold text-slate-900">4.2 MB de 10 GB</span>
+                            </div>
+                            <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+                              <div className="h-full bg-[#f6821f] rounded-full" style={{ width: "2%" }} />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="border border-slate-200 rounded-xl p-5 bg-white shadow-xs">
+                        <h2 className="font-bold text-sm text-slate-900 mb-1">Detalles de la Suscripción</h2>
+                        <div className="divide-y divide-slate-100 text-xs">
+                          <div className="py-2.5 flex justify-between">
+                            <span className="text-slate-600">Plan actual</span>
+                            <span className="font-semibold text-slate-900">Wayne Enterprise Pro (Honduras)</span>
+                          </div>
+                          <div className="py-2.5 flex justify-between">
+                            <span className="text-slate-600">Periodo de facturación</span>
+                            <span className="font-semibold text-slate-900">Anual (Renovación Octubre 2026)</span>
+                          </div>
+                          <div className="py-2.5 flex justify-between">
+                            <span className="text-slate-600">Estado</span>
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">Activo</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* SUBTAB 3: INFORMES */}
+                  {configSubTab === "informes" && (
+                    <div className="max-w-3xl space-y-6">
+                      <div className="border border-slate-200 rounded-xl p-5 bg-white shadow-xs">
+                        <h2 className="font-bold text-sm text-slate-900 mb-1">Formatos de Informes Contables</h2>
+                        <p className="text-xs text-slate-500 mb-4">Personaliza los encabezados y la apariencia de los estados financieros.</p>
+
+                        <div className="divide-y divide-slate-100 text-xs">
+                          <div className="py-3 flex items-center justify-between">
+                            <span className="font-semibold text-slate-800">Encabezado predeterminado</span>
+                            <span className="text-slate-700">WAYNE TRADEMARK PRINTING AND PACKAGING</span>
+                            <button className="text-[#f6821f] font-semibold hover:underline cursor-pointer">Editar</button>
+                          </div>
+                          <div className="py-3 flex items-center justify-between">
+                            <span className="font-semibold text-slate-800">Formato de moneda</span>
+                            <span className="text-slate-700 font-mono">$0,000.00 (USD)</span>
+                            <button className="text-[#f6821f] font-semibold hover:underline cursor-pointer">Editar</button>
+                          </div>
+                          <div className="py-3 flex items-center justify-between">
+                            <span className="font-semibold text-slate-800">Formato de fecha</span>
+                            <span className="text-slate-700">DD/MM/AAAA</span>
+                            <button className="text-[#f6821f] font-semibold hover:underline cursor-pointer">Editar</button>
+                          </div>
+                          <div className="py-3 flex items-center justify-between">
+                            <span className="font-semibold text-slate-800">Criterio contable predeterminado</span>
+                            <span className="text-slate-700">Criterio de devengo (Acumulación)</span>
+                            <button className="text-[#f6821f] font-semibold hover:underline cursor-pointer">Editar</button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* SUBTAB 4: CONTABILIDAD */}
+                  {configSubTab === "contabilidad" && (
+                    <div className="max-w-3xl space-y-6">
+                      <div className="border border-slate-200 rounded-xl p-5 bg-white shadow-xs">
+                        <h2 className="font-bold text-sm text-slate-900 mb-1">Ejercicio Fiscal y Parámetros Contables</h2>
+                        <p className="text-xs text-slate-500 mb-4">Definición de periodos, cierre de libros y codificación de cuentas.</p>
+
+                        <div className="divide-y divide-slate-100 text-xs">
+                          <div className="py-3 flex items-center justify-between">
+                            <span className="font-semibold text-slate-800">Primer mes del ejercicio fiscal</span>
+                            <span className="text-slate-700">Enero</span>
+                            <button className="text-[#f6821f] font-semibold hover:underline cursor-pointer">Editar</button>
+                          </div>
+                          <div className="py-3 flex items-center justify-between">
+                            <span className="font-semibold text-slate-800">Primer mes del año del impuesto sobre la renta</span>
+                            <span className="text-slate-700">Igual que el ejercicio fiscal (Enero)</span>
+                            <button className="text-[#f6821f] font-semibold hover:underline cursor-pointer">Editar</button>
+                          </div>
+                          <div className="py-3 flex items-center justify-between">
+                            <span className="font-semibold text-slate-800">Método de contabilidad</span>
+                            <span className="text-slate-700">Criterio de devengo</span>
+                            <button className="text-[#f6821f] font-semibold hover:underline cursor-pointer">Editar</button>
+                          </div>
+                          <div className="py-3 flex items-center justify-between">
+                            <span className="font-semibold text-slate-800">Cierre de los libros</span>
+                            <span className="text-slate-500">Desactivado (Periodo 2026 abierto)</span>
+                            <button className="text-[#f6821f] font-semibold hover:underline cursor-pointer">Editar</button>
+                          </div>
+                          <div className="py-3 flex items-center justify-between">
+                            <span className="font-semibold text-slate-800">Activar números de cuenta contable</span>
+                            <span className="text-emerald-700 font-semibold">Activado</span>
+                            <button className="text-[#f6821f] font-semibold hover:underline cursor-pointer">Editar</button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* SUBTAB 5: VENTAS */}
+                  {configSubTab === "ventas" && (
+                    <div className="max-w-3xl space-y-6">
+                      <div className="border border-slate-200 rounded-xl p-5 bg-white shadow-xs">
+                        <h2 className="font-bold text-sm text-slate-900 mb-1">Políticas de Facturación y Ventas</h2>
+                        <p className="text-xs text-slate-500 mb-4">Condiciones de pago, mensajes automáticos y recordatorios para clientes.</p>
+
+                        <div className="divide-y divide-slate-100 text-xs">
+                          <div className="py-3 flex items-center justify-between">
+                            <span className="font-semibold text-slate-800">Términos de pago predeterminados</span>
+                            <span className="text-slate-700">Neto a 30 días</span>
+                            <button className="text-[#f6821f] font-semibold hover:underline cursor-pointer">Editar</button>
+                          </div>
+                          <div className="py-3 flex items-center justify-between">
+                            <span className="font-semibold text-slate-800">Condiciones de entrega (Incoterm)</span>
+                            <span className="text-slate-700">FOB Villanueva, Cortés, Honduras</span>
+                            <button className="text-[#f6821f] font-semibold hover:underline cursor-pointer">Editar</button>
+                          </div>
+                          <div className="py-3 flex items-center justify-between">
+                            <span className="font-semibold text-slate-800">Mensaje estándar en facturas</span>
+                            <span className="text-slate-700">Gracias por su preferencia con Wayne Trademark Honduras.</span>
+                            <button className="text-[#f6821f] font-semibold hover:underline cursor-pointer">Editar</button>
+                          </div>
+                          <div className="py-3 flex items-center justify-between">
+                            <span className="font-semibold text-slate-800">Recordatorios automáticos de cobro</span>
+                            <span className="text-emerald-700 font-semibold">Activado (3 días antes del vencimiento)</span>
+                            <button className="text-[#f6821f] font-semibold hover:underline cursor-pointer">Editar</button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* SUBTAB 6: GASTOS */}
+                  {configSubTab === "gastos" && (
+                    <div className="max-w-3xl space-y-6">
+                      <div className="border border-slate-200 rounded-xl p-5 bg-white shadow-xs">
+                        <h2 className="font-bold text-sm text-slate-900 mb-1">Compras y Órdenes a Proveedores</h2>
+                        <p className="text-xs text-slate-500 mb-4">Directrices de control de compras y registro de gastos.</p>
+
+                        <div className="divide-y divide-slate-100 text-xs">
+                          <div className="py-3 flex items-center justify-between">
+                            <span className="font-semibold text-slate-800">Términos de pago de proveedores</span>
+                            <span className="text-slate-700">Neto a 30 días</span>
+                            <button className="text-[#f6821f] font-semibold hover:underline cursor-pointer">Editar</button>
+                          </div>
+                          <div className="py-3 flex items-center justify-between">
+                            <span className="font-semibold text-slate-800">Aprobación obligatoria de compras</span>
+                            <span className="text-slate-700">Requerida para montos superiores a $1,000.00</span>
+                            <button className="text-[#f6821f] font-semibold hover:underline cursor-pointer">Editar</button>
+                          </div>
+                          <div className="py-3 flex items-center justify-between">
+                            <span className="font-semibold text-slate-800">Seguimiento por orden de producción</span>
+                            <span className="text-emerald-700 font-semibold">Activado</span>
+                            <button className="text-[#f6821f] font-semibold hover:underline cursor-pointer">Editar</button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* SUBTAB 7: HORAS */}
+                  {configSubTab === "horas" && (
+                    <div className="max-w-3xl space-y-6">
+                      <div className="border border-slate-200 rounded-xl p-5 bg-white shadow-xs">
+                        <h2 className="font-bold text-sm text-slate-900 mb-1">Jornada Laboral y Control de Tiempos</h2>
+                        <p className="text-xs text-slate-500 mb-4">Parámetros de turnos y hojas de tiempo en planta.</p>
+
+                        <div className="divide-y divide-slate-100 text-xs">
+                          <div className="py-3 flex items-center justify-between">
+                            <span className="font-semibold text-slate-800">Primer día de la semana laboral</span>
+                            <span className="text-slate-700">Lunes</span>
+                            <button className="text-[#f6821f] font-semibold hover:underline cursor-pointer">Editar</button>
+                          </div>
+                          <div className="py-3 flex items-center justify-between">
+                            <span className="font-semibold text-slate-800">Jornada ordinaria máxima</span>
+                            <span className="text-slate-700">8 horas / día (44 horas semanales)</span>
+                            <button className="text-[#f6821f] font-semibold hover:underline cursor-pointer">Editar</button>
+                          </div>
+                          <div className="py-3 flex items-center justify-between">
+                            <span className="font-semibold text-slate-800">Aprobación de horas extraordinarias</span>
+                            <span className="text-emerald-700 font-semibold">Requiere visto bueno de supervisión</span>
+                            <button className="text-[#f6821f] font-semibold hover:underline cursor-pointer">Editar</button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* SUBTAB 8: MONEDERO */}
+                  {configSubTab === "monedero" && (
+                    <div className="max-w-3xl space-y-6">
+                      <div className="border border-slate-200 rounded-xl p-5 bg-white shadow-xs">
+                        <h2 className="font-bold text-sm text-slate-900 mb-1">Cuentas Bancarias y Monedas</h2>
+                        <p className="text-xs text-slate-500 mb-4">Gestión de cuentas institucionales y multidivisa.</p>
+
+                        <div className="divide-y divide-slate-100 text-xs">
+                          <div className="py-3 flex items-center justify-between">
+                            <span className="font-semibold text-slate-800">Moneda principal del sistema</span>
+                            <span className="text-slate-700 font-semibold">USD ($) Dólar estadounidense</span>
+                            <button className="text-[#f6821f] font-semibold hover:underline cursor-pointer">Editar</button>
+                          </div>
+                          <div className="py-3 flex items-center justify-between">
+                            <span className="font-semibold text-slate-800">Multidivisa</span>
+                            <span className="text-emerald-700 font-semibold">Activado (USD, HNL)</span>
+                            <button className="text-[#f6821f] font-semibold hover:underline cursor-pointer">Editar</button>
+                          </div>
+                          <div className="py-3 flex items-center justify-between">
+                            <span className="font-semibold text-slate-800">Banco de operaciones principal</span>
+                            <span className="text-slate-700">Banco Ficohsa (Cuenta de cheques empresarial USD)</span>
+                            <button className="text-[#f6821f] font-semibold hover:underline cursor-pointer">Editar</button>
+                          </div>
+                          <div className="py-3 flex items-center justify-between">
+                            <span className="font-semibold text-slate-800">Transferencias ACH Interbancarias</span>
+                            <span className="text-emerald-700 font-semibold">Habilitadas</span>
+                            <button className="text-[#f6821f] font-semibold hover:underline cursor-pointer">Editar</button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* SUBTAB 9: AVANZADAS */}
+                  {configSubTab === "avanzadas" && (
+                    <div className="max-w-3xl space-y-6">
+                      <div className="border border-slate-200 rounded-xl p-5 bg-white shadow-xs">
+                        <h2 className="font-bold text-sm text-slate-900 mb-1">Parámetros Avanzados del Sistema</h2>
+                        <p className="text-xs text-slate-500 mb-4">Configuraciones de seguridad, regionalización e infraestructura.</p>
+
+                        <div className="divide-y divide-slate-100 text-xs">
+                          <div className="py-3 flex items-center justify-between">
+                            <span className="font-semibold text-slate-800">Zona horaria</span>
+                            <span className="text-slate-700">(GMT-06:00) Hora estándar central (Honduras)</span>
+                            <button className="text-[#f6821f] font-semibold hover:underline cursor-pointer">Editar</button>
+                          </div>
+                          <div className="py-3 flex items-center justify-between">
+                            <span className="font-semibold text-slate-800">Idioma del sistema</span>
+                            <span className="text-slate-700">Español (Latinoamérica)</span>
+                            <button className="text-[#f6821f] font-semibold hover:underline cursor-pointer">Editar</button>
+                          </div>
+                          <div className="py-3 flex items-center justify-between">
+                            <span className="font-semibold text-slate-800">Cierre de sesión por inactividad</span>
+                            <span className="text-slate-700">3 horas</span>
+                            <button className="text-[#f6821f] font-semibold hover:underline cursor-pointer">Editar</button>
+                          </div>
+                          <div className="py-3 flex items-center justify-between">
+                            <span className="font-semibold text-slate-800">Base de datos empresarial</span>
+                            <span className="font-mono text-emerald-700 font-semibold">PostgreSQL 17.6 Enterprise</span>
+                            <span className="text-slate-400 text-[11px]">Conectada</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="border border-red-200 rounded-xl p-5 bg-red-50/40">
+                        <h2 className="font-bold text-sm text-red-900 mb-1">Sesión Administrativa</h2>
+                        <p className="text-xs text-red-700 mb-4">Administrador activo: admin@waynetrademarkhn.com</p>
+                        <button
+                          type="button"
+                          onClick={handleLogout}
+                          className="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white font-semibold text-xs cursor-pointer shadow-sm transition flex items-center gap-2"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                          </svg>
+                          <span>Cerrar Sesión</span>
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Inline Edit Modal for Company Settings */}
+              {editingConfigKey && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs">
+                  <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-md p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-150">
+                    <h3 className="text-base font-bold text-slate-900 mb-1">Editar {editingConfigLabel}</h3>
+                    <p className="text-xs text-slate-500 mb-4">Actualiza la información oficial de Wayne Trademark Honduras.</p>
+
+                    <div className="mb-5">
+                      <label className="block text-xs font-semibold text-slate-700 mb-1.5">{editingConfigLabel}</label>
+                      {editingConfigKey === "direccion" || editingConfigKey === "domicilioLegal" ? (
+                        <textarea
+                          rows={3}
+                          value={editingConfigValue}
+                          onChange={(e) => setEditingConfigValue(e.target.value)}
+                          className="w-full px-3.5 py-2 text-xs rounded-xl bg-slate-50 border border-slate-300 text-slate-900 focus:outline-none focus:border-[#f6821f] focus:ring-1 focus:ring-[#f6821f]"
+                        />
+                      ) : (
+                        <input
+                          type="text"
+                          value={editingConfigValue}
+                          onChange={(e) => setEditingConfigValue(e.target.value)}
+                          className="w-full px-3.5 py-2 text-xs rounded-xl bg-slate-50 border border-slate-300 text-slate-900 focus:outline-none focus:border-[#f6821f] focus:ring-1 focus:ring-[#f6821f]"
+                        />
+                      )}
+                    </div>
+
+                    <div className="flex justify-end gap-2.5">
+                      <button
+                        type="button"
+                        onClick={() => setEditingConfigKey(null)}
+                        className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium cursor-pointer"
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={saveConfigField}
+                        className="px-5 py-2 rounded-xl bg-[#f6821f] hover:bg-[#e07216] text-white text-xs font-semibold cursor-pointer shadow-md shadow-[#f6821f]/20"
+                      >
+                        Guardar cambios
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </main>
