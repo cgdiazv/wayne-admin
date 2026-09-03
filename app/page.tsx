@@ -147,6 +147,29 @@ export default function AdminDashboard() {
     "Tengo dudas/otro/ninguno",
   ];
 
+  const BUSINESS_SECTOR_OPTIONS = [
+    "Manufactura y Producción Industrial (Manufacturing)",
+    "Imprenta, Empaque y Artes Gráficas (Printing & Packaging)",
+    "Maquila, Textil y Confección",
+    "Comercio Mayorista y Distribución",
+    "Comercio Minorista (Retail) y Tiendas",
+    "Transporte, Logística y Almacenamiento",
+    "Construcción, Ingeniería e Inmobiliaria",
+    "Agricultura, Agroindustria, Silvicultura y Pesca",
+    "Tecnología, Desarrollo de Software y Telecomunicaciones",
+    "Servicios Profesionales, Científicos y Técnicos",
+    "Servicios Financieros, Seguros y Contabilidad",
+    "Salud, Farmacéutica y Equipos Médicos",
+    "Hotelería, Turismo, Restaurantes y Catering",
+    "Educación, Capacitación y Formación",
+    "Energía, Minería, Petróleo, Gas y Renovables",
+    "Medios de Comunicación, Publicidad y Marketing",
+    "Servicios Administrativos, Seguridad y Apoyo Operativo",
+    "Arte, Entretenimiento y Recreación",
+    "Organizaciones Sin Fines de Lucro y Asociaciones",
+    "Otro sector / No especificado",
+  ];
+
   const [configSubTab, setConfigSubTab] = useState<
     "empresa" | "uso" | "informes" | "contabilidad" | "ventas" | "gastos" | "horas" | "monedero" | "avanzadas"
   >("empresa");
@@ -157,7 +180,7 @@ export default function AdminDashboard() {
     email: "R.mondragon@waynetrademarkhn.com",
     telefono: "+50494522666",
     sitioWeb: "Ninguno indicado",
-    sector: "Manufacturing",
+    sector: "Manufactura y Producción Industrial (Manufacturing)",
     // Legal
     nombreLegal: "WAYNE TRADEMARK PRINTING AND PACKAGING DE HONDURAS S DE RL",
     taxId: "05019008183490",
@@ -2140,16 +2163,59 @@ export default function AdminDashboard() {
                             </button>
                           </div>
 
-                          <div className="py-3 flex items-start justify-between gap-4">
-                            <span className="w-40 font-semibold text-slate-800 shrink-0">Sector</span>
-                            <span className="flex-1 text-slate-700 font-medium">{companySettings.sector}</span>
-                            <button
-                              onClick={() => startEditConfig("sector", "Sector de la empresa")}
-                              className="text-xs font-semibold text-[#f6821f] hover:underline cursor-pointer shrink-0"
-                            >
-                              Editar
-                            </button>
-                          </div>
+                          {/* Sector Row with Inline Dropdown Editor */}
+                          {editingConfigKey === "sector" ? (
+                            <div className="py-4 px-4 my-2 border border-slate-300 rounded-xl bg-white shadow-xs animate-in fade-in duration-150">
+                              <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
+                                <div className="w-48 shrink-0">
+                                  <span className="font-semibold text-xs text-slate-800 block">Sector</span>
+                                  <span className="text-[11px] text-slate-500 mt-0.5 block leading-snug">
+                                    Actividad o industria principal de tu negocio.
+                                  </span>
+                                </div>
+                                <div className="flex-1 max-w-md">
+                                  <select
+                                    value={editingConfigValue || companySettings.sector}
+                                    onChange={(e) => setEditingConfigValue(e.target.value)}
+                                    className="w-full px-3 py-2.5 text-xs rounded-xl bg-white border-2 border-[#f6821f] text-slate-900 focus:outline-none focus:ring-1 focus:ring-[#f6821f] cursor-pointer shadow-xs font-medium"
+                                  >
+                                    {BUSINESS_SECTOR_OPTIONS.map((sec) => (
+                                      <option key={sec} value={sec}>
+                                        {sec}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </div>
+                              </div>
+                              <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-end gap-3">
+                                <button
+                                  type="button"
+                                  onClick={() => setEditingConfigKey(null)}
+                                  className="px-4 py-2 rounded-xl text-xs font-medium text-slate-700 hover:text-slate-900 hover:bg-slate-100 transition cursor-pointer"
+                                >
+                                  Cancelar
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={saveConfigField}
+                                  className="px-5 py-2 rounded-xl text-xs font-semibold text-white bg-[#f6821f] hover:bg-[#e07216] transition cursor-pointer shadow-xs"
+                                >
+                                  Guardar
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="py-3 flex items-start justify-between gap-4">
+                              <span className="w-40 font-semibold text-slate-800 shrink-0">Sector</span>
+                              <span className="flex-1 text-slate-700 font-medium">{companySettings.sector}</span>
+                              <button
+                                onClick={() => startEditConfig("sector", "Sector de la empresa")}
+                                className="text-xs font-semibold text-[#f6821f] hover:underline cursor-pointer shrink-0"
+                              >
+                                Editar
+                              </button>
+                            </div>
+                          )}
                         </div>
                       </div>
 
@@ -2592,7 +2658,7 @@ export default function AdminDashboard() {
               </div>
 
               {/* Inline Edit Modal for Other Company Settings */}
-              {editingConfigKey && editingConfigKey !== "tipoEmpresa" && (
+              {editingConfigKey && editingConfigKey !== "tipoEmpresa" && editingConfigKey !== "sector" && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs">
                   <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-md p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-150">
                     <h3 className="text-base font-bold text-slate-900 mb-1">Editar {editingConfigLabel}</h3>
