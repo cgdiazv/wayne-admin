@@ -1956,46 +1956,6 @@ export default function AdminDashboard() {
           {/* ================= VIEW: CONFIGURACIÓN ================= */}
           {currentView === "configuracion" && (
             <div className="bg-white border border-slate-200 rounded-2xl shadow-xs overflow-hidden">
-              {/* Top Header Bar matching screenshot */}
-              <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-white">
-                <h1 className="text-xl font-bold text-slate-900 tracking-tight">Configuración</h1>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => alert("Comentarios enviados al equipo de Wayne Trademark Honduras.")}
-                    className="flex items-center gap-1.5 text-xs text-slate-600 hover:text-slate-900 font-medium px-3 py-1.5 rounded-lg hover:bg-slate-100 transition cursor-pointer"
-                  >
-                    <svg className="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 10h.01M12 10h.01M16 10h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                    </svg>
-                    <span>Give feedback</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    title="Centro de ayuda y soporte técnico"
-                    onClick={() => alert("Centro de soporte de Wayne Trademark Honduras.")}
-                    className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-full transition cursor-pointer"
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <circle cx="12" cy="12" r="9" strokeWidth="2" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3m.08 4h.01" />
-                    </svg>
-                  </button>
-
-                  <button
-                    type="button"
-                    title="Cerrar y volver al Dashboard"
-                    onClick={() => setCurrentView("dashboard")}
-                    className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-full transition cursor-pointer"
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                </div>
-              </div>
-
               {/* Main Body with Left Nav & Content */}
               <div className="flex flex-col md:flex-row min-h-[720px]">
                 {/* Left Submenu Navigation matching screenshot */}
