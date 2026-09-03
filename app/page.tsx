@@ -83,6 +83,7 @@ export default function AdminDashboard() {
   const [accountModalSuccess, setAccountModalSuccess] = useState("");
   const [showBlockTooltip, setShowBlockTooltip] = useState(false);
   const [showSaveDropdown, setShowSaveDropdown] = useState(false);
+  const [showAccountTypeTooltip, setShowAccountTypeTooltip] = useState(false);
 
   // Plan de cuentas personalization sidebar states (Matching screenshot)
   const [showConfigSidebar, setShowConfigSidebar] = useState(false);
@@ -2181,20 +2182,43 @@ export default function AdminDashboard() {
                 {/* Row 2: Tipo de cuenta* & Tipo de detalles* */}
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <div className="flex items-center justify-between mb-1.5">
+                    <div className="flex items-center justify-between mb-1.5 relative">
                       <label className="text-slate-600 font-medium">
                         Tipo de cuenta<span className="text-red-500">*</span>
                       </label>
-                      <button
-                        type="button"
-                        title="Clasificación general de la cuenta contable"
-                        className="text-slate-400 hover:text-slate-600 cursor-pointer"
-                      >
-                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <circle cx="12" cy="12" r="10" strokeWidth="2" />
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 16v-4m0-4h.01" />
-                        </svg>
-                      </button>
+                      <div className="relative inline-block">
+                        <button
+                          type="button"
+                          onMouseEnter={() => setShowAccountTypeTooltip(true)}
+                          onMouseLeave={() => setShowAccountTypeTooltip(false)}
+                          onClick={() => setShowAccountTypeTooltip(!showAccountTypeTooltip)}
+                          className="text-slate-400 hover:text-slate-600 cursor-pointer flex items-center p-0.5"
+                        >
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <circle cx="12" cy="12" r="10" strokeWidth="2" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 16v-4m0-4h.01" />
+                          </svg>
+                        </button>
+
+                        {showAccountTypeTooltip && (
+                          <div className="absolute bottom-full right-0 mb-2.5 z-40 w-72 sm:w-80 p-3 bg-slate-900 text-white rounded-lg shadow-2xl text-[11px] leading-relaxed animate-in fade-in zoom-in-95 duration-150">
+                            <p>
+                              Estas son las categorías principales en las que se incluyen las cuentas. Puedes verlos en Informes como parte del balance general o de la cuenta de pérdidas y ganancias.{" "}
+                              <span
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  alert("Informes: Balance general y Estado de pérdidas y ganancias disponibles en el módulo Reportes.");
+                                }}
+                                className="text-[#4589ff] hover:underline cursor-pointer font-medium"
+                              >
+                                Obtener más información
+                              </span>
+                            </p>
+                            {/* Downward triangle arrow pointing directly to the info icon */}
+                            <div className="absolute top-full right-1.5 -mt-0.5 border-4 border-transparent border-t-slate-900" />
+                          </div>
+                        )}
+                      </div>
                     </div>
                     <div className="relative">
                       <select
