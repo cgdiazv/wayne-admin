@@ -90,6 +90,7 @@ export default function AdminDashboard() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
+    // 1. Check local storage for instant initial display
     try {
       const savedLogo = localStorage.getItem("wayne_company_logo");
       if (savedLogo) {
@@ -98,6 +99,38 @@ export default function AdminDashboard() {
     } catch {
       // ignore storage error
     }
+
+    // 2. Load persistent company data from PostgreSQL database
+    fetch("/api/company")
+      .then((res) => res.json())
+      .then((res) => {
+        if (res.success && res.data) {
+          setCompanySettings({
+            nombre: res.data.nombre || "WAYNE TRADEMARK PRINTING AND PACKAGING DE HONDURAS S DE RL",
+            direccion: res.data.direccion || "ZIP Búfalo, Villanueva, Cortés 21100",
+            email: res.data.email || "R.mondragon@waynetrademarkhn.com",
+            telefono: res.data.telefono || "+50494522666",
+            sitioWeb: res.data.sitioWeb || "Ninguno indicado",
+            sector: res.data.sector || "Manufactura y Producción Industrial (Manufacturing)",
+            nombreLegal: res.data.nombreLegal || "WAYNE TRADEMARK PRINTING AND PACKAGING DE HONDURAS S DE RL",
+            taxId: res.data.taxId || "05019008183490",
+            tipoEmpresa: res.data.tipoEmpresa || "Sociedad anónima (pequeña empresa) con dos o más propietarios",
+            domicilioLegal: res.data.domicilioLegal || "Zip Búfalo Edificio 1B, Villanueva, Cortés 21101",
+            emailCliente: res.data.emailCliente || "R.mondragon@waynetrademarkhn.com",
+            direccionCliente: res.data.direccionCliente || "Ninguno indicado",
+          });
+
+          if (res.data.logoUrl) {
+            setCompanyLogo(res.data.logoUrl);
+            try {
+              localStorage.setItem("wayne_company_logo", res.data.logoUrl);
+            } catch {
+              // ignore
+            }
+          }
+        }
+      })
+      .catch((err) => console.error("Error loading company settings from DB:", err));
   }, []);
 
   const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -110,7 +143,7 @@ export default function AdminDashboard() {
     }
 
     const reader = new FileReader();
-    reader.onload = (event) => {
+    reader.onload = async (event) => {
       const result = event.target?.result as string;
       if (result) {
         setCompanyLogo(result);
@@ -119,12 +152,23 @@ export default function AdminDashboard() {
         } catch {
           // ignore
         }
+
+        // Persist logo to PostgreSQL database
+        try {
+          await fetch("/api/company", {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ logoUrl: result }),
+          });
+        } catch (err) {
+          console.error("Error saving logo in DB:", err);
+        }
       }
     };
     reader.readAsDataURL(file);
   };
 
-  const handleRemoveLogo = () => {
+  const handleRemoveLogo = async () => {
     setCompanyLogo(null);
     try {
       localStorage.removeItem("wayne_company_logo");
@@ -133,6 +177,17 @@ export default function AdminDashboard() {
     }
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
+    }
+
+    // Persist removal in PostgreSQL database
+    try {
+      await fetch("/api/company", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ logoUrl: null }),
+      });
+    } catch (err) {
+      console.error("Error removing logo from DB:", err);
     }
   };
 
@@ -201,13 +256,28 @@ export default function AdminDashboard() {
     setEditingConfigValue(companySettings[key] === "Ninguno indicado" ? "" : companySettings[key]);
   };
 
-  const saveConfigField = () => {
+  const saveConfigField = async () => {
     if (editingConfigKey) {
+      const updatedValue = editingConfigValue.trim() || "Ninguno indicado";
+      const fieldKey = editingConfigKey;
+
+      // Optimistic update in UI
       setCompanySettings((prev) => ({
         ...prev,
-        [editingConfigKey]: editingConfigValue.trim() || "Ninguno indicado",
+        [fieldKey]: updatedValue,
       }));
       setEditingConfigKey(null);
+
+      // Persist in PostgreSQL database
+      try {
+        await fetch("/api/company", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ [fieldKey]: updatedValue }),
+        });
+      } catch (err) {
+        console.error("Error updating company setting in DB:", err);
+      }
     }
   };
 

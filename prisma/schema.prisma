@@ -53,3 +53,21 @@ model InventoryItem {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }
+
+model CompanySettings {
+  id               String   @id @default("default")
+  nombre           String   @default("WAYNE TRADEMARK PRINTING AND PACKAGING DE HONDURAS S DE RL")
+  direccion        String   @default("ZIP Búfalo, Villanueva, Cortés 21100")
+  email            String   @default("R.mondragon@waynetrademarkhn.com")
+  telefono         String   @default("+50494522666")
+  sitioWeb         String   @default("Ninguno indicado")
+  sector           String   @default("Manufactura y Producción Industrial (Manufacturing)")
+  nombreLegal      String   @default("WAYNE TRADEMARK PRINTING AND PACKAGING DE HONDURAS S DE RL")
+  taxId            String   @default("05019008183490")
+  tipoEmpresa      String   @default("Sociedad anónima (pequeña empresa) con dos o más propietarios")
+  domicilioLegal   String   @default("Zip Búfalo Edificio 1B, Villanueva, Cortés 21101")
+  emailCliente     String   @default("R.mondragon@waynetrademarkhn.com")
+  direccionCliente String   @default("Ninguno indicado")
+  logoUrl          String?  @db.Text
+  updatedAt        DateTime @updatedAt
+}
