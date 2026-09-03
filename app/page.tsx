@@ -123,7 +123,7 @@ export default function AdminDashboard() {
             <div className="flex items-center gap-2">
               <h1 className="font-bold text-lg text-white tracking-tight">Wayne Admin</h1>
               <span className="px-2 py-0.5 text-[10px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-full">
-                Supabase Live
+                Live &amp; Connected
               </span>
             </div>
             <p className="text-xs text-zinc-400">admin.waynetrademarkhn.com</p>
@@ -310,7 +310,7 @@ export default function AdminDashboard() {
                 <div className="flex items-center justify-between p-3 rounded-xl bg-zinc-900 border border-zinc-800">
                   <div className="flex items-center gap-3">
                     <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                    <span className="text-zinc-300 font-medium">Supabase Database Engine</span>
+                    <span className="text-zinc-300 font-medium">Production Database Engine</span>
                   </div>
                   <span className="text-xs text-emerald-400 font-mono">PostgreSQL 17.6 Connected</span>
                 </div>
