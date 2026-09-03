@@ -54,6 +54,105 @@ export default function AdminDashboard() {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [vendors, setVendors] = useState<Vendor[]>([]);
+
+  // Quick Actions Bar State & Config
+  const quickActions = [
+    { id: "crear-factura", label: "Crear factura" },
+    { id: "registrar-gasto", label: "Registrar gasto" },
+    { id: "agregar-deposito", label: "Agregar depósito bancario" },
+    { id: "agregar-cliente", label: "Agregar cliente" },
+    { id: "crear-estado-cuenta", label: "Crear estado de cuenta" },
+    { id: "registrar-pago", label: "Registrar pago" },
+    { id: "crear-orden-compra", label: "Crear orden de compra" },
+    { id: "pagar-facturas", label: "Pagar facturas" },
+    { id: "agregar-proveedor", label: "Agregar proveedor" },
+  ];
+
+  const [activeModal, setActiveModal] = useState<string | null>(null);
+  const [modalLoading, setModalLoading] = useState(false);
+  const [modalError, setModalError] = useState("");
+  const [modalSuccess, setModalSuccess] = useState("");
+
+  const [customerForm, setCustomerForm] = useState({
+    name: "",
+    macolaCode: "",
+    email: "",
+    phone: "",
+    address: "",
+    currency: "USD",
+  });
+
+  const [vendorForm, setVendorForm] = useState({
+    name: "",
+    macolaCode: "",
+    email: "",
+    phone: "",
+    address: "",
+    currency: "USD",
+  });
+
+  const handleQuickAction = (id: string) => {
+    setModalError("");
+    setModalSuccess("");
+    setActiveModal(id);
+  };
+
+  const handleCreateCustomer = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setModalLoading(true);
+    setModalError("");
+    try {
+      const res = await fetch("/api/customers", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(customerForm),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "Error al crear cliente");
+      }
+      setModalSuccess("¡Cliente agregado exitosamente a la base de datos!");
+      setCustomerForm({ name: "", macolaCode: "", email: "", phone: "", address: "", currency: "USD" });
+      await loadDashboardData();
+      setTimeout(() => {
+        setActiveModal(null);
+        setModalSuccess("");
+      }, 1000);
+    } catch (err: any) {
+      setModalError(err.message || "Error al registrar cliente");
+    } finally {
+      setModalLoading(false);
+    }
+  };
+
+  const handleCreateVendor = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setModalLoading(true);
+    setModalError("");
+    try {
+      const res = await fetch("/api/vendors", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(vendorForm),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "Error al crear proveedor");
+      }
+      setModalSuccess("¡Proveedor agregado exitosamente a la base de datos!");
+      setVendorForm({ name: "", macolaCode: "", email: "", phone: "", address: "", currency: "USD" });
+      await loadDashboardData();
+      setTimeout(() => {
+        setActiveModal(null);
+        setModalSuccess("");
+      }, 1000);
+    } catch (err: any) {
+      setModalError(err.message || "Error al registrar proveedor");
+    } finally {
+      setModalLoading(false);
+    }
+  };
+
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
 
   // Fetch all live data from Next.js API routes
@@ -391,6 +490,28 @@ export default function AdminDashboard() {
           {/* ================= VIEW: DASHBOARD ================= */}
           {currentView === "dashboard" && (
             <>
+              {/* Quick Actions Bar (Crear acciones) */}
+              <div className="bg-white border border-slate-200/90 rounded-2xl p-3.5 shadow-xs">
+                <div className="flex items-center gap-3 overflow-x-auto no-scrollbar py-0.5">
+                  <span className="font-bold text-slate-800 text-xs shrink-0 tracking-tight flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-[#f6821f]"></span>
+                    Crear acciones
+                  </span>
+                  <div className="h-4 w-px bg-slate-200 shrink-0"></div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    {quickActions.map((action) => (
+                      <button
+                        key={action.id}
+                        onClick={() => handleQuickAction(action.id)}
+                        className="px-3.5 py-1.5 rounded-full border border-slate-200 hover:border-[#f6821f] text-slate-700 hover:text-[#f6821f] hover:bg-[#fff7ed]/50 text-xs font-medium transition cursor-pointer shadow-2xs whitespace-nowrap bg-white"
+                      >
+                        {action.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
               {/* Metric Cards Row */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 {/* Plan de cuentas */}
@@ -813,6 +934,273 @@ export default function AdminDashboard() {
           )}
         </main>
       </div>
+
+      {/* ================= MODAL OVERLAY ================= */}
+      {activeModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs">
+          <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-lg p-6 shadow-2xl relative animate-in fade-in zoom-in-95 duration-150">
+            {/* Close button */}
+            <button
+              onClick={() => setActiveModal(null)}
+              className="absolute top-4 right-4 p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition cursor-pointer"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+
+            {/* Modal: AGREGAR CLIENTE */}
+            {activeModal === "agregar-cliente" && (
+              <div>
+                <div className="mb-4">
+                  <span className="text-[11px] font-semibold text-[#f6821f] uppercase tracking-wider">Acción Rápida</span>
+                  <h3 className="text-lg font-bold text-slate-900">Agregar Nuevo Cliente</h3>
+                  <p className="text-xs text-slate-500">Registrar cliente con código Macola opcional en la base de datos.</p>
+                </div>
+
+                {modalError && (
+                  <div className="mb-4 p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs">
+                    {modalError}
+                  </div>
+                )}
+                {modalSuccess && (
+                  <div className="mb-4 p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-semibold">
+                    {modalSuccess}
+                  </div>
+                )}
+
+                <form onSubmit={handleCreateCustomer} className="space-y-3.5 text-xs">
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">Nombre de la Empresa / Cliente *</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Ej. Distribuidora Textil S.A."
+                      value={customerForm.name}
+                      onChange={(e) => setCustomerForm({ ...customerForm, name: e.target.value })}
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:border-[#f6821f] text-slate-900"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block font-semibold text-slate-700 mb-1">Código Macola</label>
+                      <input
+                        type="text"
+                        placeholder="Ej. CUS-009"
+                        value={customerForm.macolaCode}
+                        onChange={(e) => setCustomerForm({ ...customerForm, macolaCode: e.target.value })}
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:border-[#f6821f] text-slate-900 font-mono"
+                      />
+                    </div>
+                    <div>
+                      <label className="block font-semibold text-slate-700 mb-1">Moneda</label>
+                      <select
+                        value={customerForm.currency}
+                        onChange={(e) => setCustomerForm({ ...customerForm, currency: e.target.value })}
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:border-[#f6821f] text-slate-900"
+                      >
+                        <option value="USD">USD ($)</option>
+                        <option value="HNL">HNL (L)</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block font-semibold text-slate-700 mb-1">Correo Electrónico</label>
+                      <input
+                        type="email"
+                        placeholder="contacto@cliente.com"
+                        value={customerForm.email}
+                        onChange={(e) => setCustomerForm({ ...customerForm, email: e.target.value })}
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:border-[#f6821f] text-slate-900"
+                      />
+                    </div>
+                    <div>
+                      <label className="block font-semibold text-slate-700 mb-1">Teléfono</label>
+                      <input
+                        type="text"
+                        placeholder="+504 2550-0000"
+                        value={customerForm.phone}
+                        onChange={(e) => setCustomerForm({ ...customerForm, phone: e.target.value })}
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:border-[#f6821f] text-slate-900"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">Dirección Física</label>
+                    <input
+                      type="text"
+                      placeholder="San Pedro Sula, Honduras"
+                      value={customerForm.address}
+                      onChange={(e) => setCustomerForm({ ...customerForm, address: e.target.value })}
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:border-[#f6821f] text-slate-900"
+                    />
+                  </div>
+
+                  <div className="pt-2 flex justify-end gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setActiveModal(null)}
+                      className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium cursor-pointer"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={modalLoading}
+                      className="px-5 py-2 rounded-xl bg-[#f6821f] hover:bg-[#e07216] text-white font-semibold cursor-pointer shadow-md shadow-[#f6821f]/20 disabled:opacity-50"
+                    >
+                      {modalLoading ? "Guardando..." : "Guardar Cliente"}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            )}
+
+            {/* Modal: AGREGAR PROVEEDOR */}
+            {activeModal === "agregar-proveedor" && (
+              <div>
+                <div className="mb-4">
+                  <span className="text-[11px] font-semibold text-[#f6821f] uppercase tracking-wider">Acción Rápida</span>
+                  <h3 className="text-lg font-bold text-slate-900">Agregar Nuevo Proveedor</h3>
+                  <p className="text-xs text-slate-500">Registrar proveedor con código Macola opcional en la base de datos.</p>
+                </div>
+
+                {modalError && (
+                  <div className="mb-4 p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs">
+                    {modalError}
+                  </div>
+                )}
+                {modalSuccess && (
+                  <div className="mb-4 p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-semibold">
+                    {modalSuccess}
+                  </div>
+                )}
+
+                <form onSubmit={handleCreateVendor} className="space-y-3.5 text-xs">
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">Nombre del Proveedor *</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Ej. Suministros Industriales S.A."
+                      value={vendorForm.name}
+                      onChange={(e) => setVendorForm({ ...vendorForm, name: e.target.value })}
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:border-[#f6821f] text-slate-900"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block font-semibold text-slate-700 mb-1">Código Macola</label>
+                      <input
+                        type="text"
+                        placeholder="Ej. VEN-009"
+                        value={vendorForm.macolaCode}
+                        onChange={(e) => setVendorForm({ ...vendorForm, macolaCode: e.target.value })}
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:border-[#f6821f] text-slate-900 font-mono"
+                      />
+                    </div>
+                    <div>
+                      <label className="block font-semibold text-slate-700 mb-1">Moneda</label>
+                      <select
+                        value={vendorForm.currency}
+                        onChange={(e) => setVendorForm({ ...vendorForm, currency: e.target.value })}
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:border-[#f6821f] text-slate-900"
+                      >
+                        <option value="USD">USD ($)</option>
+                        <option value="HNL">HNL (L)</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block font-semibold text-slate-700 mb-1">Correo Electrónico</label>
+                      <input
+                        type="email"
+                        placeholder="ventas@proveedor.com"
+                        value={vendorForm.email}
+                        onChange={(e) => setVendorForm({ ...vendorForm, email: e.target.value })}
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:border-[#f6821f] text-slate-900"
+                      />
+                    </div>
+                    <div>
+                      <label className="block font-semibold text-slate-700 mb-1">Teléfono</label>
+                      <input
+                        type="text"
+                        placeholder="+504 2550-1111"
+                        value={vendorForm.phone}
+                        onChange={(e) => setVendorForm({ ...vendorForm, phone: e.target.value })}
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:border-[#f6821f] text-slate-900"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">Dirección Física</label>
+                    <input
+                      type="text"
+                      placeholder="Choloma, Cortés, Honduras"
+                      value={vendorForm.address}
+                      onChange={(e) => setVendorForm({ ...vendorForm, address: e.target.value })}
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:border-[#f6821f] text-slate-900"
+                    />
+                  </div>
+
+                  <div className="pt-2 flex justify-end gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setActiveModal(null)}
+                      className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium cursor-pointer"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={modalLoading}
+                      className="px-5 py-2 rounded-xl bg-[#f6821f] hover:bg-[#e07216] text-white font-semibold cursor-pointer shadow-md shadow-[#f6821f]/20 disabled:opacity-50"
+                    >
+                      {modalLoading ? "Guardando..." : "Guardar Proveedor"}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            )}
+
+            {/* Modal: OTRAS ACCIONES */}
+            {activeModal !== "agregar-cliente" && activeModal !== "agregar-proveedor" && (
+              <div className="text-center py-4 space-y-4">
+                <div className="w-12 h-12 rounded-2xl bg-[#fff7ed] text-[#f6821f] border border-[#fed7aa] flex items-center justify-center mx-auto shadow-xs">
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900 capitalize">
+                    {quickActions.find((a) => a.id === activeModal)?.label}
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
+                    Acción configurada para Wayne Trademark Honduras. Este módulo se integrará con las cuentas contables y facturas del sistema.
+                  </p>
+                </div>
+
+                <div className="pt-2">
+                  <button
+                    onClick={() => setActiveModal(null)}
+                    className="px-6 py-2 rounded-xl bg-[#f6821f] hover:bg-[#e07216] text-white text-xs font-semibold cursor-pointer transition shadow-md shadow-[#f6821f]/20"
+                  >
+                    Entendido
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
