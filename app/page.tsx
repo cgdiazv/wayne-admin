@@ -52,6 +52,11 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [showPnL, setShowPnL] = useState(true);
   const [showGastos, setShowGastos] = useState(true);
+  const [hideConfirmWidget, setHideConfirmWidget] = useState<"pnl" | "gastos" | null>(null);
+  const [visibleWidgets, setVisibleWidgets] = useState({
+    pnl: true,
+    gastos: true,
+  });
 
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -599,23 +604,38 @@ export default function AdminDashboard() {
 
               {/* ================= SECTION: RESUMEN DE LA EMPRESA ================= */}
               <div className="space-y-3 max-w-6xl">
-                <h2 className="text-sm font-bold text-slate-900 tracking-tight">Resumen de la empresa</h2>
+                <div className="flex items-center justify-between">
+                  <h2 className="text-sm font-bold text-slate-900 tracking-tight">Resumen de la empresa</h2>
+                  {(!visibleWidgets.pnl || !visibleWidgets.gastos) && (
+                    <button
+                      onClick={() => setVisibleWidgets({ pnl: true, gastos: true })}
+                      className="text-xs font-semibold text-[#004d40] hover:text-[#002f27] transition cursor-pointer flex items-center gap-1"
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                      </svg>
+                      Personalizar
+                    </button>
+                  )}
+                </div>
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {/* Card 1: Pérdidas y Ganancias */}
-                  <div className="bg-white border border-slate-200/90 rounded-2xl p-6 shadow-xs flex flex-col justify-between">
-                    <div>
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">PÉRDIDAS Y GANANCIAS</span>
-                        <button
-                          onClick={() => setShowPnL(!showPnL)}
-                          className="text-xs font-medium text-emerald-800 hover:text-emerald-950 transition cursor-pointer"
-                        >
-                          {showPnL ? "Ocultar" : "Mostrar"}
-                        </button>
-                      </div>
-                      <h3 className="text-lg font-medium text-slate-900 leading-snug mb-8">
-                        Consulta lo que ganas y lo que gastas en todas tus cuentas
-                      </h3>
+                  {visibleWidgets.pnl && (
+                    <div className="bg-white border border-slate-200/90 rounded-2xl p-6 shadow-xs flex flex-col justify-between">
+                      <div>
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">PÉRDIDAS Y GANANCIAS</span>
+                          <button
+                            onClick={() => setHideConfirmWidget("pnl")}
+                            className="text-xs font-medium text-emerald-800 hover:text-emerald-950 transition cursor-pointer"
+                          >
+                            Ocultar
+                          </button>
+                        </div>
+                        <h3 className="text-lg font-medium text-slate-900 leading-snug mb-8">
+                          Consulta lo que ganas y lo que gastas en todas tus cuentas
+                        </h3>
 
                       {showPnL && (
                         <div className="space-y-6 my-4">
@@ -648,22 +668,24 @@ export default function AdminDashboard() {
                       </button>
                     </div>
                   </div>
+                )}
 
                   {/* Card 2: Gastos */}
-                  <div className="bg-white border border-slate-200/90 rounded-2xl p-6 shadow-xs flex flex-col justify-between">
-                    <div>
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">GASTOS</span>
-                        <button
-                          onClick={() => setShowGastos(!showGastos)}
-                          className="text-xs font-medium text-emerald-800 hover:text-emerald-950 transition cursor-pointer"
-                        >
-                          {showGastos ? "Ocultar" : "Mostrar"}
-                        </button>
-                      </div>
-                      <h3 className="text-lg font-medium text-slate-900 leading-snug mb-8">
-                        Ve a dónde va tu dinero
-                      </h3>
+                  {visibleWidgets.gastos && (
+                    <div className="bg-white border border-slate-200/90 rounded-2xl p-6 shadow-xs flex flex-col justify-between">
+                      <div>
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">GASTOS</span>
+                          <button
+                            onClick={() => setHideConfirmWidget("gastos")}
+                            className="text-xs font-medium text-emerald-800 hover:text-emerald-950 transition cursor-pointer"
+                          >
+                            Ocultar
+                          </button>
+                        </div>
+                        <h3 className="text-lg font-medium text-slate-900 leading-snug mb-8">
+                          Ve a dónde va tu dinero
+                        </h3>
 
                       {showGastos && (
                         <div className="flex items-center justify-center gap-8 my-6">
@@ -770,7 +792,20 @@ export default function AdminDashboard() {
                       </button>
                     </div>
                   </div>
+                )}
                 </div>
+
+                {!visibleWidgets.pnl && !visibleWidgets.gastos && (
+                  <div className="p-6 rounded-2xl bg-white border border-slate-200 text-center space-y-3">
+                    <p className="text-xs text-slate-500">Has ocultado los widgets del resumen de la empresa.</p>
+                    <button
+                      onClick={() => setVisibleWidgets({ pnl: true, gastos: true })}
+                      className="px-4 py-2 rounded-xl border border-[#004d40] text-[#004d40] text-xs font-semibold hover:bg-emerald-50 transition cursor-pointer"
+                    >
+                      Personalizar y restaurar widgets
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* Quick Navigation Panels */}
@@ -1386,6 +1421,54 @@ export default function AdminDashboard() {
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* ================= MODAL: OCULTAR WIDGET CONFIRMATION ================= */}
+      {hideConfirmWidget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs">
+          <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-sm p-6 shadow-2xl relative animate-in fade-in zoom-in-95 duration-150">
+            {/* Close button */}
+            <button
+              onClick={() => setHideConfirmWidget(null)}
+              className="absolute top-4 right-4 p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition cursor-pointer"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+
+            <div className="pt-2">
+              <h3 className="text-xl font-bold text-slate-900 leading-snug mb-3">
+                ¿Seguro que deseas ocultar este widget?
+              </h3>
+              <p className="text-xs text-slate-600 mb-6">
+                Para volver a añadirlo, selecciona Personalizar.
+              </p>
+
+              <div className="border-t border-slate-200 pt-4 flex items-center justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setHideConfirmWidget(null)}
+                  className="px-5 py-2 rounded-xl border border-[#004d40] text-[#004d40] hover:bg-emerald-50/50 font-semibold text-xs transition cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (hideConfirmWidget) {
+                      setVisibleWidgets((prev) => ({ ...prev, [hideConfirmWidget]: false }));
+                    }
+                    setHideConfirmWidget(null);
+                  }}
+                  className="px-5 py-2 rounded-xl bg-[#004d40] hover:bg-[#00382f] text-white font-semibold text-xs transition cursor-pointer shadow-xs"
+                >
+                  Ocultar
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
