@@ -700,7 +700,7 @@ export default function AdminDashboard() {
                   {(!visibleWidgets.pnl || !visibleWidgets.gastos) && (
                     <button
                       onClick={() => setVisibleWidgets({ pnl: true, gastos: true })}
-                      className="text-xs font-semibold text-[#004d40] hover:text-[#002f27] transition cursor-pointer flex items-center gap-1"
+                      className="text-xs font-semibold text-[#f6821f] hover:text-[#e07216] transition cursor-pointer flex items-center gap-1"
                     >
                       <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
@@ -719,7 +719,7 @@ export default function AdminDashboard() {
                           <span className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">PÉRDIDAS Y GANANCIAS</span>
                           <button
                             onClick={() => setHideConfirmWidget("pnl")}
-                            className="text-xs font-medium text-emerald-800 hover:text-emerald-950 transition cursor-pointer"
+                            className="text-xs font-medium text-[#f6821f] hover:text-[#e07216] transition cursor-pointer"
                           >
                             Ocultar
                           </button>
@@ -764,7 +764,7 @@ export default function AdminDashboard() {
                           <span className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">GASTOS</span>
                           <button
                             onClick={() => setHideConfirmWidget("gastos")}
-                            className="text-xs font-medium text-emerald-800 hover:text-emerald-950 transition cursor-pointer"
+                            className="text-xs font-medium text-[#f6821f] hover:text-[#e07216] transition cursor-pointer"
                           >
                             Ocultar
                           </button>
@@ -881,7 +881,7 @@ export default function AdminDashboard() {
                     <p className="text-xs text-slate-500">Has ocultado los widgets del resumen de la empresa.</p>
                     <button
                       onClick={() => setVisibleWidgets({ pnl: true, gastos: true })}
-                      className="px-4 py-2 rounded-xl border border-[#004d40] text-[#004d40] text-xs font-semibold hover:bg-emerald-50 transition cursor-pointer"
+                      className="px-4 py-2 rounded-xl border border-[#f6821f] text-[#f6821f] text-xs font-semibold hover:bg-[#fff7ed] transition cursor-pointer"
                     >
                       Personalizar y restaurar widgets
                     </button>
@@ -979,14 +979,14 @@ export default function AdminDashboard() {
 
                   <button
                     onClick={handleExportAccounts}
-                    className="px-4 py-2 rounded-xl border border-[#004d40] text-[#004d40] hover:bg-emerald-50 text-xs font-semibold transition cursor-pointer shadow-xs"
+                    className="px-4 py-2 rounded-xl border border-[#f6821f] text-[#f6821f] hover:bg-[#fff7ed] text-xs font-semibold transition cursor-pointer shadow-xs"
                   >
                     Generar informe
                   </button>
 
                   <button
                     onClick={() => setShowNewAccountModal(true)}
-                    className="px-4 py-2 rounded-xl bg-[#004d40] hover:bg-[#00382f] text-white text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer shadow-xs"
+                    className="px-4 py-2 rounded-xl bg-[#f6821f] hover:bg-[#e07216] text-white text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer shadow-md shadow-[#f6821f]/20"
                   >
                     <span>Nueva cuenta</span>
                     <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1006,7 +1006,7 @@ export default function AdminDashboard() {
                       placeholder="Filtrar por nombre o número"
                       value={accountsSearch}
                       onChange={(e) => setAccountsSearch(e.target.value)}
-                      className="w-full pl-8 pr-3 py-1.5 text-xs rounded-xl bg-slate-50 border border-slate-200 text-slate-900 placeholder-slate-400 focus:outline-none focus:border-[#004d40] focus:ring-1 focus:ring-[#004d40]"
+                      className="w-full pl-8 pr-3 py-1.5 text-xs rounded-xl bg-slate-50 border border-slate-200 text-slate-900 placeholder-slate-400 focus:outline-none focus:border-[#f6821f] focus:ring-1 focus:ring-[#f6821f]"
                     />
                     <svg className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -1018,7 +1018,7 @@ export default function AdminDashboard() {
                     <select
                       value={accountsTypeFilter}
                       onChange={(e) => setAccountsTypeFilter(e.target.value)}
-                      className="pl-3 pr-8 py-1.5 text-xs rounded-xl bg-slate-50 border border-slate-200 text-slate-700 font-medium appearance-none focus:outline-none focus:border-[#004d40] cursor-pointer"
+                      className="pl-3 pr-8 py-1.5 text-xs rounded-xl bg-slate-50 border border-slate-200 text-slate-700 font-medium appearance-none focus:outline-none focus:border-[#f6821f] cursor-pointer"
                     >
                       <option value="Todo">Todo</option>
                       <option value="ACTIVO">Activo</option>
@@ -1796,7 +1796,7 @@ export default function AdminDashboard() {
                 <button
                   type="button"
                   onClick={() => setHideConfirmWidget(null)}
-                  className="px-5 py-2 rounded-xl border border-[#004d40] text-[#004d40] hover:bg-emerald-50/50 font-semibold text-xs transition cursor-pointer"
+                  className="px-5 py-2 rounded-xl border border-slate-300 text-slate-700 hover:bg-slate-50 font-semibold text-xs transition cursor-pointer"
                 >
                   Cancelar
                 </button>
@@ -1808,7 +1808,7 @@ export default function AdminDashboard() {
                     }
                     setHideConfirmWidget(null);
                   }}
-                  className="px-5 py-2 rounded-xl bg-[#004d40] hover:bg-[#00382f] text-white font-semibold text-xs transition cursor-pointer shadow-xs"
+                  className="px-5 py-2 rounded-xl bg-[#f6821f] hover:bg-[#e07216] text-white font-semibold text-xs transition cursor-pointer shadow-md shadow-[#f6821f]/20"
                 >
                   Ocultar
                 </button>
@@ -1856,7 +1856,7 @@ export default function AdminDashboard() {
                     placeholder="Ej. 1115 o 2120"
                     value={newAccountForm.code}
                     onChange={(e) => setNewAccountForm({ ...newAccountForm, code: e.target.value })}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-mono focus:outline-none focus:border-[#004d40]"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-mono focus:outline-none focus:border-[#f6821f] focus:ring-1 focus:ring-[#f6821f]"
                   />
                 </div>
 
@@ -1865,7 +1865,7 @@ export default function AdminDashboard() {
                   <select
                     value={newAccountForm.type}
                     onChange={(e) => setNewAccountForm({ ...newAccountForm, type: e.target.value })}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-medium focus:outline-none focus:border-[#004d40]"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-medium focus:outline-none focus:border-[#f6821f]"
                   >
                     <option value="ACTIVO">ACTIVO</option>
                     <option value="PASIVO">PASIVO</option>
@@ -1884,7 +1884,7 @@ export default function AdminDashboard() {
                   placeholder="Ej. Banco Ficohsa USD o Gastos de Mantenimiento"
                   value={newAccountForm.name}
                   onChange={(e) => setNewAccountForm({ ...newAccountForm, name: e.target.value })}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:border-[#004d40]"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:border-[#f6821f] focus:ring-1 focus:ring-[#f6821f]"
                 />
               </div>
 
@@ -1894,7 +1894,7 @@ export default function AdminDashboard() {
                   <select
                     value={newAccountForm.currency}
                     onChange={(e) => setNewAccountForm({ ...newAccountForm, currency: e.target.value })}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-medium focus:outline-none focus:border-[#004d40]"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-medium focus:outline-none focus:border-[#f6821f]"
                   >
                     <option value="USD">USD ($)</option>
                     <option value="HNL">HNL (L)</option>
@@ -1906,7 +1906,7 @@ export default function AdminDashboard() {
                   <select
                     value={newAccountForm.isActive ? "true" : "false"}
                     onChange={(e) => setNewAccountForm({ ...newAccountForm, isActive: e.target.value === "true" })}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-medium focus:outline-none focus:border-[#004d40]"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-medium focus:outline-none focus:border-[#f6821f]"
                   >
                     <option value="true">Activa</option>
                     <option value="false">Inactiva</option>
@@ -1925,7 +1925,7 @@ export default function AdminDashboard() {
                 <button
                   type="submit"
                   disabled={accountModalLoading}
-                  className="px-5 py-2.5 rounded-xl bg-[#004d40] hover:bg-[#00382f] text-white font-semibold cursor-pointer shadow-md transition disabled:opacity-50"
+                  className="px-5 py-2.5 rounded-xl bg-[#f6821f] hover:bg-[#e07216] text-white font-semibold cursor-pointer shadow-md shadow-[#f6821f]/20 transition disabled:opacity-50"
                 >
                   {accountModalLoading ? "Guardando..." : "Guardar Cuenta"}
                 </button>
