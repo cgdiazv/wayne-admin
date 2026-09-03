@@ -662,11 +662,6 @@ export default function AdminDashboard() {
                       )}
                     </div>
 
-                    <div className="pt-6">
-                      <button className="w-full py-2.5 px-4 rounded-xl border border-slate-200 hover:border-slate-300 text-slate-700 hover:text-slate-900 text-xs font-medium transition cursor-pointer hover:bg-slate-50 text-center">
-                        Transfiere transacciones automática
-                      </button>
-                    </div>
                   </div>
                 )}
 
@@ -786,11 +781,6 @@ export default function AdminDashboard() {
                       )}
                     </div>
 
-                    <div className="pt-6">
-                      <button className="w-full py-2.5 px-4 rounded-xl border border-slate-200 hover:border-slate-300 text-slate-700 hover:text-slate-900 text-xs font-medium transition cursor-pointer hover:bg-slate-50 text-center">
-                        Transfiere transacciones automática
-                      </button>
-                    </div>
                   </div>
                 )}
                 </div>
