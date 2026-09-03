@@ -1,0 +1,10 @@
+code,name,type,currency,isActive
+1000,Cash on Hand,Asset,USD,true
+1100,Operating Checking Account,Asset,USD,true
+1200,Accounts Receivable,Asset,USD,true
+1300,Inventory Asset,Asset,USD,true
+2000,Accounts Payable,Liability,USD,true
+3000,Owner Equity,Equity,USD,true
+4000,Sales Revenue,Income,USD,true
+5000,Cost of Goods Sold,Expense,USD,true
+6000,General & Administrative,Expense,USD,true

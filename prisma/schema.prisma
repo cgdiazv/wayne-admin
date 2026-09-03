@@ -1,0 +1,55 @@
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Account {
+  id        String   @id @default(cuid())
+  code      String   @unique // e.g., 1000-6000 standard numbering
+  name      String
+  type      String   // Asset, Liability, Equity, Income, Expense
+  currency  String   @default("USD")
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Customer {
+  id         String   @id @default(cuid())
+  macolaCode String?  @unique // Macola tracking code
+  name       String
+  email      String?
+  phone      String?
+  address    String?
+  currency   String   @default("USD")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model Vendor {
+  id         String   @id @default(cuid())
+  macolaCode String?  @unique // Macola tracking code
+  name       String
+  email      String?
+  phone      String?
+  address    String?
+  currency   String   @default("USD")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model InventoryItem {
+  id          String   @id @default(cuid())
+  sku         String   @unique
+  description String
+  quantity    Float    @default(0)
+  cost        Float    @default(0)
+  price       Float    @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
