@@ -41,9 +41,13 @@ type InventoryItem = {
   price: number;
 };
 
+type NavItem = "dashboard" | "plan-cuentas" | "transacciones" | "macola-sync" | "clientes" | "proveedores" | "inventario" | "configuracion";
+
 export default function AdminDashboard() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<"overview" | "accounts" | "customers" | "vendors" | "inventory">("overview");
+  const [currentView, setCurrentView] = useState<NavItem>("dashboard");
+  const [contabilidadOpen, setContabilidadOpen] = useState(true);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
 
@@ -88,7 +92,7 @@ export default function AdminDashboard() {
   const totalInventoryUnits = inventory.reduce((sum, item) => sum + (item.quantity || 0), 0);
   const totalInventoryValuation = inventory.reduce((sum, item) => sum + (item.quantity || 0) * (item.cost || 0), 0);
 
-  // Filtered views
+  // Filters
   const filteredAccounts = accounts.filter(
     (a) => a.code.toLowerCase().includes(search.toLowerCase()) || a.name.toLowerCase().includes(search.toLowerCase())
   );
@@ -112,424 +116,703 @@ export default function AdminDashboard() {
   );
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans">
-      {/* Top Navigation Bar */}
-      <header className="border-b border-slate-200 bg-white/95 backdrop-blur-md sticky top-0 z-30 px-6 py-4 flex items-center justify-between shadow-xs">
-        <div className="flex items-center gap-3.5">
-          <div className="w-10 h-10 rounded-xl bg-[#fff7ed] border border-[#f6821f]/30 flex items-center justify-center font-bold text-[#f6821f] text-lg shadow-xs">
-            W
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="font-bold text-lg text-slate-900 tracking-tight">Wayne Admin</h1>
-              <span className="px-2 py-0.5 text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                Live &amp; Connected
-              </span>
+    <div className="min-h-screen bg-slate-50 text-slate-900 flex font-sans antialiased">
+      {/* ===================== SIDEBAR ===================== */}
+      <aside
+        className={`${
+          sidebarCollapsed ? "w-20" : "w-64"
+        } shrink-0 bg-white border-r border-slate-200 flex flex-col transition-all duration-300 z-30 sticky top-0 h-screen`}
+      >
+        {/* Brand Header */}
+        <div className="p-4 border-b border-slate-100 flex items-center justify-between">
+          <div className="flex items-center gap-3 overflow-hidden">
+            <div className="w-10 h-10 rounded-xl bg-[#fff7ed] border border-[#f6821f]/30 flex items-center justify-center font-bold text-[#f6821f] text-lg shrink-0 shadow-xs">
+              W
             </div>
-            <p className="text-xs text-slate-500">Wayne Trademark Honduras</p>
+            {!sidebarCollapsed && (
+              <div className="truncate">
+                <h1 className="font-bold text-sm text-slate-900 leading-tight">Wayne Admin</h1>
+                <p className="text-[11px] text-slate-500 truncate">Wayne Trademark Honduras</p>
+              </div>
+            )}
           </div>
-        </div>
-
-        <div className="flex items-center gap-3">
           <button
-            onClick={loadDashboardData}
-            title="Refresh database records"
-            className="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200/80 transition cursor-pointer text-xs font-medium flex items-center gap-1.5"
+            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer transition hidden md:block"
+            title={sidebarCollapsed ? "Expandir sidebar" : "Colapsar sidebar"}
           >
-            <svg className={`w-3.5 h-3.5 text-[#f6821f] ${loading ? "animate-spin" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d={sidebarCollapsed ? "M13 5l7 7-7 7M5 5l7 7-7 7" : "M11 19l-7-7 7-7m8 14l-7-7 7-7"} />
             </svg>
-            <span>Sync</span>
-          </button>
-
-          <button
-            onClick={handleLogout}
-            className="px-3 py-1.5 rounded-lg bg-white hover:bg-red-50 text-slate-600 hover:text-red-600 border border-slate-200 hover:border-red-200 transition cursor-pointer text-xs font-medium"
-          >
-            Sign Out
           </button>
         </div>
-      </header>
 
-      {/* Main Content Area */}
-      <main className="flex-1 p-6 max-w-7xl mx-auto w-full space-y-6">
-        {/* Metric Cards Row */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {/* Card 1: Accounts */}
-          <div
-            onClick={() => setActiveTab("accounts")}
-            className={`p-5 rounded-2xl border transition-all cursor-pointer shadow-xs ${
-              activeTab === "accounts"
-                ? "bg-white border-[#f6821f] ring-2 ring-[#f6821f]/20 shadow-md"
-                : "bg-white border-slate-200 hover:border-slate-300 hover:shadow-sm"
+        {/* Navigation Items */}
+        <nav className="flex-1 p-3 space-y-1 overflow-y-auto text-xs font-medium">
+          {/* Dashboard Item */}
+          <button
+            onClick={() => setCurrentView("dashboard")}
+            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition cursor-pointer ${
+              currentView === "dashboard"
+                ? "bg-[#fff7ed] text-[#f6821f] font-semibold shadow-xs"
+                : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
             }`}
           >
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Chart of Accounts</span>
-              <span className="p-2 rounded-xl bg-[#fff7ed] text-[#f6821f]">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                </svg>
-              </span>
-            </div>
-            <div className="text-3xl font-bold text-slate-900">{accounts.length}</div>
-            <p className="text-xs text-slate-500 mt-1">General ledger master codes</p>
-          </div>
-
-          {/* Card 2: Customers */}
-          <div
-            onClick={() => setActiveTab("customers")}
-            className={`p-5 rounded-2xl border transition-all cursor-pointer shadow-xs ${
-              activeTab === "customers"
-                ? "bg-white border-[#f6821f] ring-2 ring-[#f6821f]/20 shadow-md"
-                : "bg-white border-slate-200 hover:border-slate-300 hover:shadow-sm"
-            }`}
-          >
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Customers</span>
-              <span className="p-2 rounded-xl bg-blue-50 text-blue-600">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                </svg>
-              </span>
-            </div>
-            <div className="text-3xl font-bold text-slate-900">{customers.length}</div>
-            <p className="text-xs text-slate-500 mt-1">Macola integrated clients</p>
-          </div>
-
-          {/* Card 3: Vendors */}
-          <div
-            onClick={() => setActiveTab("vendors")}
-            className={`p-5 rounded-2xl border transition-all cursor-pointer shadow-xs ${
-              activeTab === "vendors"
-                ? "bg-white border-[#f6821f] ring-2 ring-[#f6821f]/20 shadow-md"
-                : "bg-white border-slate-200 hover:border-slate-300 hover:shadow-sm"
-            }`}
-          >
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Vendors</span>
-              <span className="p-2 rounded-xl bg-purple-50 text-purple-600">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                </svg>
-              </span>
-            </div>
-            <div className="text-3xl font-bold text-slate-900">{vendors.length}</div>
-            <p className="text-xs text-slate-500 mt-1">Suppliers &amp; Freight Partners</p>
-          </div>
-
-          {/* Card 4: Inventory */}
-          <div
-            onClick={() => setActiveTab("inventory")}
-            className={`p-5 rounded-2xl border transition-all cursor-pointer shadow-xs ${
-              activeTab === "inventory"
-                ? "bg-white border-[#f6821f] ring-2 ring-[#f6821f]/20 shadow-md"
-                : "bg-white border-slate-200 hover:border-slate-300 hover:shadow-sm"
-            }`}
-          >
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Inventory Valuation</span>
-              <span className="p-2 rounded-xl bg-[#fff7ed] text-[#f6821f]">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-                </svg>
-              </span>
-            </div>
-            <div className="text-3xl font-bold text-[#f6821f]">
-              ${totalInventoryValuation.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </div>
-            <p className="text-xs text-slate-500 mt-1">{totalInventoryUnits} units across {inventory.length} SKUs</p>
-          </div>
-        </div>
-
-        {/* Navigation Tabs & Search Toolbar */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-200 pb-4">
-          <div className="flex items-center gap-1.5 bg-slate-200/60 p-1.5 rounded-xl border border-slate-200 text-xs font-medium">
-            <button
-              onClick={() => setActiveTab("overview")}
-              className={`px-3 py-1.5 rounded-lg transition cursor-pointer ${
-                activeTab === "overview" ? "bg-[#f6821f] text-white shadow-xs font-semibold" : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
-              }`}
-            >
-              Overview
-            </button>
-            <button
-              onClick={() => setActiveTab("accounts")}
-              className={`px-3 py-1.5 rounded-lg transition cursor-pointer ${
-                activeTab === "accounts" ? "bg-[#f6821f] text-white shadow-xs font-semibold" : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
-              }`}
-            >
-              Accounts ({accounts.length})
-            </button>
-            <button
-              onClick={() => setActiveTab("customers")}
-              className={`px-3 py-1.5 rounded-lg transition cursor-pointer ${
-                activeTab === "customers" ? "bg-[#f6821f] text-white shadow-xs font-semibold" : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
-              }`}
-            >
-              Customers ({customers.length})
-            </button>
-            <button
-              onClick={() => setActiveTab("vendors")}
-              className={`px-3 py-1.5 rounded-lg transition cursor-pointer ${
-                activeTab === "vendors" ? "bg-[#f6821f] text-white shadow-xs font-semibold" : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
-              }`}
-            >
-              Vendors ({vendors.length})
-            </button>
-            <button
-              onClick={() => setActiveTab("inventory")}
-              className={`px-3 py-1.5 rounded-lg transition cursor-pointer ${
-                activeTab === "inventory" ? "bg-[#f6821f] text-white shadow-xs font-semibold" : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
-              }`}
-            >
-              Inventory ({inventory.length})
-            </button>
-          </div>
-
-          <div className="relative w-full sm:w-72">
-            <input
-              type="text"
-              placeholder="Search records..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 text-xs rounded-xl bg-white border border-slate-200 text-slate-900 placeholder-slate-400 focus:outline-none focus:border-[#f6821f] focus:ring-2 focus:ring-[#f6821f]/20 shadow-xs"
-            />
-            <svg className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
             </svg>
+            {!sidebarCollapsed && <span>Dashboard</span>}
+          </button>
+
+          {/* Contabilidad Section (Collapsible Dropdown matching screenshot) */}
+          <div className="pt-2">
+            <button
+              onClick={() => setContabilidadOpen(!contabilidadOpen)}
+              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl transition cursor-pointer text-slate-700 hover:bg-slate-100 ${
+                currentView.includes("cuentas") || currentView === "transacciones" || currentView === "macola-sync"
+                  ? "font-semibold text-slate-900"
+                  : ""
+              }`}
+            >
+              <div className="flex items-center gap-3 truncate">
+                <div className="w-4 h-4 rounded-full bg-[#f6821f]/15 text-[#f6821f] flex items-center justify-center shrink-0">
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                  </svg>
+                </div>
+                {!sidebarCollapsed && <span>Contabilidad</span>}
+              </div>
+              {!sidebarCollapsed && (
+                <svg
+                  className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-200 ${
+                    contabilidadOpen ? "rotate-180" : ""
+                  }`}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                </svg>
+              )}
+            </button>
+
+            {/* Sub-items */}
+            {contabilidadOpen && !sidebarCollapsed && (
+              <div className="pl-9 pr-2 py-1 space-y-0.5 border-l-2 border-slate-100 ml-5 mt-1">
+                <button
+                  onClick={() => setCurrentView("plan-cuentas")}
+                  className={`w-full text-left px-2.5 py-1.5 rounded-lg transition cursor-pointer ${
+                    currentView === "plan-cuentas"
+                      ? "bg-[#fff7ed] text-[#f6821f] font-semibold"
+                      : "text-slate-500 hover:text-slate-900 hover:bg-slate-50"
+                  }`}
+                >
+                  Plan de cuentas
+                </button>
+                <button
+                  onClick={() => setCurrentView("transacciones")}
+                  className={`w-full text-left px-2.5 py-1.5 rounded-lg transition cursor-pointer ${
+                    currentView === "transacciones"
+                      ? "bg-[#fff7ed] text-[#f6821f] font-semibold"
+                      : "text-slate-500 hover:text-slate-900 hover:bg-slate-50"
+                  }`}
+                >
+                  Transacciones bancarias
+                </button>
+                <button
+                  onClick={() => setCurrentView("macola-sync")}
+                  className={`w-full text-left px-2.5 py-1.5 rounded-lg transition cursor-pointer ${
+                    currentView === "macola-sync"
+                      ? "bg-[#fff7ed] text-[#f6821f] font-semibold"
+                      : "text-slate-500 hover:text-slate-900 hover:bg-slate-50"
+                  }`}
+                >
+                  Transacciones de integración
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Clientes */}
+          <button
+            onClick={() => setCurrentView("clientes")}
+            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition cursor-pointer ${
+              currentView === "clientes"
+                ? "bg-[#fff7ed] text-[#f6821f] font-semibold shadow-xs"
+                : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+            }`}
+          >
+            <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+            </svg>
+            {!sidebarCollapsed && <span>Clientes ({customers.length})</span>}
+          </button>
+
+          {/* Proveedores */}
+          <button
+            onClick={() => setCurrentView("proveedores")}
+            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition cursor-pointer ${
+              currentView === "proveedores"
+                ? "bg-[#fff7ed] text-[#f6821f] font-semibold shadow-xs"
+                : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+            }`}
+          >
+            <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+            </svg>
+            {!sidebarCollapsed && <span>Proveedores ({vendors.length})</span>}
+          </button>
+
+          {/* Inventario */}
+          <button
+            onClick={() => setCurrentView("inventario")}
+            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition cursor-pointer ${
+              currentView === "inventario"
+                ? "bg-[#fff7ed] text-[#f6821f] font-semibold shadow-xs"
+                : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+            }`}
+          >
+            <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+            </svg>
+            {!sidebarCollapsed && <span>Inventario ({inventory.length})</span>}
+          </button>
+
+          {/* Configuración */}
+          <button
+            onClick={() => setCurrentView("configuracion")}
+            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition cursor-pointer ${
+              currentView === "configuracion"
+                ? "bg-[#fff7ed] text-[#f6821f] font-semibold shadow-xs"
+                : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+            }`}
+          >
+            <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+            {!sidebarCollapsed && <span>Configuración</span>}
+          </button>
+        </nav>
+
+        {/* Footer / User Profile */}
+        <div className="p-3 border-t border-slate-100">
+          <div className="flex items-center justify-between p-2 rounded-xl bg-slate-50 border border-slate-200/60">
+            <div className="flex items-center gap-2.5 overflow-hidden">
+              <div className="w-8 h-8 rounded-lg bg-[#f6821f] text-white flex items-center justify-center font-bold text-xs shrink-0">
+                WA
+              </div>
+              {!sidebarCollapsed && (
+                <div className="truncate">
+                  <p className="font-semibold text-slate-800 text-xs truncate">Administrador</p>
+                  <p className="text-[10px] text-slate-500 truncate">admin@waynetrademarkhn.com</p>
+                </div>
+              )}
+            </div>
+            {!sidebarCollapsed && (
+              <button
+                onClick={handleLogout}
+                title="Cerrar sesión"
+                className="p-1.5 text-slate-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition cursor-pointer"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                </svg>
+              </button>
+            )}
           </div>
         </div>
+      </aside>
 
-        {/* Tab Content Display */}
-        {activeTab === "overview" && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2 bg-white border border-slate-200 rounded-2xl p-6 space-y-4 shadow-xs">
-              <h2 className="text-base font-bold text-slate-900 tracking-tight">System Infrastructure</h2>
-              <div className="space-y-3 text-sm">
-                <div className="flex items-center justify-between p-3.5 rounded-xl bg-slate-50 border border-slate-200/80">
-                  <div className="flex items-center gap-3">
-                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                    <span className="text-slate-700 font-medium">Production Database Engine</span>
+      {/* ===================== MAIN WORKSPACE ===================== */}
+      <div className="flex-1 flex flex-col min-w-0">
+        {/* Top Navbar */}
+        <header className="border-b border-slate-200 bg-white/95 backdrop-blur-md sticky top-0 z-20 px-6 py-3.5 flex items-center justify-between shadow-xs">
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+              className="p-2 rounded-lg text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition cursor-pointer md:hidden"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            </button>
+
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="font-bold text-base text-slate-900 capitalize">
+                  {currentView === "dashboard" && "Resumen Ejecutivo"}
+                  {currentView === "plan-cuentas" && "Contabilidad / Plan de Cuentas"}
+                  {currentView === "transacciones" && "Contabilidad / Transacciones Bancarias"}
+                  {currentView === "macola-sync" && "Contabilidad / Transacciones de Integración"}
+                  {currentView === "clientes" && "Directorio de Clientes"}
+                  {currentView === "proveedores" && "Directorio de Proveedores"}
+                  {currentView === "inventario" && "Control Maestro de Inventario"}
+                  {currentView === "configuracion" && "Configuración del Sistema"}
+                </span>
+                <span className="px-2 py-0.5 text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                  Conectado
+                </span>
+              </div>
+              <p className="text-xs text-slate-500">Wayne Trademark Honduras</p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <div className="relative w-64 hidden sm:block">
+              <input
+                type="text"
+                placeholder="Buscar registros..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="w-full pl-9 pr-4 py-1.5 text-xs rounded-xl bg-slate-50 border border-slate-200 text-slate-900 placeholder-slate-400 focus:outline-none focus:border-[#f6821f] focus:ring-2 focus:ring-[#f6821f]/20 shadow-xs"
+              />
+              <svg className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+            </div>
+
+            <button
+              onClick={loadDashboardData}
+              title="Sincronizar datos"
+              className="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 transition cursor-pointer text-xs font-medium flex items-center gap-1.5 shadow-xs"
+            >
+              <svg className={`w-3.5 h-3.5 text-[#f6821f] ${loading ? "animate-spin" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              <span>Sync</span>
+            </button>
+          </div>
+        </header>
+
+        {/* Workspace Body */}
+        <main className="flex-1 p-6 space-y-6 max-w-7xl w-full mx-auto">
+          {/* ================= VIEW: DASHBOARD ================= */}
+          {currentView === "dashboard" && (
+            <>
+              {/* Metric Cards Row */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                {/* Plan de cuentas */}
+                <div
+                  onClick={() => setCurrentView("plan-cuentas")}
+                  className="p-5 rounded-2xl bg-white border border-slate-200 hover:border-[#f6821f] transition cursor-pointer shadow-xs hover:shadow-sm"
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Plan de Cuentas</span>
+                    <span className="p-2 rounded-xl bg-[#fff7ed] text-[#f6821f]">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                      </svg>
+                    </span>
                   </div>
-                  <span className="text-xs text-emerald-700 font-mono font-medium">PostgreSQL 17.6 Connected</span>
+                  <div className="text-3xl font-bold text-slate-900">{accounts.length}</div>
+                  <p className="text-xs text-slate-500 mt-1">Cuentas contables activas</p>
                 </div>
 
-                <div className="flex items-center justify-between p-3.5 rounded-xl bg-slate-50 border border-slate-200/80">
-                  <div className="flex items-center gap-3">
-                    <span className="w-2.5 h-2.5 rounded-full bg-[#f6821f]"></span>
-                    <span className="text-slate-700 font-medium">Prisma ORM Client</span>
+                {/* Clientes */}
+                <div
+                  onClick={() => setCurrentView("clientes")}
+                  className="p-5 rounded-2xl bg-white border border-slate-200 hover:border-[#f6821f] transition cursor-pointer shadow-xs hover:shadow-sm"
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Clientes</span>
+                    <span className="p-2 rounded-xl bg-blue-50 text-blue-600">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                      </svg>
+                    </span>
                   </div>
-                  <span className="text-xs text-[#f6821f] font-mono font-medium">v6.19.3 (Singleton Mode)</span>
+                  <div className="text-3xl font-bold text-slate-900">{customers.length}</div>
+                  <p className="text-xs text-slate-500 mt-1">Con códigos de Macola</p>
                 </div>
 
-                <div className="flex items-center justify-between p-3.5 rounded-xl bg-slate-50 border border-slate-200/80">
-                  <div className="flex items-center gap-3">
-                    <span className="w-2.5 h-2.5 rounded-full bg-blue-500"></span>
-                    <span className="text-slate-700 font-medium">Organization</span>
+                {/* Proveedores */}
+                <div
+                  onClick={() => setCurrentView("proveedores")}
+                  className="p-5 rounded-2xl bg-white border border-slate-200 hover:border-[#f6821f] transition cursor-pointer shadow-xs hover:shadow-sm"
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Proveedores</span>
+                    <span className="p-2 rounded-xl bg-purple-50 text-purple-600">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                      </svg>
+                    </span>
                   </div>
-                  <span className="text-xs text-slate-600 font-medium">Wayne Trademark Honduras</span>
+                  <div className="text-3xl font-bold text-slate-900">{vendors.length}</div>
+                  <p className="text-xs text-slate-500 mt-1">Socios comerciales registrados</p>
+                </div>
+
+                {/* Valoración Inventario */}
+                <div
+                  onClick={() => setCurrentView("inventario")}
+                  className="p-5 rounded-2xl bg-white border border-slate-200 hover:border-[#f6821f] transition cursor-pointer shadow-xs hover:shadow-sm"
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Valoración Inventario</span>
+                    <span className="p-2 rounded-xl bg-[#fff7ed] text-[#f6821f]">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                      </svg>
+                    </span>
+                  </div>
+                  <div className="text-3xl font-bold text-[#f6821f]">
+                    ${totalInventoryValuation.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </div>
+                  <p className="text-xs text-slate-500 mt-1">{totalInventoryUnits} unidades en stock</p>
                 </div>
               </div>
 
-              <div className="pt-4 border-t border-slate-100">
-                <h3 className="text-xs uppercase font-semibold text-slate-500 tracking-wider mb-2">Available API Endpoints</h3>
-                <div className="grid grid-cols-2 gap-2 text-xs font-mono text-slate-600">
-                  <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200">GET/POST /api/accounts</div>
-                  <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200">GET/POST /api/customers</div>
-                  <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200">GET/POST /api/vendors</div>
-                  <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200">GET/POST /api/inventory</div>
+              {/* Quick Navigation Panels */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-sm font-bold text-slate-900">Accesos Rápidos de Contabilidad</h2>
+                    <span className="text-xs text-[#f6821f] font-medium cursor-pointer hover:underline" onClick={() => setCurrentView("plan-cuentas")}>
+                      Ver todo →
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3 text-xs">
+                    <button
+                      onClick={() => setCurrentView("plan-cuentas")}
+                      className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 hover:border-[#f6821f] text-left transition cursor-pointer"
+                    >
+                      <span className="font-semibold text-slate-800 block mb-1">Plan de cuentas</span>
+                      <span className="text-slate-500 text-[11px] block">Catálogo y códigos contables</span>
+                    </button>
+                    <button
+                      onClick={() => setCurrentView("transacciones")}
+                      className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 hover:border-[#f6821f] text-left transition cursor-pointer"
+                    >
+                      <span className="font-semibold text-slate-800 block mb-1">Transacciones bancarias</span>
+                      <span className="text-slate-500 text-[11px] block">Libro diario y movimientos</span>
+                    </button>
+                    <button
+                      onClick={() => setCurrentView("macola-sync")}
+                      className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 hover:border-[#f6821f] text-left transition cursor-pointer"
+                    >
+                      <span className="font-semibold text-slate-800 block mb-1">Integración Macola</span>
+                      <span className="text-slate-500 text-[11px] block">Estado de migración</span>
+                    </button>
+                    <button
+                      onClick={() => setCurrentView("inventario")}
+                      className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 hover:border-[#f6821f] text-left transition cursor-pointer"
+                    >
+                      <span className="font-semibold text-slate-800 block mb-1">Inventario</span>
+                      <span className="text-slate-500 text-[11px] block">Costos y precios por SKU</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs space-y-4">
+                  <h2 className="text-sm font-bold text-slate-900">Infraestructura del Sistema</h2>
+                  <div className="space-y-2.5 text-xs">
+                    <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between">
+                      <span className="text-slate-700 font-medium">Motor de Base de Datos</span>
+                      <span className="text-emerald-700 font-mono font-medium bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">PostgreSQL 17.6</span>
+                    </div>
+                    <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between">
+                      <span className="text-slate-700 font-medium">Cliente ORM</span>
+                      <span className="text-[#f6821f] font-mono font-medium bg-[#fff7ed] px-2 py-0.5 rounded border border-[#fed7aa]">Prisma 6.19.3</span>
+                    </div>
+                    <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between">
+                      <span className="text-slate-700 font-medium">Organización</span>
+                      <span className="text-slate-800 font-medium">Wayne Trademark Honduras</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* ================= VIEW: PLAN DE CUENTAS ================= */}
+          {currentView === "plan-cuentas" && (
+            <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xs">
+              <div className="p-4 border-b border-slate-100 flex items-center justify-between">
+                <div>
+                  <h2 className="font-semibold text-sm text-slate-900">Plan de Cuentas Contables ({filteredAccounts.length})</h2>
+                  <p className="text-xs text-slate-500">Catálogo estándar con numeración 1000–6000</p>
+                </div>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs text-slate-600">
+                  <thead className="bg-slate-50 text-slate-700 font-semibold border-b border-slate-200">
+                    <tr>
+                      <th className="p-3.5">Código</th>
+                      <th className="p-3.5">Nombre de la Cuenta</th>
+                      <th className="p-3.5">Tipo</th>
+                      <th className="p-3.5">Moneda</th>
+                      <th className="p-3.5">Estado</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {filteredAccounts.map((acc) => (
+                      <tr key={acc.id} className="hover:bg-slate-50/80 transition">
+                        <td className="p-3.5 font-mono text-[#f6821f] font-semibold">{acc.code}</td>
+                        <td className="p-3.5 font-medium text-slate-900">{acc.name}</td>
+                        <td className="p-3.5">
+                          <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-slate-100 border border-slate-200 text-slate-700">
+                            {acc.type}
+                          </span>
+                        </td>
+                        <td className="p-3.5 font-medium">{acc.currency}</td>
+                        <td className="p-3.5">
+                          <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-semibold ${acc.isActive ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-slate-100 text-slate-500"}`}>
+                            {acc.isActive ? "Activa" : "Inactiva"}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                    {filteredAccounts.length === 0 && (
+                      <tr>
+                        <td colSpan={5} className="p-8 text-center text-slate-400">No se encontraron cuentas</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* ================= VIEW: TRANSACCIONES BANCARIAS ================= */}
+          {currentView === "transacciones" && (
+            <div className="bg-white border border-slate-200 rounded-2xl p-8 shadow-xs space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="font-bold text-base text-slate-900">Transacciones Bancarias &amp; Libro Diario</h2>
+                  <p className="text-xs text-slate-500 mt-0.5">Control de cobros, pagos a proveedores y transferencias</p>
+                </div>
+                <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200">
+                  Módulo de Registro
+                </span>
+              </div>
+
+              <div className="p-6 rounded-xl bg-slate-50 border border-slate-200 text-center space-y-3">
+                <div className="w-12 h-12 rounded-full bg-[#fff7ed] text-[#f6821f] flex items-center justify-center mx-auto">
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <h3 className="font-semibold text-sm text-slate-800">Módulo en Preparación</h3>
+                <p className="text-xs text-slate-500 max-w-md mx-auto">
+                  El libro diario se nutre de las cuentas configuradas en el <strong>Plan de cuentas</strong> y los registros de clientes y proveedores.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* ================= VIEW: TRANSACCIONES DE INTEGRACIÓN ================= */}
+          {currentView === "macola-sync" && (
+            <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="font-bold text-base text-slate-900">Transacciones de Integración Macola</h2>
+                  <p className="text-xs text-slate-500">Historial y estado de sincronización de datos con Macola</p>
+                </div>
+                <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                  Sincronización Habilitada
+                </span>
+              </div>
+
+              <div className="space-y-3 text-xs">
+                <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between">
+                  <div>
+                    <span className="font-semibold text-slate-800 block">Sincronización de Clientes Macola</span>
+                    <span className="text-slate-500 text-[11px]">{customers.length} registros con código tracking</span>
+                  </div>
+                  <span className="text-emerald-700 font-medium">Sincronizado</span>
+                </div>
+
+                <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between">
+                  <div>
+                    <span className="font-semibold text-slate-800 block">Sincronización de Proveedores Macola</span>
+                    <span className="text-slate-500 text-[11px]">{vendors.length} registros con código tracking</span>
+                  </div>
+                  <span className="text-emerald-700 font-medium">Sincronizado</span>
+                </div>
+
+                <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between">
+                  <div>
+                    <span className="font-semibold text-slate-800 block">Catálogo Maestro de SKUs</span>
+                    <span className="text-slate-500 text-[11px]">{inventory.length} artículos enlazados</span>
+                  </div>
+                  <span className="text-emerald-700 font-medium">Sincronizado</span>
                 </div>
               </div>
             </div>
+          )}
 
-            <div className="bg-white border border-slate-200 rounded-2xl p-6 space-y-4 shadow-xs">
-              <h2 className="text-base font-bold text-slate-900 tracking-tight">CLI Import Utility</h2>
-              <p className="text-xs text-slate-600 leading-relaxed">
-                Run batch migrations using the built-in command line utility:
-              </p>
-              <div className="p-3.5 rounded-xl bg-slate-900 border border-slate-800 text-[11px] font-mono text-amber-300 space-y-1 overflow-x-auto shadow-inner">
-                <div>npx tsx scripts/import-data.ts customers &lt;file.csv&gt;</div>
-                <div>npx tsx scripts/import-data.ts vendors &lt;file.csv&gt;</div>
-                <div>npx tsx scripts/import-data.ts inventory &lt;file.csv&gt;</div>
-                <div>npx tsx scripts/import-data.ts accounts &lt;file.csv&gt;</div>
+          {/* ================= VIEW: CLIENTES ================= */}
+          {currentView === "clientes" && (
+            <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xs">
+              <div className="p-4 border-b border-slate-100 flex items-center justify-between">
+                <h2 className="font-semibold text-sm text-slate-900">Directorio de Clientes ({filteredCustomers.length})</h2>
               </div>
-              <p className="text-[11px] text-slate-500">
-                Supports automatic Macola code upserting and duplicate avoidance.
-              </p>
-            </div>
-          </div>
-        )}
-
-        {/* Tab Content: Accounts */}
-        {activeTab === "accounts" && (
-          <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xs">
-            <div className="p-4 border-b border-slate-100 flex items-center justify-between">
-              <h2 className="font-semibold text-sm text-slate-900">Chart of Accounts ({filteredAccounts.length})</h2>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs text-slate-600">
-                <thead className="bg-slate-50 text-slate-700 font-semibold border-b border-slate-200">
-                  <tr>
-                    <th className="p-3.5">Code</th>
-                    <th className="p-3.5">Account Name</th>
-                    <th className="p-3.5">Type</th>
-                    <th className="p-3.5">Currency</th>
-                    <th className="p-3.5">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {filteredAccounts.map((acc) => (
-                    <tr key={acc.id} className="hover:bg-slate-50/80 transition">
-                      <td className="p-3.5 font-mono text-[#f6821f] font-semibold">{acc.code}</td>
-                      <td className="p-3.5 font-medium text-slate-900">{acc.name}</td>
-                      <td className="p-3.5">
-                        <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-slate-100 border border-slate-200 text-slate-700">
-                          {acc.type}
-                        </span>
-                      </td>
-                      <td className="p-3.5 font-medium">{acc.currency}</td>
-                      <td className="p-3.5">
-                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-semibold ${acc.isActive ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-slate-100 text-slate-500"}`}>
-                          {acc.isActive ? "Active" : "Inactive"}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                  {filteredAccounts.length === 0 && (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs text-slate-600">
+                  <thead className="bg-slate-50 text-slate-700 font-semibold border-b border-slate-200">
                     <tr>
-                      <td colSpan={5} className="p-8 text-center text-slate-400">No accounts match your query</td>
+                      <th className="p-3.5">Código Macola</th>
+                      <th className="p-3.5">Nombre de Empresa / Cliente</th>
+                      <th className="p-3.5">Correo Electrónico</th>
+                      <th className="p-3.5">Teléfono</th>
+                      <th className="p-3.5">Dirección</th>
+                      <th className="p-3.5">Moneda</th>
                     </tr>
-                  )}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {filteredCustomers.map((c) => (
+                      <tr key={c.id} className="hover:bg-slate-50/80 transition">
+                        <td className="p-3.5 font-mono text-[#f6821f] font-semibold">{c.macolaCode || "—"}</td>
+                        <td className="p-3.5 font-medium text-slate-900">{c.name}</td>
+                        <td className="p-3.5 text-slate-500">{c.email || "—"}</td>
+                        <td className="p-3.5 text-slate-500">{c.phone || "—"}</td>
+                        <td className="p-3.5 text-slate-500 truncate max-w-xs">{c.address || "—"}</td>
+                        <td className="p-3.5 font-medium">{c.currency}</td>
+                      </tr>
+                    ))}
+                    {filteredCustomers.length === 0 && (
+                      <tr>
+                        <td colSpan={6} className="p-8 text-center text-slate-400">No se encontraron clientes</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* Tab Content: Customers */}
-        {activeTab === "customers" && (
-          <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xs">
-            <div className="p-4 border-b border-slate-100 flex items-center justify-between">
-              <h2 className="font-semibold text-sm text-slate-900">Customers ({filteredCustomers.length})</h2>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs text-slate-600">
-                <thead className="bg-slate-50 text-slate-700 font-semibold border-b border-slate-200">
-                  <tr>
-                    <th className="p-3.5">Macola Code</th>
-                    <th className="p-3.5">Name</th>
-                    <th className="p-3.5">Email</th>
-                    <th className="p-3.5">Phone</th>
-                    <th className="p-3.5">Address</th>
-                    <th className="p-3.5">Currency</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {filteredCustomers.map((c) => (
-                    <tr key={c.id} className="hover:bg-slate-50/80 transition">
-                      <td className="p-3.5 font-mono text-[#f6821f] font-semibold">{c.macolaCode || "—"}</td>
-                      <td className="p-3.5 font-medium text-slate-900">{c.name}</td>
-                      <td className="p-3.5 text-slate-500">{c.email || "—"}</td>
-                      <td className="p-3.5 text-slate-500">{c.phone || "—"}</td>
-                      <td className="p-3.5 text-slate-500 truncate max-w-xs">{c.address || "—"}</td>
-                      <td className="p-3.5 font-medium">{c.currency}</td>
-                    </tr>
-                  ))}
-                  {filteredCustomers.length === 0 && (
+          {/* ================= VIEW: PROVEEDORES ================= */}
+          {currentView === "proveedores" && (
+            <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xs">
+              <div className="p-4 border-b border-slate-100 flex items-center justify-between">
+                <h2 className="font-semibold text-sm text-slate-900">Directorio de Proveedores ({filteredVendors.length})</h2>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs text-slate-600">
+                  <thead className="bg-slate-50 text-slate-700 font-semibold border-b border-slate-200">
                     <tr>
-                      <td colSpan={6} className="p-8 text-center text-slate-400">No customers found</td>
+                      <th className="p-3.5">Código Macola</th>
+                      <th className="p-3.5">Proveedor</th>
+                      <th className="p-3.5">Correo</th>
+                      <th className="p-3.5">Teléfono</th>
+                      <th className="p-3.5">Dirección</th>
+                      <th className="p-3.5">Moneda</th>
                     </tr>
-                  )}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {filteredVendors.map((v) => (
+                      <tr key={v.id} className="hover:bg-slate-50/80 transition">
+                        <td className="p-3.5 font-mono text-[#f6821f] font-semibold">{v.macolaCode || "—"}</td>
+                        <td className="p-3.5 font-medium text-slate-900">{v.name}</td>
+                        <td className="p-3.5 text-slate-500">{v.email || "—"}</td>
+                        <td className="p-3.5 text-slate-500">{v.phone || "—"}</td>
+                        <td className="p-3.5 text-slate-500 truncate max-w-xs">{v.address || "—"}</td>
+                        <td className="p-3.5 font-medium">{v.currency}</td>
+                      </tr>
+                    ))}
+                    {filteredVendors.length === 0 && (
+                      <tr>
+                        <td colSpan={6} className="p-8 text-center text-slate-400">No se encontraron proveedores</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* Tab Content: Vendors */}
-        {activeTab === "vendors" && (
-          <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xs">
-            <div className="p-4 border-b border-slate-100 flex items-center justify-between">
-              <h2 className="font-semibold text-sm text-slate-900">Vendors ({filteredVendors.length})</h2>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs text-slate-600">
-                <thead className="bg-slate-50 text-slate-700 font-semibold border-b border-slate-200">
-                  <tr>
-                    <th className="p-3.5">Macola Code</th>
-                    <th className="p-3.5">Name</th>
-                    <th className="p-3.5">Email</th>
-                    <th className="p-3.5">Phone</th>
-                    <th className="p-3.5">Address</th>
-                    <th className="p-3.5">Currency</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {filteredVendors.map((v) => (
-                    <tr key={v.id} className="hover:bg-slate-50/80 transition">
-                      <td className="p-3.5 font-mono text-[#f6821f] font-semibold">{v.macolaCode || "—"}</td>
-                      <td className="p-3.5 font-medium text-slate-900">{v.name}</td>
-                      <td className="p-3.5 text-slate-500">{v.email || "—"}</td>
-                      <td className="p-3.5 text-slate-500">{v.phone || "—"}</td>
-                      <td className="p-3.5 text-slate-500 truncate max-w-xs">{v.address || "—"}</td>
-                      <td className="p-3.5 font-medium">{v.currency}</td>
-                    </tr>
-                  ))}
-                  {filteredVendors.length === 0 && (
+          {/* ================= VIEW: INVENTARIO ================= */}
+          {currentView === "inventario" && (
+            <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xs">
+              <div className="p-4 border-b border-slate-100 flex items-center justify-between">
+                <div>
+                  <h2 className="font-semibold text-sm text-slate-900">Control Maestro de Inventario ({filteredInventory.length})</h2>
+                  <p className="text-xs text-slate-500">Catálogo de SKUs, existencias y costos unitarios</p>
+                </div>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs text-slate-600">
+                  <thead className="bg-slate-50 text-slate-700 font-semibold border-b border-slate-200">
                     <tr>
-                      <td colSpan={6} className="p-8 text-center text-slate-400">No vendors found</td>
+                      <th className="p-3.5">SKU</th>
+                      <th className="p-3.5">Descripción del Artículo</th>
+                      <th className="p-3.5 text-right">Existencias</th>
+                      <th className="p-3.5 text-right">Costo Unitario</th>
+                      <th className="p-3.5 text-right">Precio de Venta</th>
+                      <th className="p-3.5 text-right">Valoración Total</th>
                     </tr>
-                  )}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {filteredInventory.map((item) => (
+                      <tr key={item.id} className="hover:bg-slate-50/80 transition">
+                        <td className="p-3.5 font-mono text-[#f6821f] font-semibold">{item.sku}</td>
+                        <td className="p-3.5 font-medium text-slate-900">{item.description}</td>
+                        <td className="p-3.5 text-right font-mono font-medium">{item.quantity}</td>
+                        <td className="p-3.5 text-right font-mono font-medium">${item.cost.toFixed(2)}</td>
+                        <td className="p-3.5 text-right font-mono font-medium">${item.price.toFixed(2)}</td>
+                        <td className="p-3.5 text-right font-mono text-slate-900 font-bold">
+                          ${(item.quantity * item.cost).toFixed(2)}
+                        </td>
+                      </tr>
+                    ))}
+                    {filteredInventory.length === 0 && (
+                      <tr>
+                        <td colSpan={6} className="p-8 text-center text-slate-400">No se encontraron artículos en inventario</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* Tab Content: Inventory */}
-        {activeTab === "inventory" && (
-          <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xs">
-            <div className="p-4 border-b border-slate-100 flex items-center justify-between">
-              <h2 className="font-semibold text-sm text-slate-900">Inventory Master ({filteredInventory.length})</h2>
+          {/* ================= VIEW: CONFIGURACIÓN ================= */}
+          {currentView === "configuracion" && (
+            <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs space-y-6">
+              <div>
+                <h2 className="font-bold text-base text-slate-900">Configuración General</h2>
+                <p className="text-xs text-slate-500">Parámetros de acceso y credenciales administrativas</p>
+              </div>
+
+              <div className="space-y-4 max-w-xl text-xs">
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Nombre de la Organización</label>
+                  <input
+                    type="text"
+                    disabled
+                    value="Wayne Trademark Honduras"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-100 border border-slate-200 text-slate-700 font-medium"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Correo de Administrador</label>
+                  <input
+                    type="email"
+                    disabled
+                    value="admin@waynetrademarkhn.com"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-100 border border-slate-200 text-slate-700 font-medium"
+                  />
+                </div>
+
+                <div className="pt-2">
+                  <button
+                    onClick={handleLogout}
+                    className="px-4 py-2.5 rounded-xl bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 font-semibold cursor-pointer transition flex items-center gap-2"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                    </svg>
+                    <span>Cerrar Sesión</span>
+                  </button>
+                </div>
+              </div>
             </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs text-slate-600">
-                <thead className="bg-slate-50 text-slate-700 font-semibold border-b border-slate-200">
-                  <tr>
-                    <th className="p-3.5">SKU</th>
-                    <th className="p-3.5">Description</th>
-                    <th className="p-3.5 text-right">Qty</th>
-                    <th className="p-3.5 text-right">Unit Cost</th>
-                    <th className="p-3.5 text-right">Selling Price</th>
-                    <th className="p-3.5 text-right">Total Valuation</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {filteredInventory.map((item) => (
-                    <tr key={item.id} className="hover:bg-slate-50/80 transition">
-                      <td className="p-3.5 font-mono text-[#f6821f] font-semibold">{item.sku}</td>
-                      <td className="p-3.5 font-medium text-slate-900">{item.description}</td>
-                      <td className="p-3.5 text-right font-mono font-medium">{item.quantity}</td>
-                      <td className="p-3.5 text-right font-mono font-medium">${item.cost.toFixed(2)}</td>
-                      <td className="p-3.5 text-right font-mono font-medium">${item.price.toFixed(2)}</td>
-                      <td className="p-3.5 text-right font-mono text-slate-900 font-bold">
-                        ${(item.quantity * item.cost).toFixed(2)}
-                      </td>
-                    </tr>
-                  ))}
-                  {filteredInventory.length === 0 && (
-                    <tr>
-                      <td colSpan={6} className="p-8 text-center text-slate-400">No inventory items found</td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-      </main>
+          )}
+        </main>
+      </div>
     </div>
   );
 }
