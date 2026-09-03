@@ -522,12 +522,12 @@ export default function AdminDashboard() {
           {/* ================= VIEW: DASHBOARD ================= */}
           {currentView === "dashboard" && (
             <>
-              {/* Quick Actions Bar (Crear acciones) */}
+              {/* Quick Actions Bar (Acciones) */}
               <div className="bg-white border border-slate-200/90 rounded-2xl p-3.5 shadow-xs w-full">
                 <div className="flex items-center gap-3 overflow-x-auto no-scrollbar py-0.5">
                   <span className="font-bold text-slate-800 text-xs shrink-0 tracking-tight flex items-center gap-1.5">
                     <span className="w-2 h-2 rounded-full bg-[#f6821f]"></span>
-                    Crear acciones
+                    Acciones
                   </span>
                   <div className="h-4 w-px bg-slate-200 shrink-0"></div>
                   <div className="flex items-center gap-2 shrink-0">
