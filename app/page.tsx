@@ -2219,36 +2219,7 @@ export default function AdminDashboard() {
                 </div>
               </div>
 
-              {/* Section: Características */}
-              <div className="p-5 space-y-3">
-                <div className="flex items-center gap-1.5 font-bold text-slate-800">
-                  <svg className="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
-                  </svg>
-                  <span>Características</span>
-                </div>
 
-                <div className="pl-5 pt-1">
-                  <label className="flex items-center gap-3 cursor-pointer select-none">
-                    <button
-                      type="button"
-                      role="switch"
-                      aria-checked={activateAccountNumbers}
-                      onClick={() => setActivateAccountNumbers(!activateAccountNumbers)}
-                      className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                        activateAccountNumbers ? "bg-[#f6821f]" : "bg-slate-300"
-                      }`}
-                    >
-                      <span
-                        className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
-                          activateAccountNumbers ? "translate-x-4" : "translate-x-0"
-                        }`}
-                      />
-                    </button>
-                    <span className="text-slate-700 font-medium text-xs">Activar números de cuenta</span>
-                  </label>
-                </div>
-              </div>
 
               {/* Section: Preferencias */}
               <div className="p-5 space-y-3">
