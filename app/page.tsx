@@ -486,12 +486,12 @@ export default function AdminDashboard() {
         </header>
 
         {/* Workspace Body */}
-        <main className="flex-1 p-6 space-y-6 max-w-7xl w-full mx-auto">
+        <main className="flex-1 p-6 lg:p-8 space-y-6 w-full">
           {/* ================= VIEW: DASHBOARD ================= */}
           {currentView === "dashboard" && (
             <>
               {/* Quick Actions Bar (Crear acciones) */}
-              <div className="bg-white border border-slate-200/90 rounded-2xl p-3.5 shadow-xs">
+              <div className="bg-white border border-slate-200/90 rounded-2xl p-3.5 shadow-xs max-w-6xl">
                 <div className="flex items-center gap-3 overflow-x-auto no-scrollbar py-0.5">
                   <span className="font-bold text-slate-800 text-xs shrink-0 tracking-tight flex items-center gap-1.5">
                     <span className="w-2 h-2 rounded-full bg-[#f6821f]"></span>
@@ -513,7 +513,7 @@ export default function AdminDashboard() {
               </div>
 
               {/* Metric Cards Row */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 max-w-6xl">
                 {/* Plan de cuentas */}
                 <div
                   onClick={() => setCurrentView("plan-cuentas")}
@@ -586,7 +586,7 @@ export default function AdminDashboard() {
               </div>
 
               {/* Quick Navigation Panels */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 max-w-6xl">
                 <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs space-y-4">
                   <div className="flex items-center justify-between">
                     <h2 className="text-sm font-bold text-slate-900">Accesos Rápidos de Contabilidad</h2>
