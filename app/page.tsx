@@ -71,6 +71,10 @@ export default function AdminDashboard() {
     name: "",
     type: "ACTIVO",
     detailType: "Efectivo y equivalentes de efectivo",
+    isSubAccount: false,
+    parentAccountId: "",
+    description: "",
+    isLocked: false,
     currency: "USD",
     isActive: true,
   });
@@ -392,10 +396,28 @@ export default function AdminDashboard() {
     setAccountModalSuccess("");
 
     try {
+      const assignedCode =
+        newAccountForm.code.trim() ||
+        (newAccountForm.type === "ACTIVO"
+          ? `1${100 + accounts.length}`
+          : newAccountForm.type === "RESPONSABILIDAD"
+          ? `2${100 + accounts.length}`
+          : newAccountForm.type === "FONDOS PROPIOS"
+          ? `3${100 + accounts.length}`
+          : newAccountForm.type === "INGRESOS"
+          ? `4${100 + accounts.length}`
+          : `5${100 + accounts.length}`);
+
       const res = await fetch("/api/accounts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(newAccountForm),
+        body: JSON.stringify({
+          code: assignedCode,
+          name: newAccountForm.name.trim(),
+          type: newAccountForm.type,
+          currency: newAccountForm.currency || "USD",
+          isActive: newAccountForm.isActive,
+        }),
       });
 
       const data = await res.json();
@@ -413,10 +435,14 @@ export default function AdminDashboard() {
           name: "",
           type: "ACTIVO",
           detailType: "Efectivo y equivalentes de efectivo",
+          isSubAccount: false,
+          parentAccountId: "",
+          description: "",
+          isLocked: false,
           currency: "USD",
           isActive: true,
         });
-      }, 900);
+      }, 800);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Error inesperado";
       setAccountModalError(msg);
@@ -2056,144 +2082,279 @@ export default function AdminDashboard() {
           </div>
         </div>
       )}
-      {/* ================= MODAL: NUEVA CUENTA CONTABLE ================= */}
+      {/* ================= RIGHT SIDEBAR DRAWER: NUEVA CUENTA (Matching screenshot) ================= */}
       {showNewAccountModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs">
-          <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-lg p-6 shadow-2xl relative animate-in fade-in zoom-in-95 duration-150">
-            <button
-              onClick={() => setShowNewAccountModal(false)}
-              className="absolute top-4 right-4 p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition cursor-pointer"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
+        <div className="fixed inset-0 z-50 flex justify-end">
+          {/* Backdrop */}
+          <div
+            onClick={() => setShowNewAccountModal(false)}
+            className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs transition-opacity duration-200"
+          />
 
-            <div className="mb-5">
-              <h3 className="text-base font-bold text-slate-900">Crear Nueva Cuenta Contable</h3>
-              <p className="text-xs text-slate-500 mt-0.5">Registra una nueva cuenta en el catálogo de Wayne Trademark Honduras</p>
+          {/* Drawer panel */}
+          <aside className="relative w-full max-w-md sm:max-w-lg bg-white border-l border-slate-200 shadow-2xl z-10 flex flex-col h-full animate-in slide-in-from-right duration-200">
+            {/* Header */}
+            <div className="border-b border-slate-200 px-6 py-4 flex items-center justify-between">
+              <div className="w-5" />
+              <h2 className="text-base font-semibold text-slate-800 text-center">
+                Nueva cuenta
+              </h2>
+              <button
+                type="button"
+                onClick={() => setShowNewAccountModal(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition cursor-pointer"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
             </div>
 
-            {accountModalError && (
-              <div className="p-3 mb-4 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs font-medium">
-                {accountModalError}
-              </div>
-            )}
-            {accountModalSuccess && (
-              <div className="p-3 mb-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-medium">
-                {accountModalSuccess}
-              </div>
-            )}
+            {/* Form */}
+            <form onSubmit={handleCreateAccount} className="flex-1 flex flex-col min-h-0">
+              {/* Scrollable Body */}
+              <div className="flex-1 overflow-y-auto p-6 space-y-5 text-xs">
+                {accountModalError && (
+                  <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 font-medium">
+                    {accountModalError}
+                  </div>
+                )}
+                {accountModalSuccess && (
+                  <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 font-medium">
+                    {accountModalSuccess}
+                  </div>
+                )}
 
-            <form onSubmit={handleCreateAccount} className="space-y-4 text-xs">
-              <div className="grid grid-cols-2 gap-4">
+                {/* Row 1: Nombre de la cuenta* & Número de cuenta */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-slate-600 font-medium mb-1.5">
+                      Nombre de la cuenta<span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={newAccountForm.name}
+                      onChange={(e) => setNewAccountForm({ ...newAccountForm, name: e.target.value })}
+                      className="w-full px-3 py-2 rounded-lg bg-white border border-slate-300 text-slate-900 text-xs focus:outline-none focus:border-[#f6821f] focus:ring-1 focus:ring-[#f6821f]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-600 font-medium mb-1.5">
+                      Número de cuenta
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Ej. 1105 (opcional)"
+                      value={newAccountForm.code}
+                      onChange={(e) => setNewAccountForm({ ...newAccountForm, code: e.target.value })}
+                      className="w-full px-3 py-2 rounded-lg bg-white border border-slate-300 text-slate-900 text-xs font-mono focus:outline-none focus:border-[#f6821f] focus:ring-1 focus:ring-[#f6821f]"
+                    />
+                  </div>
+                </div>
+
+                {/* Row 2: Tipo de cuenta* & Tipo de detalles* */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="text-slate-600 font-medium">
+                        Tipo de cuenta<span className="text-red-500">*</span>
+                      </label>
+                      <button
+                        type="button"
+                        title="Clasificación general de la cuenta contable"
+                        className="text-slate-400 hover:text-slate-600 cursor-pointer"
+                      >
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <circle cx="12" cy="12" r="10" strokeWidth="2" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 16v-4m0-4h.01" />
+                        </svg>
+                      </button>
+                    </div>
+                    <div className="relative">
+                      <select
+                        value={newAccountForm.type}
+                        onChange={(e) => {
+                          const selectedType = e.target.value;
+                          const defaultDetail = ACCOUNT_HIERARCHY[selectedType]?.[0] || "";
+                          setNewAccountForm({
+                            ...newAccountForm,
+                            type: selectedType,
+                            detailType: defaultDetail,
+                          });
+                        }}
+                        className="w-full pl-3 pr-8 py-2 rounded-lg bg-white border border-slate-300 text-slate-700 text-xs appearance-none focus:outline-none focus:border-[#f6821f] cursor-pointer"
+                      >
+                        <option value="ACTIVO">ACTIVO</option>
+                        <option value="RESPONSABILIDAD">RESPONSABILIDAD</option>
+                        <option value="FONDOS PROPIOS">FONDOS PROPIOS</option>
+                        <option value="INGRESOS">INGRESOS</option>
+                        <option value="GASTO">GASTO</option>
+                      </select>
+                      <svg className="w-4 h-4 text-slate-400 absolute right-2.5 top-2.5 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-600 font-medium mb-1.5">
+                      Tipo de detalles<span className="text-red-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <select
+                        value={newAccountForm.detailType}
+                        onChange={(e) => setNewAccountForm({ ...newAccountForm, detailType: e.target.value })}
+                        className="w-full pl-3 pr-8 py-2 rounded-lg bg-white border border-slate-300 text-slate-700 text-xs appearance-none focus:outline-none focus:border-[#f6821f] cursor-pointer"
+                      >
+                        {(ACCOUNT_HIERARCHY[newAccountForm.type] || []).map((dt) => (
+                          <option key={dt} value={dt}>
+                            {dt}
+                          </option>
+                        ))}
+                      </select>
+                      <svg className="w-4 h-4 text-slate-400 absolute right-2.5 top-2.5 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Row 3: Convertir en una cuenta secundaria */}
+                <div className="space-y-3 pt-1">
+                  <label className="flex items-center gap-2.5 cursor-pointer select-none text-slate-700">
+                    <input
+                      type="checkbox"
+                      checked={newAccountForm.isSubAccount}
+                      onChange={(e) => setNewAccountForm({ ...newAccountForm, isSubAccount: e.target.checked })}
+                      className="w-4 h-4 rounded border-slate-300 text-[#f6821f] focus:ring-[#f6821f] cursor-pointer accent-[#f6821f]"
+                    />
+                    <span className="font-medium text-xs">Convertir en una cuenta secundaria</span>
+                  </label>
+
+                  {newAccountForm.isSubAccount && (
+                    <div className="pl-6 space-y-1">
+                      <label className="text-slate-600 block text-xs">Cuenta principal</label>
+                      <select
+                        value={newAccountForm.parentAccountId}
+                        onChange={(e) => setNewAccountForm({ ...newAccountForm, parentAccountId: e.target.value })}
+                        className="w-full px-3 py-2 rounded-lg bg-slate-50 border border-slate-300 text-slate-800 text-xs focus:outline-none focus:border-[#f6821f]"
+                      >
+                        <option value="">Seleccionar cuenta principal...</option>
+                        {accounts
+                          .filter((a) => normalizeAccountType(a.type) === normalizeAccountType(newAccountForm.type))
+                          .map((a) => (
+                            <option key={a.id} value={a.id}>
+                              {a.code} - {a.name}
+                            </option>
+                          ))}
+                      </select>
+                    </div>
+                  )}
+                </div>
+
+                {/* Row 4: Descripción */}
                 <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Código de Cuenta *</label>
+                  <label className="block text-slate-600 font-medium mb-1.5">
+                    Descripción
+                  </label>
                   <input
                     type="text"
-                    required
-                    placeholder="Ej. 1115 o 2120"
-                    value={newAccountForm.code}
-                    onChange={(e) => setNewAccountForm({ ...newAccountForm, code: e.target.value })}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-mono focus:outline-none focus:border-[#f6821f] focus:ring-1 focus:ring-[#f6821f]"
+                    value={newAccountForm.description}
+                    onChange={(e) => setNewAccountForm({ ...newAccountForm, description: e.target.value })}
+                    className="w-full px-3 py-2 rounded-lg bg-white border border-slate-300 text-slate-900 text-xs focus:outline-none focus:border-[#f6821f] focus:ring-1 focus:ring-[#f6821f]"
                   />
                 </div>
 
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Tipo de Cuenta *</label>
-                  <select
-                    value={newAccountForm.type}
-                    onChange={(e) => {
-                      const selectedType = e.target.value;
-                      const defaultDetail = ACCOUNT_HIERARCHY[selectedType]?.[0] || "";
-                      setNewAccountForm({
-                        ...newAccountForm,
-                        type: selectedType,
-                        detailType: defaultDetail,
-                      });
-                    }}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-medium focus:outline-none focus:border-[#f6821f]"
-                  >
-                    <option value="ACTIVO">ACTIVO</option>
-                    <option value="RESPONSABILIDAD">RESPONSABILIDAD</option>
-                    <option value="FONDOS PROPIOS">FONDOS PROPIOS</option>
-                    <option value="INGRESOS">INGRESOS</option>
-                    <option value="GASTO">GASTO</option>
-                  </select>
+                {/* Divider & Bloquear cuenta */}
+                <div className="border-t border-slate-200 pt-4">
+                  <div className="flex items-center justify-between">
+                    <span
+                      className="text-slate-700 font-medium border-b border-dotted border-slate-400 cursor-help"
+                      title="Bloquear cuenta para evitar modificaciones accidentales"
+                    >
+                      Bloquear cuenta
+                    </span>
+
+                    <div className="inline-flex rounded-lg border border-slate-200 p-0.5 bg-slate-100/70">
+                      <button
+                        type="button"
+                        onClick={() => setNewAccountForm({ ...newAccountForm, isLocked: false })}
+                        className={`px-3 py-1.5 rounded-md text-xs font-medium flex items-center gap-1 transition cursor-pointer ${
+                          !newAccountForm.isLocked
+                            ? "bg-white text-slate-800 shadow-xs border border-slate-200"
+                            : "text-slate-400 hover:text-slate-700"
+                        }`}
+                        title="Desbloqueada"
+                      >
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z" />
+                        </svg>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setNewAccountForm({ ...newAccountForm, isLocked: true })}
+                        className={`px-3 py-1.5 rounded-md text-xs font-medium flex items-center gap-1 transition cursor-pointer ${
+                          newAccountForm.isLocked
+                            ? "bg-white text-[#f6821f] shadow-xs border border-slate-200"
+                            : "text-slate-400 hover:text-slate-700"
+                        }`}
+                        title="Bloqueada"
+                      >
+                        <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">Tipo de Detalles *</label>
-                <select
-                  value={newAccountForm.detailType}
-                  onChange={(e) => setNewAccountForm({ ...newAccountForm, detailType: e.target.value })}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-medium focus:outline-none focus:border-[#f6821f]"
-                >
-                  {(ACCOUNT_HIERARCHY[newAccountForm.type] || []).map((dt) => (
-                    <option key={dt} value={dt}>
-                      {dt}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">Nombre de la Cuenta *</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="Ej. Banco Ficohsa USD o Gastos de Mantenimiento"
-                  value={newAccountForm.name}
-                  onChange={(e) => setNewAccountForm({ ...newAccountForm, name: e.target.value })}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:border-[#f6821f] focus:ring-1 focus:ring-[#f6821f]"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Moneda</label>
-                  <select
-                    value={newAccountForm.currency}
-                    onChange={(e) => setNewAccountForm({ ...newAccountForm, currency: e.target.value })}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-medium focus:outline-none focus:border-[#f6821f]"
-                  >
-                    <option value="USD">USD ($)</option>
-                    <option value="HNL">HNL (L)</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Estado</label>
-                  <select
-                    value={newAccountForm.isActive ? "true" : "false"}
-                    onChange={(e) => setNewAccountForm({ ...newAccountForm, isActive: e.target.value === "true" })}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-medium focus:outline-none focus:border-[#f6821f]"
-                  >
-                    <option value="true">Activa</option>
-                    <option value="false">Inactiva</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="border-t border-slate-200 pt-4 flex items-center justify-end gap-3">
+              {/* Sticky Footer */}
+              <div className="border-t border-slate-200 px-6 py-3.5 bg-slate-50/50 flex items-center justify-between">
                 <button
                   type="button"
-                  onClick={() => setShowNewAccountModal(false)}
-                  className="px-5 py-2.5 rounded-xl border border-slate-300 text-slate-700 hover:bg-slate-50 font-semibold cursor-pointer transition"
+                  onClick={() => alert("Los video tutoriales estarán disponibles próximamente.")}
+                  className="flex items-center gap-1.5 text-xs text-[#0f62fe] hover:text-[#0353e9] hover:underline font-medium cursor-pointer"
                 >
-                  Cancelar
+                  <svg className="w-4 h-4 text-[#0f62fe]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <circle cx="12" cy="12" r="9" strokeWidth="2" />
+                    <polygon points="10,8 16,12 10,16" fill="currentColor" />
+                  </svg>
+                  <span>Video tutorials</span>
                 </button>
-                <button
-                  type="submit"
-                  disabled={accountModalLoading}
-                  className="px-5 py-2.5 rounded-xl bg-[#f6821f] hover:bg-[#e07216] text-white font-semibold cursor-pointer shadow-md shadow-[#f6821f]/20 transition disabled:opacity-50"
-                >
-                  {accountModalLoading ? "Guardando..." : "Guardar Cuenta"}
-                </button>
+
+                <div className="flex items-center gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => setShowNewAccountModal(false)}
+                    className="px-4 py-2 rounded-lg border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 font-semibold text-xs transition cursor-pointer"
+                  >
+                    Cancelar
+                  </button>
+
+                  <div className="inline-flex rounded-lg shadow-sm">
+                    <button
+                      type="submit"
+                      disabled={accountModalLoading}
+                      className="px-4 py-2 rounded-l-lg bg-[#f6821f] hover:bg-[#e07216] text-white font-semibold text-xs transition cursor-pointer disabled:opacity-50 flex items-center gap-1"
+                    >
+                      {accountModalLoading ? "Guardando..." : "Guardar"}
+                    </button>
+                    <button
+                      type="button"
+                      className="px-2 py-2 rounded-r-lg bg-[#e07216] hover:bg-[#d06512] text-white border-l border-white/20 transition cursor-pointer flex items-center justify-center"
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
               </div>
             </form>
-          </div>
+          </aside>
         </div>
       )}
       {/* ================= SIDEBAR: PERSONALIZAR (Matching screenshot) ================= */}
