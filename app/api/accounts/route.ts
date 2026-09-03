@@ -43,7 +43,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { code, name, type, currency, isActive } = body;
+    const { code, name, type, currency, balance, isActive } = body;
 
     if (!code || !name || !type) {
       return NextResponse.json(
@@ -69,6 +69,7 @@ export async function POST(request: NextRequest) {
         name,
         type,
         currency: currency || "USD",
+        balance: balance !== undefined ? Number(balance) : 0,
         isActive: isActive !== undefined ? Boolean(isActive) : true,
       },
     });

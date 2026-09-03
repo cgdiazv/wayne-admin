@@ -48,7 +48,7 @@ export async function PATCH(request: NextRequest, { params }: RouteProps) {
       );
     }
 
-    const { code, name, type, currency, isActive } = body;
+    const { code, name, type, currency, balance, isActive } = body;
 
     // Check if new code conflicts with another account
     if (code && code !== existing.code) {
@@ -70,6 +70,7 @@ export async function PATCH(request: NextRequest, { params }: RouteProps) {
         ...(name !== undefined && { name }),
         ...(type !== undefined && { type }),
         ...(currency !== undefined && { currency }),
+        ...(balance !== undefined && { balance: Number(balance) }),
         ...(isActive !== undefined && { isActive: Boolean(isActive) }),
       },
     });

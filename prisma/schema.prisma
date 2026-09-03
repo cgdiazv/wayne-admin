@@ -14,6 +14,7 @@ model Account {
   name      String
   type      String   // Asset, Liability, Equity, Income, Expense
   currency  String   @default("USD")
+  balance   Float    @default(0)
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -70,4 +71,47 @@ model CompanySettings {
   direccionCliente String   @default("Ninguno indicado")
   logoUrl          String?  @db.Text
   updatedAt        DateTime @updatedAt
+}
+
+model BankAccount {
+  id            String            @id @default(cuid())
+  name          String            // e.g. "Banco Ficohsa"
+  accountNumber String            // e.g. "•••• 2266"
+  type          String            // e.g. "Cuenta de cheques empresarial USD"
+  currency      String            @default("USD")
+  bankBalance   Float             @default(0)
+  bookBalance   Float             @default(0)
+  lastUpdated   String            @default("Hoy, 10:15 PM")
+  status        String            @default("Conectado")
+  color         String            @default("#0284c7")
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+  transactions  BankTransaction[]
+}
+
+model BankTransaction {
+  id               String       @id @default(cuid())
+  bankAccountId    String
+  bankAccount      BankAccount  @relation(fields: [bankAccountId], references: [id], onDelete: Cascade)
+  date             String       // e.g. "02/09/2026"
+  description      String
+  payee            String
+  type             String       // "deposit" | "expense"
+  amount           Float
+  suggestedAccount String
+  ruleApplied      String?
+  status           String       @default("porRevisar") // "porRevisar" | "categorizadas" | "excluidas"
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+}
+
+model BankRule {
+  id            String   @id @default(cuid())
+  name          String
+  condition     String
+  targetAccount String
+  autoConfirm   Boolean  @default(false)
+  active        Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 }

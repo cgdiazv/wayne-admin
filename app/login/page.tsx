@@ -5,8 +5,8 @@ import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
   const router = useRouter();
-  const [email, setEmail] = useState("admin@waynetrademarkhn.com");
-  const [password, setPassword] = useState("WayneAdmin2026!");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -63,25 +63,27 @@ export default function LoginPage() {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-2">
-              Admin Email
+              Correo electrónico
             </label>
             <input
               type="email"
               required
+              autoComplete="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 placeholder-slate-400 focus:outline-none focus:border-[#f6821f] focus:ring-2 focus:ring-[#f6821f]/20 transition-all text-sm font-medium"
-              placeholder="admin@waynetrademarkhn.com"
+              placeholder="ejemplo@correo.com"
             />
           </div>
 
           <div>
             <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-2">
-              Password
+              Contraseña
             </label>
             <input
               type="password"
               required
+              autoComplete="current-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 placeholder-slate-400 focus:outline-none focus:border-[#f6821f] focus:ring-2 focus:ring-[#f6821f]/20 transition-all text-sm font-medium"
