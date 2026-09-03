@@ -2004,15 +2004,15 @@ export default function AdminDashboard() {
                         onChange={handleLogoUpload}
                       />
 
-                      {/* Company Logo Header with Fallback matching screenshot */}
-                      <div className="flex flex-col items-center justify-center pb-2">
+                      {/* Company Logo Header with Generic Fallback - Left Aligned */}
+                      <div className="flex flex-col items-start justify-start pb-4">
                         {companyLogo ? (
-                          /* Uploaded Custom Logo Display */
-                          <div className="flex flex-col items-center">
+                          /* Uploaded Custom Logo Display - Left Aligned */
+                          <div className="flex flex-col items-start">
                             <div className="p-3 border border-slate-200 rounded-2xl bg-white shadow-xs max-w-xs flex items-center justify-center">
                               <img
                                 src={companyLogo}
-                                alt="Logotipo Wayne Trademark"
+                                alt="Logotipo de la empresa"
                                 className="max-h-20 max-w-[260px] object-contain"
                               />
                             </div>
@@ -2042,29 +2042,24 @@ export default function AdminDashboard() {
                             </div>
                           </div>
                         ) : (
-                          /* Fallback State (with Default Wayne emblem + Upload prompt) */
-                          <div className="flex flex-col items-center">
-                            <div className="flex items-center gap-2 mb-2">
-                              <svg className="w-9 h-9 text-[#f6821f]" viewBox="0 0 100 100" fill="currentColor">
-                                <path d="M10 25 L35 75 L50 45 L65 75 L90 25 L75 25 L60 60 L50 40 L40 60 L25 25 Z" />
+                          /* Generic Fallback Box - Left Aligned */
+                          <div
+                            onClick={() => fileInputRef.current?.click()}
+                            className="flex items-center gap-4 px-4 py-3.5 rounded-2xl border-2 border-dashed border-slate-300 hover:border-[#f6821f] bg-slate-50/80 hover:bg-[#fff7ed]/50 cursor-pointer transition group max-w-sm"
+                            title="Haz clic para subir el logotipo oficial de la empresa"
+                          >
+                            <div className="w-12 h-12 rounded-xl bg-slate-200/80 group-hover:bg-[#f6821f]/10 text-slate-500 group-hover:text-[#f6821f] flex items-center justify-center shrink-0 transition">
+                              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                               </svg>
-                              <div className="flex flex-col">
-                                <span className="font-black text-2xl tracking-tight text-[#f6821f] leading-none">wayne</span>
-                                <span className="text-[7px] tracking-wider text-slate-500 font-bold uppercase">PRINTING & PACKAGING HONDURAS</span>
-                              </div>
                             </div>
-                            <div className="flex items-center gap-2 mt-1">
-                              <button
-                                type="button"
-                                onClick={() => fileInputRef.current?.click()}
-                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-[#fff7ed] hover:text-[#f6821f] text-slate-700 text-xs font-medium cursor-pointer shadow-xs border border-slate-200 hover:border-[#f6821f] transition"
-                                title="Subir logotipo oficial"
-                              >
-                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-                                </svg>
-                                <span>Subir logotipo</span>
-                              </button>
+                            <div className="flex flex-col text-left">
+                              <span className="text-xs font-bold text-slate-800 group-hover:text-[#f6821f] transition">
+                                + Agregar logotipo
+                              </span>
+                              <span className="text-[11px] text-slate-400 mt-0.5">
+                                PNG, JPG o SVG (máx. 2 MB)
+                              </span>
                             </div>
                           </div>
                         )}
