@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
+import { Users, Factory, Package, BookOpen, Download, Upload, CheckCircle2, FileSpreadsheet, ArrowRight, X } from "lucide-react";
 
 type Account = {
   id: string;
@@ -84,11 +85,308 @@ type BankRule = {
   active: boolean;
 };
 
-type NavItem = "dashboard" | "plan-cuentas" | "transacciones" | "macola-sync" | "clientes" | "proveedores" | "inventario" | "reportes" | "configuracion";
+type NavItem = "dashboard" | "plan-cuentas" | "transacciones" | "macola-sync" | "clientes" | "proveedores" | "inventario" | "reportes" | "configuracion" | "factura-editor" | "lista-facturas" | "lista-ordenes-compra" | "orden-compra-editor" | "deposito-bancario" | "recibir-pago" | "agregar-gasto" | "pagar-proveedor";
 
 export default function AdminDashboard() {
   const router = useRouter();
   const [currentView, setCurrentView] = useState<NavItem>("dashboard");
+  const [previousInvoiceView, setPreviousInvoiceView] = useState<NavItem>("dashboard");
+
+  const openInvoiceEditor = () => {
+    if (currentView !== "factura-editor") {
+      setPreviousInvoiceView(currentView);
+    }
+    setCurrentView("factura-editor");
+  };
+
+  const closeInvoiceEditor = () => {
+    setCurrentView(previousInvoiceView || "dashboard");
+  };
+
+  // Recibir Pago State & Handlers
+  const defaultRecibirPagoForm = {
+    customerId: "",
+    customerName: "",
+    customerEmail: "",
+    emailCc: "",
+    emailCco: "",
+    sendLater: false,
+    paymentDate: new Date().toISOString().split("T")[0],
+    paymentMethod: "Efectivo",
+    referenceNumber: "",
+    depositAccount: "Cash and cash equivalents",
+    amount: 0,
+    note: "",
+    attachmentName: "",
+  };
+
+  const [previousRecibirPagoView, setPreviousRecibirPagoView] = useState<NavItem>("dashboard");
+  const [recibirPagoForm, setRecibirPagoForm] = useState(defaultRecibirPagoForm);
+  const [recibirPagoLoading, setRecibirPagoLoading] = useState(false);
+  const [recibirPagoSuccessMsg, setRecibirPagoSuccessMsg] = useState("");
+  const [recibirPagoErrorMsg, setRecibirPagoErrorMsg] = useState("");
+  const [showRecibirPagoSaveDropdown, setShowRecibirPagoSaveDropdown] = useState(false);
+  const [showCcCcoPopover, setShowCcCcoPopover] = useState(false);
+  const [showInvoiceSearchModal, setShowInvoiceSearchModal] = useState(false);
+  const [showCancelPaymentConfirmModal, setShowCancelPaymentConfirmModal] = useState(false);
+  const [searchInvoiceNumber, setSearchInvoiceNumber] = useState("");
+  const [selectedPurchaseOrder, setSelectedPurchaseOrder] = useState<{
+    num: string;
+    date: string;
+    vendor: string;
+    category: string;
+    total: number;
+    status: string;
+  } | null>(null);
+  const [purchaseOrders, setPurchaseOrders] = useState([
+    { num: "OC-2026-084", date: "2026-09-02", vendor: "Insumos Flexográficos S.A.", category: "Tintas Flexo", total: 6450, status: "Aprobada" },
+    { num: "OC-2026-083", date: "2026-08-30", vendor: "Papelera Hondureña", category: "Cartón Corrugado", total: 14200, status: "Recibida" },
+    { num: "OC-2026-082", date: "2026-08-25", vendor: "Químicos Industriales S.A.", category: "Solventes", total: 3180, status: "Pendiente" },
+  ]);
+
+  const [invoicesList, setInvoicesList] = useState([
+    { num: "1001", date: "2026-09-03", customer: "Textiles Búfalo S.A.", due: "2026-10-03", total: 12500, status: "Pendiente" },
+    { num: "1000", date: "2026-09-01", customer: "Empaques del Norte S. de R.L.", due: "2026-09-15", total: 4850, status: "Cobrada" },
+    { num: "0999", date: "2026-08-28", customer: "Confecciones Gildan Búfalo", due: "2026-09-28", total: 8720, status: "Cobrada" },
+  ]);
+
+  const handleUpdatePOStatus = (poNum: string, newStatus: string) => {
+    setPurchaseOrders((prev) =>
+      prev.map((po) => (po.num === poNum ? { ...po, status: newStatus } : po))
+    );
+    if (selectedPurchaseOrder && selectedPurchaseOrder.num === poNum) {
+      setSelectedPurchaseOrder((prev) => (prev ? { ...prev, status: newStatus } : null));
+    }
+  };
+
+  const handleUpdateInvoiceStatus = (num: string, newStatus: string) => {
+    setInvoicesList((prev) =>
+      prev.map((inv) => (inv.num === num ? { ...inv, status: newStatus } : inv))
+    );
+  };
+
+  // Dynamic Facturas Statistics
+  const totalFacturado = invoicesList.reduce((acc, item) => acc + item.total, 0);
+  const facturasCobradas = invoicesList.filter((item) => item.status === "Cobrada");
+  const totalCobradas = facturasCobradas.reduce((acc, item) => acc + item.total, 0);
+  const facturasPendientes = invoicesList.filter((item) => item.status === "Pendiente");
+  const totalPendientes = facturasPendientes.reduce((acc, item) => acc + item.total, 0);
+
+  // Dynamic Purchase Orders Statistics
+  const totalPO = purchaseOrders.reduce((acc, item) => acc + item.total, 0);
+  const poRecibidas = purchaseOrders.filter((item) => item.status === "Recibida");
+  const totalPORecibidas = poRecibidas.reduce((acc, item) => acc + item.total, 0);
+  const poPendientes = purchaseOrders.filter((item) => item.status === "Pendiente" || item.status === "Aprobada");
+  const totalPOPendientes = poPendientes.reduce((acc, item) => acc + item.total, 0);
+
+  const [editingProduct, setEditingProduct] = useState<{
+    id: string;
+    sku: string;
+    description: string;
+    quantity: number;
+    cost: number;
+    price: number;
+  } | null>(null);
+
+  const [productForm, setProductForm] = useState({
+    sku: "",
+    description: "",
+    quantity: 0,
+    cost: 0,
+    price: 0,
+  });
+
+  const handleOpenEditProduct = (prod: any) => {
+    setEditingProduct(prod);
+    setProductForm({
+      sku: prod.sku,
+      description: prod.description,
+      quantity: prod.quantity,
+      cost: prod.cost,
+      price: prod.price,
+    });
+    setModalError("");
+    setModalSuccess("");
+    setActiveModal("editar-producto");
+  };
+
+  const handleSaveEditProduct = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingProduct) return;
+    setModalLoading(true);
+    setModalError("");
+    setModalSuccess("");
+    try {
+      setInventory((prev) =>
+        prev.map((item) =>
+          item.id === editingProduct.id
+            ? { ...item, ...productForm }
+            : item
+        )
+      );
+      setModalSuccess("¡Producto de inventario actualizado correctamente!");
+      setTimeout(() => {
+        setActiveModal(null);
+        setEditingProduct(null);
+        setModalSuccess("");
+      }, 1000);
+    } catch (err: any) {
+      setModalError(err.message || "Error al actualizar producto");
+    } finally {
+      setModalLoading(false);
+    }
+  };
+
+  const paymentFileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleRequestCancelRecibirPago = () => {
+    // Check if user has entered data
+    if (
+      recibirPagoForm.customerName ||
+      recibirPagoForm.amount > 0 ||
+      recibirPagoForm.referenceNumber ||
+      recibirPagoForm.note ||
+      recibirPagoForm.attachmentName ||
+      recibirPagoForm.emailCc ||
+      recibirPagoForm.emailCco
+    ) {
+      setShowCancelPaymentConfirmModal(true);
+    } else {
+      setRecibirPagoForm(defaultRecibirPagoForm);
+      setRecibirPagoErrorMsg("");
+      setRecibirPagoSuccessMsg("");
+      closeRecibirPagoView();
+    }
+  };
+
+  const handleConfirmDiscardPaymentChanges = () => {
+    setRecibirPagoForm(defaultRecibirPagoForm);
+    setRecibirPagoErrorMsg("");
+    setRecibirPagoSuccessMsg("");
+    setShowCancelPaymentConfirmModal(false);
+    closeRecibirPagoView();
+  };
+
+  const openRecibirPagoView = (initialCustomerId?: string) => {
+    if (currentView !== "recibir-pago") {
+      setPreviousRecibirPagoView(currentView);
+    }
+    if (initialCustomerId) {
+      const selected = customers.find((c) => c.id === initialCustomerId);
+      if (selected) {
+        setRecibirPagoForm((prev) => ({
+          ...prev,
+          customerId: selected.id,
+          customerName: selected.name,
+          customerEmail: selected.email || "",
+        }));
+      }
+    }
+    setCurrentView("recibir-pago");
+  };
+
+  const closeRecibirPagoView = () => {
+    setCurrentView(previousRecibirPagoView || "dashboard");
+  };
+
+  const handleRecibirPagoCustomerChange = (custNameOrId: string) => {
+    const selected = customers.find((c) => c.id === custNameOrId || c.name === custNameOrId);
+    if (selected) {
+      setRecibirPagoForm((prev) => ({
+        ...prev,
+        customerId: selected.id,
+        customerName: selected.name,
+        customerEmail: selected.email || "",
+      }));
+    } else {
+      setRecibirPagoForm((prev) => ({
+        ...prev,
+        customerId: "",
+        customerName: custNameOrId,
+      }));
+    }
+  };
+
+  const handleImportInvoiceData = (numToSearch: string) => {
+    if (!numToSearch || !numToSearch.trim()) return;
+    const query = numToSearch.trim().toLowerCase();
+    const availableInvoices = [
+      { num: "1001", date: "2026-09-03", customer: "Textiles Búfalo S.A.", email: "compras@textilesbufalo.com", due: "2026-10-03", total: 12500, status: "Pendiente" },
+      { num: "1000", date: "2026-09-01", customer: "Empaques del Norte S. de R.L.", email: "facturacion@empaquesnorte.hn", due: "2026-09-15", total: 4850, status: "Cobrada" },
+      { num: "0999", date: "2026-08-28", customer: "Confecciones Gildan Búfalo", email: "ap@gildanbufalo.com", due: "2026-09-28", total: 8720, status: "Cobrada" },
+    ];
+    const match = availableInvoices.find(
+      (i) => i.num.toLowerCase().includes(query) || i.customer.toLowerCase().includes(query)
+    );
+    if (match) {
+      const foundCustomer = customers.find(
+        (c) => c.name.toLowerCase().includes(match.customer.toLowerCase()) || match.customer.toLowerCase().includes(c.name.toLowerCase())
+      );
+      setRecibirPagoForm((prev) => ({
+        ...prev,
+        customerId: foundCustomer ? foundCustomer.id : "",
+        customerName: match.customer,
+        customerEmail: match.email || foundCustomer?.email || "",
+        amount: match.total,
+        referenceNumber: `FAC-${match.num}`,
+        note: `Pago asignado a la Factura N.º ${match.num}`,
+      }));
+      setRecibirPagoErrorMsg("");
+      setRecibirPagoSuccessMsg(`¡Factura N.º ${match.num} vinculada con éxito! Se importaron los datos de ${match.customer} e importe de $${match.total.toLocaleString("es-HN", { minimumFractionDigits: 2 })}.`);
+      setShowInvoiceSearchModal(false);
+      setSearchInvoiceNumber("");
+    } else {
+      setRecibirPagoSuccessMsg("");
+      setRecibirPagoErrorMsg(`No se encontró ninguna factura con el número u orden "${numToSearch}".`);
+      setShowInvoiceSearchModal(false);
+    }
+  };
+
+  const handleSaveRecibirPago = async (andClose = false) => {
+    if (!recibirPagoForm.customerName) {
+      setRecibirPagoErrorMsg("Por favor elige un cliente.");
+      return;
+    }
+    if (!recibirPagoForm.amount || recibirPagoForm.amount <= 0) {
+      setRecibirPagoErrorMsg("Ingresa un importe recibido mayor a 0.");
+      return;
+    }
+    setRecibirPagoLoading(true);
+    setRecibirPagoErrorMsg("");
+    try {
+      const res = await fetch("/api/payments", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(recibirPagoForm),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "Error al registrar el pago");
+      }
+      setRecibirPagoSuccessMsg(`¡Pago por $${recibirPagoForm.amount.toFixed(2)} registrado correctamente!`);
+      await loadDashboardData();
+      if (andClose) {
+        setTimeout(() => {
+          closeRecibirPagoView();
+          setRecibirPagoSuccessMsg("");
+        }, 1000);
+      } else {
+        setTimeout(() => {
+          setRecibirPagoSuccessMsg("");
+          setRecibirPagoForm((prev) => ({
+            ...prev,
+            amount: 0,
+            referenceNumber: "",
+            note: "",
+          }));
+        }, 1500);
+      }
+    } catch (err: any) {
+      setRecibirPagoErrorMsg(err.message || "Error al registrar el pago");
+    } finally {
+      setRecibirPagoLoading(false);
+    }
+  };
   const [contabilidadOpen, setContabilidadOpen] = useState(true);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [search, setSearch] = useState("");
@@ -142,16 +440,50 @@ export default function AdminDashboard() {
   const [bankTransactions, setBankTransactions] = useState<BankTransaction[]>([]);
   const [automationRules, setAutomationRules] = useState<BankRule[]>([]);
 
-  // Connect bank modal form state
+  // Register bank modal form state
   const [connectBankForm, setConnectBankForm] = useState({
     institution: "Banco Ficohsa",
     accountType: "Cuenta de cheques empresarial",
     accountNumber: "",
     currency: "USD",
-    syncFrequency: "Automática cada hora",
   });
   const [connectBankLoading, setConnectBankLoading] = useState(false);
-  const [connectBankSuccess, setConnectBankSuccess] = useState("");
+  const [editingBank, setEditingBank] = useState<BankAccount | null>(null);
+
+  const handleDeleteBank = async (bankId: string) => {
+    try {
+      const res = await fetch(`/api/bank-accounts/${bankId}`, { method: "DELETE" });
+      const data = await res.json();
+      if (data.success) {
+        setConnectedBanks((prev) => prev.filter((b) => b.id !== bankId));
+        setBankToastNotification("Cuenta bancaria eliminada de la base de datos.");
+        setTimeout(() => setBankToastNotification(""), 4000);
+      }
+    } catch (err) {
+      console.error("Error deleting bank account:", err);
+    }
+  };
+
+  const handleUpdateBank = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingBank) return;
+    try {
+      const res = await fetch(`/api/bank-accounts/${editingBank.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(editingBank),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setConnectedBanks((prev) => prev.map((b) => (b.id === editingBank.id ? data.data : b)));
+        setBankToastNotification("Cuenta bancaria actualizada correctamente.");
+        setTimeout(() => setBankToastNotification(""), 4000);
+        setEditingBank(null);
+      }
+    } catch (err) {
+      console.error("Error updating bank account:", err);
+    }
+  };
 
   // New rule modal form state
   const [newRuleForm, setNewRuleForm] = useState({
@@ -302,7 +634,7 @@ export default function AdminDashboard() {
   ];
 
   const [configSubTab, setConfigSubTab] = useState<
-    "empresa" | "reportes" | "contabilidad" | "ventas" | "gastos" | "horas" | "monedas" | "avanzadas"
+    "empresa" | "reportes" | "contabilidad" | "ventas" | "gastos" | "horas" | "monedas" | "avanzadas" | "listas" | "importar"
   >("empresa");
 
   const [companySettings, setCompanySettings] = useState({
@@ -484,6 +816,92 @@ export default function AdminDashboard() {
   const [editingExpenseSection, setEditingExpenseSection] = useState<string | null>(null);
   const [expenseSavedNotification, setExpenseSavedNotification] = useState(false);
 
+  // Subtabs state (Contabilidad, Horas, Monedas, Avanzadas)
+  const [contabilidadSettings, setContabilidadSettings] = useState({
+    primerMesFiscal: "Enero",
+    primerMesImpuesto: "Igual que el ejercicio fiscal (Enero)",
+    metodoContabilidad: "Criterio de devengo",
+    cierreLibros: "Desactivado (Periodo 2026 abierto)",
+    numerosCuenta: "Activado",
+  });
+
+  const [horasSettings, setHorasSettings] = useState({
+    primerDia: "Lunes",
+    jornadaMaxima: "8 horas / día (44 horas semanales)",
+    aprobacionHorasExtra: "Requiere visto bueno de supervisión",
+  });
+
+  const [monedasSettings, setMonedasSettings] = useState({
+    monedaPrincipal: "USD ($) Dólar estadounidense",
+    multidivisa: "Activado (USD, HNL)",
+    bancoPrincipal: "Banco Ficohsa (Cuenta de cheques empresarial USD)",
+    transferenciasAch: "Habilitadas",
+  });
+
+  const [avanzadasSettings, setAvanzadasSettings] = useState({
+    zonaHoraria: "(GMT-06:00) Hora estándar central (Honduras)",
+    idioma: "Español (Latinoamérica)",
+    cierreSesionInactividad: "3 horas",
+  });
+
+  // Generic Edit Modal State for parameter subtabs
+  const [paramEditModal, setParamEditModal] = useState<{
+    title: string;
+    label: string;
+    value: string;
+    options?: string[];
+    onSave: (val: string) => void;
+  } | null>(null);
+
+  // Hub de Listas State
+  const [activeListModal, setActiveListModal] = useState<string | null>(null);
+
+  // Import Data Wizard State (Clientes, Proveedores, Productos para Inventario, Catálogo de Cuentas)
+  const [selectedImportCategory, setSelectedImportCategory] = useState<"clientes" | "proveedores" | "productos" | "cuentas">("clientes");
+  const [importPasteText, setImportPasteText] = useState<string>("");
+  const [importPreviewRows, setImportPreviewRows] = useState<any[]>([]);
+  const [importNotification, setImportNotification] = useState<string>("");
+  const [isImporting, setIsImporting] = useState<boolean>(false);
+
+  const [productCategoriesList, setProductCategoriesList] = useState<string[]>([
+    "Empaque e Impresión Flexográfica",
+    "Etiquetas y Adhesivos Industriales",
+    "Cartón Corrugado y Cajas",
+    "Suministros y Materiales de Producción",
+  ]);
+
+  const [physicalLocationsList, setPhysicalLocationsList] = useState<{ id: string; name: string; address: string }[]>([
+    { id: "1", name: "Planta Principal Zip Búfalo", address: "Zip Búfalo Edificio 1B, Villanueva, Cortés" },
+    { id: "2", name: "Oficina Comercial San Pedro Sula", address: "Barrio los Andes, 7 Calle NO, San Pedro Sula" },
+    { id: "3", name: "Bodega de Distribución Central", address: "Km 5 Carretera a Puerto Cortés" },
+  ]);
+
+  const [paymentMethodsList, setPaymentMethodsList] = useState<{ id: string; name: string; type: string }[]>([
+    { id: "1", name: "Efectivo Disponible", type: "Efectivo" },
+    { id: "2", name: "Cheque Bancario", type: "Cheque" },
+    { id: "3", name: "Transferencia Interbancaria ACH", type: "Transferencia" },
+    { id: "4", name: "Tarjeta de Crédito / Débito", type: "Tarjeta" },
+  ]);
+
+  const [paymentTermsList, setPaymentTermsList] = useState<{ id: string; name: string; days: number }[]>([
+    { id: "1", name: "Contado (Inmediato)", days: 0 },
+    { id: "2", name: "Neto 15 Días", days: 15 },
+    { id: "3", name: "Neto 30 Días", days: 30 },
+    { id: "4", name: "Neto 60 Días", days: 60 },
+  ]);
+
+  const [recurringTransactionsList, setRecurringTransactionsList] = useState<{ id: string; name: string; type: string; frequency: string; amount: number }[]>([
+    { id: "1", name: "Alquiler Mensual Planta Zip Búfalo", type: "Gasto", frequency: "Mensual", amount: 4500.00 },
+    { id: "2", name: "Servicios Públicos e Internet", type: "Gasto", frequency: "Mensual", amount: 850.00 },
+    { id: "3", name: "Facturación Recurrente Cliente Búfalo", type: "Ingreso", frequency: "Mensual", amount: 12500.00 },
+  ]);
+
+  const [accountingClassesList, setAccountingClassesList] = useState<{ id: string; name: string; description: string }[]>([
+    { id: "1", name: "Línea Flexografía", description: "Impresiones flexográficas de alta velocidad" },
+    { id: "2", name: "Línea Offset & Embalaje", description: "Cajas y empaques de cartón rígido" },
+    { id: "3", name: "Administración & Ventas", description: "Gastos operativos administrativos" },
+  ]);
+
   const [editingConfigKey, setEditingConfigKey] = useState<string | null>(null);
   const [editingConfigLabel, setEditingConfigLabel] = useState<string>("");
   const [editingConfigValue, setEditingConfigValue] = useState<string>("");
@@ -516,6 +934,277 @@ export default function AdminDashboard() {
       } catch (err) {
         console.error("Error updating company setting in DB:", err);
       }
+    }
+  };
+
+  // Factura Full-Screen Editor State
+  const [activeInvoiceTab, setActiveInvoiceTab] = useState<"Editar" | "Vista de correo electrónico" | "Vista de PDF">("Editar");
+  const [showInvoiceOptionsSidebar, setShowInvoiceOptionsSidebar] = useState(false);
+  const [activeInvoiceOptionSection, setActiveInvoiceOptionSection] = useState<"personalizacion" | "pago" | "diseno" | null>("diseno");
+  const [showInvoiceSaveDropdown, setShowInvoiceSaveDropdown] = useState(false);
+  const [showInvoiceSendDropdown, setShowInvoiceSendDropdown] = useState(false);
+  const [showPrintDownloadDropdown, setShowPrintDownloadDropdown] = useState(false);
+  const [invoiceSuccessMsg, setInvoiceSuccessMsg] = useState("");
+  const [invoiceDesign, setInvoiceDesign] = useState({
+    template: "Moderno",
+    printerFriendly: false,
+    color: "#79bd58",
+    font: "Helvetica Neue",
+  });
+
+  const [invoiceForm, setInvoiceForm] = useState({
+    invoiceNumber: "1001",
+    customerId: "",
+    customerName: "",
+    customerEmail: "",
+    paymentTerms: "Neto 30",
+    invoiceDate: "2026-09-03",
+    dueDate: "2026-10-03",
+    paymentInstructions: "Realizar depósito o transferencia ACH a Banco Ficohsa en USD / HNL.",
+    customerNote: "Gracias por elegir a Wayne Trademark Printing & Packaging.",
+    statementNote: "Factura emitida por Wayne Trademark Honduras.",
+    lines: [
+      {
+        id: "line-1",
+        serviceDate: "2026-09-03",
+        productId: "",
+        productName: "Impresión Flexográfica Cartón Búfalo",
+        sku: "SKU-104928",
+        description: "Impresión flexográfica 4 colores en caja de cartón corrugado",
+        quantity: 100,
+        rate: 2.50,
+        amount: 250.00,
+      },
+    ],
+  });
+
+  const invoiceSubtotal = invoiceForm.lines.reduce((sum, line) => sum + (line.amount || 0), 0);
+  const invoiceTotal = invoiceSubtotal;
+
+  const addInvoiceLine = () => {
+    setInvoiceForm((prev) => ({
+      ...prev,
+      lines: [
+        ...prev.lines,
+        {
+          id: `line-${Date.now()}`,
+          serviceDate: prev.invoiceDate,
+          productId: "",
+          productName: "",
+          sku: "",
+          description: "",
+          quantity: 1,
+          rate: 0,
+          amount: 0,
+        },
+      ],
+    }));
+  };
+
+  const removeInvoiceLine = (id: string) => {
+    setInvoiceForm((prev) => ({
+      ...prev,
+      lines: prev.lines.filter((l) => l.id !== id),
+    }));
+  };
+
+  const clearAllInvoiceLines = () => {
+    setInvoiceForm((prev) => ({
+      ...prev,
+      lines: [],
+    }));
+  };
+
+  const updateInvoiceLine = (id: string, field: string, value: any) => {
+    setInvoiceForm((prev) => {
+      const updatedLines = prev.lines.map((line) => {
+        if (line.id !== id) return line;
+        const newLine = { ...line, [field]: value };
+        if (field === "quantity" || field === "rate") {
+          const q = field === "quantity" ? parseFloat(value) || 0 : line.quantity;
+          const r = field === "rate" ? parseFloat(value) || 0 : line.rate;
+          newLine.amount = q * r;
+        }
+        if (field === "productName") {
+          const invItem = inventory.find((i) => i.description.toLowerCase().includes(value.toLowerCase()) || i.sku === value);
+          if (invItem) {
+            newLine.productId = invItem.id;
+            newLine.sku = invItem.sku;
+            newLine.rate = invItem.price || 0;
+            newLine.amount = newLine.quantity * newLine.rate;
+            if (!newLine.description) newLine.description = invItem.description;
+          }
+        }
+        return newLine;
+      });
+      return { ...prev, lines: updatedLines };
+    });
+  };
+
+  const [sendingInvoiceEmail, setSendingInvoiceEmail] = useState(false);
+
+  const handleSendInvoiceEmail = async () => {
+    const targetEmail = invoiceForm.customerEmail || "sac@waynetrademarkhn.com";
+    setSendingInvoiceEmail(true);
+    try {
+      const res = await fetch("/api/send-invoice", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          to: targetEmail,
+          invoiceNumber: invoiceForm.invoiceNumber,
+          customerName: invoiceForm.customerName || "Estimado cliente",
+          invoiceDate: invoiceForm.invoiceDate,
+          dueDate: invoiceForm.dueDate,
+          paymentTerms: invoiceForm.paymentTerms,
+          lines: invoiceForm.lines,
+          subtotal: invoiceSubtotal,
+          total: invoiceTotal,
+          paymentInstructions: invoiceForm.paymentInstructions,
+          customerNote: invoiceForm.customerNote,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Falló el envío por correo.");
+      }
+
+      setInvoiceSuccessMsg(`¡Factura N.º ${invoiceForm.invoiceNumber} enviada a ${targetEmail} (From: notifications@indevasa.com, Reply-To: sac@waynetrademarkhn.com)!`);
+      setTimeout(() => setInvoiceSuccessMsg(""), 5000);
+    } catch (err: any) {
+      alert(`Error al enviar correo por Resend: ${err.message}`);
+    } finally {
+      setSendingInvoiceEmail(false);
+    }
+  };
+
+  // New Product / Service Drawer State
+  const [showNewProductDrawer, setShowNewProductDrawer] = useState(false);
+  const [showProductSaveDropdown, setShowProductSaveDropdown] = useState(false);
+  const [productDrawerLoading, setProductDrawerLoading] = useState(false);
+  const [productDrawerSuccess, setProductDrawerSuccess] = useState("");
+  const [productSectionsOpen, setProductSectionsOpen] = useState({
+    basic: true,
+    sales: true,
+    purchases: false,
+  });
+
+  // Customer & Vendor Slide-Over Drawers State
+  const [showNewCustomerDrawer, setShowNewCustomerDrawer] = useState(false);
+  const [newCustomerDrawerForm, setNewCustomerDrawerForm] = useState({
+    name: "",
+    rtn: "",
+    macolaCode: "",
+    currency: "USD",
+    email: "",
+    phone: "",
+    address: "",
+    city: "San Pedro Sula",
+    paymentTerms: "Crédito 30 días",
+    creditLimit: 0,
+  });
+  const [customerDrawerLoading, setCustomerDrawerLoading] = useState(false);
+  const [customerDrawerSuccess, setCustomerDrawerSuccess] = useState("");
+  const [showCustomerSaveDropdown, setShowCustomerSaveDropdown] = useState(false);
+  const [customerSectionsOpen, setCustomerSectionsOpen] = useState({
+    basic: true,
+    contact: true,
+    commercial: true,
+  });
+
+  // New Vendor Side Drawer State
+  const [showNewVendorDrawer, setShowNewVendorDrawer] = useState(false);
+  const [newVendorDrawerForm, setNewVendorDrawerForm] = useState({
+    name: "",
+    rtn: "",
+    macolaCode: "",
+    currency: "USD",
+    email: "",
+    phone: "",
+    address: "",
+    city: "San Pedro Sula",
+    category: "Tintas Flexo",
+    paymentTerms: "Crédito 30 días",
+  });
+  const [vendorDrawerLoading, setVendorDrawerLoading] = useState(false);
+  const [vendorDrawerSuccess, setVendorDrawerSuccess] = useState("");
+  const [showVendorSaveDropdown, setShowVendorSaveDropdown] = useState(false);
+  const [vendorSectionsOpen, setVendorSectionsOpen] = useState({
+    basic: true,
+    contact: true,
+    commercial: true,
+  });
+
+  const [newProductForm, setNewProductForm] = useState({
+    name: "",
+    type: "Servicio",
+    sku: "",
+    category: "Empaque e Impresión Flexográfica",
+    isSold: true,
+    salesDescription: "",
+    price: 0,
+    incomeAccountId: "7000",
+    isPurchased: false,
+    purchaseDescription: "",
+    cost: 0,
+    expenseAccountId: "5000",
+    imageUrl: "",
+  });
+
+  const handleCreateProduct = async (e?: React.FormEvent, createAnother: boolean = false) => {
+    if (e) e.preventDefault();
+    if (!newProductForm.name.trim()) return;
+
+    setProductDrawerLoading(true);
+    try {
+      const generatedSku = newProductForm.sku.trim() || `SKU-${Date.now().toString().slice(-6)}`;
+      const descriptionText = `${newProductForm.name.trim()}${newProductForm.salesDescription ? ` - ${newProductForm.salesDescription.trim()}` : ""}`;
+
+      const res = await fetch("/api/inventory", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sku: generatedSku,
+          description: descriptionText,
+          quantity: newProductForm.type === "Servicio" ? 1 : 10,
+          cost: newProductForm.cost || 0,
+          price: newProductForm.price || 0,
+        }),
+      });
+
+      const json = await res.json();
+      if (json.success && json.data) {
+        setInventory((prev) => [...prev, json.data]);
+        setProductDrawerSuccess("¡Producto / servicio registrado correctamente!");
+        setTimeout(() => setProductDrawerSuccess(""), 4000);
+
+        if (createAnother) {
+          setNewProductForm({
+            name: "",
+            type: "Servicio",
+            sku: "",
+            category: productCategoriesList[0] || "Empaque e Impresión Flexográfica",
+            isSold: true,
+            salesDescription: "",
+            price: 0,
+            incomeAccountId: "7000",
+            isPurchased: false,
+            purchaseDescription: "",
+            cost: 0,
+            expenseAccountId: "5000",
+            imageUrl: "",
+          });
+        } else {
+          setShowNewProductDrawer(false);
+        }
+      } else {
+        alert(json.error || "Error al crear el producto en la base de datos");
+      }
+    } catch (err) {
+      console.error("Error creating product:", err);
+    } finally {
+      setProductDrawerLoading(false);
     }
   };
 
@@ -556,15 +1245,15 @@ export default function AdminDashboard() {
 
   // Quick Actions Bar State & Config
   const quickActions = [
+    { id: "crear-producto", label: "Crear producto / servicio" },
     { id: "crear-factura", label: "Crear factura" },
-    { id: "registrar-gasto", label: "Registrar gasto" },
-    { id: "agregar-deposito", label: "Agregar depósito bancario" },
     { id: "agregar-cliente", label: "Agregar cliente" },
-    { id: "crear-estado-cuenta", label: "Crear estado de cuenta" },
     { id: "registrar-pago", label: "Registrar pago" },
+    { id: "agregar-deposito", label: "Agregar depósito bancario" },
     { id: "crear-orden-compra", label: "Crear orden de compra" },
-    { id: "pagar-facturas", label: "Pagar facturas" },
     { id: "agregar-proveedor", label: "Agregar proveedor" },
+    { id: "registrar-gasto", label: "Registrar gasto" },
+    { id: "pagar-facturas", label: "Pagar facturas" },
   ];
 
   const [activeModal, setActiveModal] = useState<string | null>(null);
@@ -593,7 +1282,672 @@ export default function AdminDashboard() {
   const handleQuickAction = (id: string) => {
     setModalError("");
     setModalSuccess("");
+    if (id === "crear-producto") {
+      setShowNewProductDrawer(true);
+      return;
+    }
+    if (id === "agregar-cliente") {
+      setShowNewCustomerDrawer(true);
+      return;
+    }
+    if (id === "crear-factura") {
+      openInvoiceEditor();
+      return;
+    }
+    if (id === "registrar-pago") {
+      openRecibirPagoView();
+      return;
+    }
+    if (id === "crear-orden-compra") {
+      openPurchaseOrderEditor();
+      return;
+    }
+    if (id === "agregar-proveedor") {
+      setShowNewVendorDrawer(true);
+      return;
+    }
+    if (id === "agregar-deposito") {
+      openDepositoBancarioView();
+      return;
+    }
+    if (id === "registrar-gasto" || id === "agregar-gasto") {
+      openGastoView();
+      return;
+    }
+    if (id === "pagar-facturas" || id === "pagar-proveedor") {
+      openPagarProveedorView();
+      return;
+    }
     setActiveModal(id);
+  };
+
+  const handleCreateCustomerDrawer = async (e?: React.FormEvent, createAnother = false) => {
+    if (e) e.preventDefault();
+    if (!newCustomerDrawerForm.name.trim()) {
+      alert("Por favor ingresa el nombre de la empresa o cliente.");
+      return;
+    }
+    setCustomerDrawerLoading(true);
+    try {
+      const res = await fetch("/api/customers", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: newCustomerDrawerForm.name,
+          macolaCode: newCustomerDrawerForm.macolaCode || `CUS-${Math.floor(100 + Math.random() * 900)}`,
+          email: newCustomerDrawerForm.email,
+          phone: newCustomerDrawerForm.phone,
+          address: newCustomerDrawerForm.address,
+          currency: newCustomerDrawerForm.currency,
+        }),
+      });
+
+      const json = await res.json();
+      if (json.success && json.data) {
+        setCustomers((prev) => [json.data, ...prev]);
+        setCustomerDrawerSuccess("¡Cliente registrado correctamente!");
+        setTimeout(() => setCustomerDrawerSuccess(""), 4000);
+
+        if (createAnother) {
+          setNewCustomerDrawerForm({
+            name: "",
+            rtn: "",
+            macolaCode: "",
+            currency: "USD",
+            email: "",
+            phone: "",
+            address: "",
+            city: "San Pedro Sula",
+            paymentTerms: "Crédito 30 días",
+            creditLimit: 0,
+          });
+        } else {
+          setShowNewCustomerDrawer(false);
+        }
+      } else {
+        alert(json.error || "Error al registrar el cliente");
+      }
+    } catch (err: any) {
+      console.error("Error creating customer:", err);
+      alert("Error al conectar con el servidor");
+    } finally {
+      setCustomerDrawerLoading(false);
+    }
+  };
+
+  const handleCreateVendorDrawer = async (e?: React.FormEvent, createAnother = false) => {
+    if (e) e.preventDefault();
+    if (!newVendorDrawerForm.name.trim()) {
+      alert("Por favor ingresa el nombre de la empresa o proveedor.");
+      return;
+    }
+    setVendorDrawerLoading(true);
+    try {
+      const res = await fetch("/api/vendors", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: newVendorDrawerForm.name,
+          macolaCode: newVendorDrawerForm.macolaCode || `VEN-${Math.floor(100 + Math.random() * 900)}`,
+          email: newVendorDrawerForm.email,
+          phone: newVendorDrawerForm.phone,
+          address: newVendorDrawerForm.address,
+          category: newVendorDrawerForm.category,
+          currency: newVendorDrawerForm.currency,
+        }),
+      });
+
+      const json = await res.json();
+      if (json.success && json.data) {
+        setVendors((prev) => [json.data, ...prev]);
+        setVendorDrawerSuccess("¡Proveedor registrado correctamente!");
+        setTimeout(() => setVendorDrawerSuccess(""), 4000);
+
+        if (createAnother) {
+          setNewVendorDrawerForm({
+            name: "",
+            rtn: "",
+            macolaCode: "",
+            currency: "USD",
+            email: "",
+            phone: "",
+            address: "",
+            city: "San Pedro Sula",
+            category: "Tintas Flexo",
+            paymentTerms: "Crédito 30 días",
+          });
+        } else {
+          setShowNewVendorDrawer(false);
+        }
+      } else {
+        alert(json.error || "Error al registrar el proveedor");
+      }
+    } catch (err: any) {
+      console.error("Error creating vendor:", err);
+      alert("Error al conectar con el servidor");
+    } finally {
+      setVendorDrawerLoading(false);
+    }
+  };
+
+  // Purchase Order Full-Page Editor State
+  const [activePOTab, setActivePOTab] = useState<"Editar" | "Vista de correo" | "Vista de PDF">("Editar");
+  const [showPOOptionsSidebar, setShowPOOptionsSidebar] = useState(false);
+  const [activePOOptionSection, setActivePOOptionSection] = useState<string | null>("general");
+  const [showPOSaveDropdown, setShowPOSaveDropdown] = useState(false);
+  const [showPOPrintDropdown, setShowPOPrintDropdown] = useState(false);
+  const [showPOSendDropdown, setShowPOSendDropdown] = useState(false);
+  const [sendingPOEmail, setSendingPOEmail] = useState(false);
+  const [poSuccessMsg, setPOSuccessMsg] = useState("");
+
+  const [poForm, setPOForm] = useState({
+    num: "OC-2026-085",
+    vendorName: "Insumos Flexográficos S.A.",
+    vendorEmail: "compras@insumosflexo.hn",
+    vendorAddress: "Zona Industrial San José, San Pedro Sula",
+    category: "Tintas Flexo",
+    currency: "USD",
+    date: "2026-09-03",
+    expectedDate: "2026-09-18",
+    paymentTerms: "Crédito 30 días",
+    status: "Aprobada",
+    notes: "Entregar en almacén central de materias primas con certificado de calidad del lote.",
+    lines: [
+      { id: "1", productName: "Tinta Flexográfica Cian UV", sku: "TIN-UV-01", description: "Cubeta de 20kg alta viscosidad", quantity: 5, rate: 450.00, total: 2250.00 },
+      { id: "2", productName: "Tinta Flexográfica Magenta UV", sku: "TIN-UV-02", description: "Cubeta de 20kg alta viscosidad", quantity: 5, rate: 450.00, total: 2250.00 },
+      { id: "3", productName: "Solvente de Limpieza Flexo", sku: "SOL-FL-09", description: "Tambor de 55 galones", quantity: 2, rate: 975.00, total: 1950.00 },
+    ],
+  });
+
+  const poSubtotal = poForm.lines.reduce((acc, l) => acc + (l.total || 0), 0);
+  const poTotal = poSubtotal;
+
+  const openPurchaseOrderEditor = (poToEdit?: any) => {
+    if (poToEdit) {
+      setSelectedPurchaseOrder(poToEdit);
+      setPOForm({
+        num: poToEdit.num,
+        vendorName: poToEdit.vendor,
+        vendorEmail: "compras@insumosflexo.hn",
+        vendorAddress: "Zona Industrial San José, San Pedro Sula",
+        category: poToEdit.category || "Tintas Flexo",
+        currency: "USD",
+        date: poToEdit.date,
+        expectedDate: "2026-09-20",
+        paymentTerms: "Crédito 30 días",
+        status: poToEdit.status,
+        notes: "Entregar en almacén central de materias primas con certificado de calidad del lote.",
+        lines: [
+          { id: "1", productName: `${poToEdit.category} - Lote de Insumos`, sku: "INS-001", description: `Suministro de insumos categoría ${poToEdit.category}`, quantity: 1, rate: poToEdit.total, total: poToEdit.total }
+        ],
+      });
+    } else {
+      const nextNum = `OC-2026-${Math.floor(100 + Math.random() * 900)}`;
+      setSelectedPurchaseOrder(null);
+      setPOForm({
+        num: nextNum,
+        vendorName: vendors[0]?.name || "Insumos Flexográficos S.A.",
+        vendorEmail: vendors[0]?.email || "compras@insumosflexo.hn",
+        vendorAddress: vendors[0]?.address || "Zona Industrial San José, San Pedro Sula",
+        category: "Tintas Flexo",
+        currency: "USD",
+        date: new Date().toISOString().split("T")[0],
+        expectedDate: "2026-09-20",
+        paymentTerms: "Crédito 30 días",
+        status: "Aprobada",
+        notes: "Favor incluir certificado de análisis y cumplir normas de seguridad en transporte.",
+        lines: [
+          { id: "1", productName: "Materia Prima Flexográfica", sku: "MAT-FLX-01", description: "Insumo de producción estándar", quantity: 10, rate: 250.00, total: 2500.00 },
+        ],
+      });
+    }
+    setActiveModal(null);
+    setCurrentView("orden-compra-editor");
+  };
+
+  const closePurchaseOrderEditor = () => {
+    setCurrentView("lista-ordenes-compra");
+  };
+
+  const handlePOLineChange = (id: string, field: string, val: any) => {
+    setPOForm((prev) => {
+      const newLines = prev.lines.map((l) => {
+        if (l.id !== id) return l;
+        const updated = { ...l, [field]: val };
+        if (field === "quantity" || field === "rate") {
+          updated.total = (Number(updated.quantity) || 0) * (Number(updated.rate) || 0);
+        }
+        return updated;
+      });
+      return { ...prev, lines: newLines };
+    });
+  };
+
+  const handleAddPOLine = () => {
+    setPOForm((prev) => ({
+      ...prev,
+      lines: [
+        ...prev.lines,
+        {
+          id: Date.now().toString(),
+          productName: "",
+          sku: "",
+          description: "",
+          quantity: 1,
+          rate: 0,
+          total: 0,
+        },
+      ],
+    }));
+  };
+
+  const handleRemovePOLine = (id: string) => {
+    if (poForm.lines.length <= 1) return;
+    setPOForm((prev) => ({
+      ...prev,
+      lines: prev.lines.filter((l) => l.id !== id),
+    }));
+  };
+
+  const handleSavePOEditor = (statusOverride?: string) => {
+    const finalStatus = statusOverride || poForm.status;
+    const poTotalVal = poForm.lines.reduce((acc, l) => acc + l.total, 0);
+    const existing = purchaseOrders.find((p) => p.num === poForm.num);
+    if (existing) {
+      setPurchaseOrders((prev) =>
+        prev.map((p) =>
+          p.num === poForm.num
+            ? {
+                ...p,
+                vendor: poForm.vendorName,
+                category: poForm.category,
+                total: poTotalVal,
+                status: finalStatus,
+                date: poForm.date,
+              }
+            : p
+        )
+      );
+    } else {
+      setPurchaseOrders((prev) => [
+        {
+          num: poForm.num,
+          date: poForm.date,
+          vendor: poForm.vendorName,
+          category: poForm.category,
+          total: poTotalVal,
+          status: finalStatus,
+        },
+        ...prev,
+      ]);
+    }
+    setPOSuccessMsg("¡Orden de compra guardada exitosamente!");
+    setTimeout(() => setPOSuccessMsg(""), 3500);
+  };
+
+  const handleSendPOEmail = async () => {
+    setSendingPOEmail(true);
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 800));
+      handleSavePOEditor("Aprobada");
+      setPOSuccessMsg(`¡Orden de compra ${poForm.num} enviada con éxito por correo a ${poForm.vendorName} (${poForm.vendorEmail})!`);
+      setTimeout(() => setPOSuccessMsg(""), 4500);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setSendingPOEmail(false);
+    }
+  };
+
+  // Depósito Bancario Full-Page State
+  const [depositForm, setDepositForm] = useState({
+    account: "1002 - Banco Ficohsa USD",
+    accountBalance: 45200.00,
+    date: new Date().toISOString().split("T")[0],
+    currency: "USD",
+    memo: "",
+    cashbackAccount: "",
+    cashbackMemo: "",
+    cashbackAmount: 0,
+    lines: [
+      { id: "1", receivedFrom: "", account: "1100 - Cuentas por Cobrar", memo: "", paymentMethod: "Transferencia bancaria", reference: "", amount: 0 },
+    ],
+  });
+
+  const [depositSuccessMsg, setDepositSuccessMsg] = useState("");
+  const [showDepositSaveDropdown, setShowDepositSaveDropdown] = useState(false);
+  const [previousDepositView, setPreviousDepositView] = useState<NavItem>("dashboard");
+
+  const openDepositoBancarioView = () => {
+    if (currentView !== "deposito-bancario") {
+      setPreviousDepositView(currentView);
+    }
+    setDepositForm({
+      account: "1002 - Banco Ficohsa USD",
+      accountBalance: 45200.00,
+      date: new Date().toISOString().split("T")[0],
+      currency: "USD",
+      memo: "",
+      cashbackAccount: "",
+      cashbackMemo: "",
+      cashbackAmount: 0,
+      lines: [
+        { id: Date.now().toString(), receivedFrom: "", account: "1100 - Cuentas por Cobrar", memo: "", paymentMethod: "Transferencia bancaria", reference: "", amount: 0 },
+      ],
+    });
+    setCurrentView("deposito-bancario");
+  };
+
+  const closeDepositoBancarioView = () => {
+    setCurrentView(previousDepositView || "dashboard");
+  };
+
+  const handleDepositLineChange = (id: string, field: string, val: any) => {
+    setDepositForm((prev) => {
+      const newLines = prev.lines.map((l) => {
+        if (l.id !== id) return l;
+        const updated = { ...l, [field]: val };
+        if (field === "amount") {
+          updated.amount = Number(val) || 0;
+        }
+        return updated;
+      });
+      return { ...prev, lines: newLines };
+    });
+  };
+
+  const handleAddDepositLine = () => {
+    setDepositForm((prev) => ({
+      ...prev,
+      lines: [
+        ...prev.lines,
+        {
+          id: Date.now().toString(),
+          receivedFrom: "",
+          account: "1100 - Cuentas por Cobrar",
+          memo: "",
+          paymentMethod: "Transferencia bancaria",
+          reference: "",
+          amount: 0,
+        },
+      ],
+    }));
+  };
+
+  const handleRemoveDepositLine = (id: string) => {
+    if (depositForm.lines.length <= 1) return;
+    setDepositForm((prev) => ({
+      ...prev,
+      lines: prev.lines.filter((l) => l.id !== id),
+    }));
+  };
+
+  const handleClearAllDepositLines = () => {
+    setDepositForm((prev) => ({
+      ...prev,
+      lines: [
+        {
+          id: Date.now().toString(),
+          receivedFrom: "",
+          account: "1100 - Cuentas por Cobrar",
+          memo: "",
+          paymentMethod: "Transferencia bancaria",
+          reference: "",
+          amount: 0,
+        },
+      ],
+    }));
+  };
+
+  const depositTotalLines = depositForm.lines.reduce((acc, l) => acc + (l.amount || 0), 0);
+  const depositFinalTotal = depositTotalLines - (depositForm.cashbackAmount || 0);
+
+  const handleSaveDeposit = (createAnother = false) => {
+    setDepositSuccessMsg(`¡Depósito bancario por $${depositFinalTotal.toFixed(2)} USD registrado correctamente!`);
+    setTimeout(() => {
+      setDepositSuccessMsg("");
+      if (createAnother) {
+        setDepositForm({
+          account: "1002 - Banco Ficohsa USD",
+          accountBalance: 45200.00,
+          date: new Date().toISOString().split("T")[0],
+          currency: "USD",
+          memo: "",
+          cashbackAccount: "",
+          cashbackMemo: "",
+          cashbackAmount: 0,
+          lines: [
+            { id: Date.now().toString(), receivedFrom: "", account: "1100 - Cuentas por Cobrar", memo: "", paymentMethod: "Transferencia bancaria", reference: "", amount: 0 },
+          ],
+        });
+      } else {
+        closeDepositoBancarioView();
+      }
+    }, 1200);
+  };
+
+  // Gasto Full-Page Editor State
+  const [previousGastoView, setPreviousGastoView] = useState<NavItem>("dashboard");
+  const [showGastoSaveDropdown, setShowGastoSaveDropdown] = useState(false);
+  const [gastoSuccessMsg, setGastoSuccessMsg] = useState("");
+  
+  const [gastoForm, setGastoForm] = useState({
+    payeeId: "",
+    payeeName: "",
+    paymentAccount: "Accrued Liabilities",
+    paymentDate: new Date().toISOString().split("T")[0],
+    paymentMethod: "Efectivo",
+    refNumber: "",
+    notes: "",
+    lines: [
+      { id: "1", category: "", description: "", amount: 0 },
+      { id: "2", category: "", description: "", amount: 0 },
+    ],
+  });
+
+  const gastoTotal = useMemo(() => {
+    return gastoForm.lines.reduce((sum, line) => sum + (Number(line.amount) || 0), 0);
+  }, [gastoForm.lines]);
+
+  const openGastoView = () => {
+    setPreviousGastoView(currentView);
+    setGastoSuccessMsg("");
+    setGastoForm({
+      payeeId: "",
+      payeeName: "",
+      paymentAccount: "Accrued Liabilities",
+      paymentDate: new Date().toISOString().split("T")[0],
+      paymentMethod: "Efectivo",
+      refNumber: "",
+      notes: "",
+      lines: [
+        { id: "1", category: "", description: "", amount: 0 },
+        { id: "2", category: "", description: "", amount: 0 },
+      ],
+    });
+    setCurrentView("agregar-gasto");
+  };
+
+  const closeGastoView = () => {
+    setCurrentView(previousGastoView || "dashboard");
+  };
+
+  const handleGastoLineChange = (id: string, field: string, value: any) => {
+    setGastoForm((prev) => ({
+      ...prev,
+      lines: prev.lines.map((l) => (l.id === id ? { ...l, [field]: value } : l)),
+    }));
+  };
+
+  const handleAddGastoLine = () => {
+    setGastoForm((prev) => ({
+      ...prev,
+      lines: [
+        ...prev.lines,
+        { id: String(Date.now()), category: "", description: "", amount: 0 },
+      ],
+    }));
+  };
+
+  const handleDuplicateGastoLine = (id: string) => {
+    const target = gastoForm.lines.find((l) => l.id === id);
+    if (!target) return;
+    setGastoForm((prev) => ({
+      ...prev,
+      lines: [
+        ...prev.lines,
+        {
+          id: String(Date.now()),
+          category: target.category,
+          description: target.description,
+          amount: target.amount,
+        },
+      ],
+    }));
+  };
+
+  const handleRemoveGastoLine = (id: string) => {
+    if (gastoForm.lines.length <= 1) {
+      setGastoForm((prev) => ({
+        ...prev,
+        lines: [{ id: "1", category: "", description: "", amount: 0 }],
+      }));
+      return;
+    }
+    setGastoForm((prev) => ({
+      ...prev,
+      lines: prev.lines.filter((l) => l.id !== id),
+    }));
+  };
+
+  const handleClearAllGastoLines = () => {
+    setGastoForm((prev) => ({
+      ...prev,
+      lines: [{ id: "1", category: "", description: "", amount: 0 }],
+    }));
+  };
+
+  const handleSaveGasto = (createAnother = false) => {
+    setGastoSuccessMsg("¡Gasto registrado correctamente!");
+    setTimeout(() => {
+      setGastoSuccessMsg("");
+      if (createAnother) {
+        setGastoForm({
+          payeeId: "",
+          payeeName: "",
+          paymentAccount: "Accrued Liabilities",
+          paymentDate: new Date().toISOString().split("T")[0],
+          paymentMethod: "Efectivo",
+          refNumber: "",
+          notes: "",
+          lines: [
+            { id: "1", category: "", description: "", amount: 0 },
+            { id: "2", category: "", description: "", amount: 0 },
+          ],
+        });
+      } else {
+        closeGastoView();
+      }
+    }, 1200);
+  };
+
+  // Pagar a Proveedor State
+  const [previousPagarProveedorView, setPreviousPagarProveedorView] = useState<NavItem>("dashboard");
+  const [showPagarProveedorFilterPopover, setShowPagarProveedorFilterPopover] = useState(false); // Closed by default per user request
+  const [showPagarProveedorSaveDropdown, setShowPagarProveedorSaveDropdown] = useState(false);
+  const [pagarProveedorSuccessMsg, setPagarProveedorSuccessMsg] = useState("");
+  
+  const [pagarProveedorForm, setPagarProveedorForm] = useState({
+    account: "Seleccionar una cuenta",
+    paymentDate: new Date().toISOString().split("T")[0],
+    paymentMethod: "Transferencia Bancaria",
+    refNumber: "",
+    currency: "USD - Dólar estadounidense",
+    dueDateFilter: "Últimos 365 días",
+    dateFrom: "",
+    dateTo: "",
+    payeeFilter: "Todo",
+    onlyOverdue: false,
+  });
+
+  const [vendorBills, setVendorBills] = useState<Array<{
+    id: string;
+    vendorName: string;
+    billNumber: string;
+    dueDate: string;
+    originalAmount: number;
+    balanceDue: number;
+  }>>([]);
+
+  const [selectedBillIds, setSelectedBillIds] = useState<string[]>([]);
+  const [customBillAmounts, setCustomBillAmounts] = useState<Record<string, number>>({});
+
+  const totalPagarSum = useMemo(() => {
+    return selectedBillIds.reduce((sum, id) => {
+      const bill = vendorBills.find((b) => b.id === id);
+      const amount = customBillAmounts[id] ?? bill?.balanceDue ?? 0;
+      return sum + (Number(amount) || 0);
+    }, 0);
+  }, [selectedBillIds, vendorBills, customBillAmounts]);
+
+  const openPagarProveedorView = () => {
+    setPreviousPagarProveedorView(currentView);
+    setPagarProveedorSuccessMsg("");
+    setShowPagarProveedorFilterPopover(false);
+    
+    // Map existing pending/approved/received Purchase Orders from database/state to vendorBills
+    const mappedBills = purchaseOrders
+      .filter((po) => po.status !== "Cancelada" && po.status !== "Pagada")
+      .map((po) => ({
+        id: po.num,
+        vendorName: po.vendor,
+        billNumber: po.num,
+        dueDate: po.date,
+        originalAmount: po.total,
+        balanceDue: po.total,
+      }));
+
+    setVendorBills(mappedBills);
+    setSelectedBillIds(mappedBills.map((b) => b.id)); // Default select all available bills for payment
+    setCurrentView("pagar-proveedor");
+  };
+
+  const closePagarProveedorView = () => {
+    setCurrentView(previousPagarProveedorView || "dashboard");
+  };
+
+  const handleToggleSelectAllBills = () => {
+    if (selectedBillIds.length === vendorBills.length) {
+      setSelectedBillIds([]);
+    } else {
+      setSelectedBillIds(vendorBills.map((b) => b.id));
+    }
+  };
+
+  const handleToggleSelectBill = (id: string) => {
+    if (selectedBillIds.includes(id)) {
+      setSelectedBillIds((prev) => prev.filter((bId) => bId !== id));
+    } else {
+      setSelectedBillIds((prev) => [...prev, id]);
+    }
+  };
+
+  const handleSavePagarProveedor = (createAnother = false) => {
+    if (selectedBillIds.length === 0) return;
+    selectedBillIds.forEach((poNum) => {
+      handleUpdatePOStatus(poNum, "Pagada");
+    });
+
+    setPagarProveedorSuccessMsg(`¡Pago por $${totalPagarSum.toLocaleString("es-HN", { minimumFractionDigits: 2 })} USD procesado con éxito!`);
+    setTimeout(() => {
+      setPagarProveedorSuccessMsg("");
+      if (createAnother) {
+        setVendorBills((prev) => prev.filter((b) => !selectedBillIds.includes(b.id)));
+        setSelectedBillIds([]);
+      } else {
+        closePagarProveedorView();
+      }
+    }, 1400);
   };
 
   const handleCreateCustomer = async (e: React.FormEvent) => {
@@ -647,6 +2001,147 @@ export default function AdminDashboard() {
       }, 1000);
     } catch (err: any) {
       setModalError(err.message || "Error al registrar proveedor");
+    } finally {
+      setModalLoading(false);
+    }
+  };
+
+  const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
+  const [editingVendor, setEditingVendor] = useState<Vendor | null>(null);
+
+  const handleOpenEditCustomer = (c: Customer) => {
+    setEditingCustomer(c);
+    setCustomerForm({
+      name: c.name || "",
+      macolaCode: c.macolaCode || "",
+      email: c.email || "",
+      phone: c.phone || "",
+      address: c.address || "",
+      currency: c.currency || "USD",
+    });
+    setModalError("");
+    setModalSuccess("");
+    setActiveModal("editar-cliente");
+  };
+
+  const handleUpdateCustomer = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingCustomer) return;
+    setModalLoading(true);
+    setModalError("");
+    try {
+      const res = await fetch(`/api/customers/${editingCustomer.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(customerForm),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "Error al actualizar cliente");
+      }
+      setModalSuccess("¡Cliente actualizado exitosamente!");
+      await loadDashboardData();
+      setTimeout(() => {
+        setActiveModal(null);
+        setEditingCustomer(null);
+        setModalSuccess("");
+      }, 1000);
+    } catch (err: any) {
+      setModalError(err.message || "Error al actualizar cliente");
+    } finally {
+      setModalLoading(false);
+    }
+  };
+
+  const handleDeleteCustomer = async () => {
+    if (!editingCustomer) return;
+    if (!confirm(`¿Eliminar al cliente "${editingCustomer.name}"?`)) return;
+    setModalLoading(true);
+    setModalError("");
+    try {
+      const res = await fetch(`/api/customers/${editingCustomer.id}`, { method: "DELETE" });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "Error al eliminar cliente");
+      }
+      setModalSuccess("¡Cliente eliminado!");
+      await loadDashboardData();
+      setTimeout(() => {
+        setActiveModal(null);
+        setEditingCustomer(null);
+        setModalSuccess("");
+      }, 1000);
+    } catch (err: any) {
+      setModalError(err.message || "Error al eliminar cliente");
+    } finally {
+      setModalLoading(false);
+    }
+  };
+
+  const handleOpenEditVendor = (v: Vendor) => {
+    setEditingVendor(v);
+    setVendorForm({
+      name: v.name || "",
+      macolaCode: v.macolaCode || "",
+      email: v.email || "",
+      phone: v.phone || "",
+      address: v.address || "",
+      currency: v.currency || "USD",
+    });
+    setModalError("");
+    setModalSuccess("");
+    setActiveModal("editar-proveedor");
+  };
+
+  const handleUpdateVendor = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingVendor) return;
+    setModalLoading(true);
+    setModalError("");
+    try {
+      const res = await fetch(`/api/vendors/${editingVendor.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(vendorForm),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "Error al actualizar proveedor");
+      }
+      setModalSuccess("¡Proveedor actualizado exitosamente!");
+      await loadDashboardData();
+      setTimeout(() => {
+        setActiveModal(null);
+        setEditingVendor(null);
+        setModalSuccess("");
+      }, 1000);
+    } catch (err: any) {
+      setModalError(err.message || "Error al actualizar proveedor");
+    } finally {
+      setModalLoading(false);
+    }
+  };
+
+  const handleDeleteVendor = async () => {
+    if (!editingVendor) return;
+    if (!confirm(`¿Eliminar al proveedor "${editingVendor.name}"?`)) return;
+    setModalLoading(true);
+    setModalError("");
+    try {
+      const res = await fetch(`/api/vendors/${editingVendor.id}`, { method: "DELETE" });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "Error al eliminar proveedor");
+      }
+      setModalSuccess("¡Proveedor eliminado!");
+      await loadDashboardData();
+      setTimeout(() => {
+        setActiveModal(null);
+        setEditingVendor(null);
+        setModalSuccess("");
+      }, 1000);
+    } catch (err: any) {
+      setModalError(err.message || "Error al eliminar proveedor");
     } finally {
       setModalLoading(false);
     }
@@ -795,10 +2290,16 @@ export default function AdminDashboard() {
 
   const DETAIL_TYPES_MAP: Record<string, string[]> = {
     "Efectivo y equivalentes de efectivo": [
+      "Ahorros",
+      "Alquileres de propiedad fiduciaria",
       "Banco",
       "Caja chica",
+      "Cuenta de anticipos de clientes",
       "Dinero en efectivo",
       "Dinero recibido sin depositar",
+      "Efectivo disponible",
+      "Efectivo y equivalentes de efectivo",
+      "Mercado monetario",
     ],
     "Cuentas por cobrar (C/C)": [
       "Cuentas por cobrar",
@@ -1274,6 +2775,21 @@ export default function AdminDashboard() {
             {!sidebarCollapsed && <span>Clientes ({customers.length})</span>}
           </button>
 
+          {/* Facturas (abajo de Clientes) */}
+          <button
+            onClick={() => setCurrentView("lista-facturas")}
+            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition cursor-pointer ${
+              currentView === "lista-facturas" || currentView === "factura-editor"
+                ? "bg-[#fff7ed] text-[#f6821f] font-semibold shadow-xs"
+                : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+            }`}
+          >
+            <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            {!sidebarCollapsed && <span>Facturas</span>}
+          </button>
+
           {/* Proveedores */}
           <button
             onClick={() => setCurrentView("proveedores")}
@@ -1287,6 +2803,21 @@ export default function AdminDashboard() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
             </svg>
             {!sidebarCollapsed && <span>Proveedores ({vendors.length})</span>}
+          </button>
+
+          {/* Órdenes de compra (abajo de Proveedores) */}
+          <button
+            onClick={() => setCurrentView("lista-ordenes-compra")}
+            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition cursor-pointer ${
+              currentView === "lista-ordenes-compra"
+                ? "bg-[#fff7ed] text-[#f6821f] font-semibold shadow-xs"
+                : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+            }`}
+          >
+            <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 11V7a4 4 0 00-8 0v4M5 11h14l1 12H4L5 11z" />
+            </svg>
+            {!sidebarCollapsed && <span>Órdenes de compra</span>}
           </button>
 
           {/* Inventario */}
@@ -1387,7 +2918,9 @@ export default function AdminDashboard() {
                   {currentView === "transacciones" && "Contabilidad / Transacciones Bancarias"}
                   {currentView === "macola-sync" && "Contabilidad / Transacciones de Integración"}
                   {currentView === "clientes" && "Directorio de Clientes"}
+                  {currentView === "lista-facturas" && "Gestión de Facturas"}
                   {currentView === "proveedores" && "Directorio de Proveedores"}
+                  {currentView === "lista-ordenes-compra" && "Gestión de Órdenes de Compra"}
                   {currentView === "inventario" && "Control Maestro de Inventario"}
                   {currentView === "configuracion" && "Configuración del Sistema"}
                 </span>
@@ -2096,13 +3629,13 @@ export default function AdminDashboard() {
               <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                 <div>
                   <div className="flex items-center gap-2">
-                    <h2 className="font-bold text-lg text-slate-900">Transacciones Bancarias &amp; Feeds</h2>
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                      En vivo
+                    <h2 className="font-bold text-lg text-slate-900">Transacciones Bancarias &amp; Conciliación</h2>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                      Cuentas Institucionales
                     </span>
                   </div>
                   <p className="text-xs text-slate-500 mt-1">
-                    Conecta tus bancos institucionales y automatiza la descarga, conciliación y categorización de movimientos.
+                    Registra tus cuentas bancarias operativas, importa extractos de movimientos y realiza la conciliación y categorización contable.
                   </p>
                 </div>
 
@@ -2114,7 +3647,7 @@ export default function AdminDashboard() {
                       await loadBankingData();
                       setTimeout(() => {
                         setBankSyncing(false);
-                        setBankToastNotification("Feeds bancarios sincronizados desde la base de datos.");
+                        setBankToastNotification("Lista de cuentas y movimientos actualizada.");
                         setTimeout(() => setBankToastNotification(""), 4000);
                       }, 600);
                     }}
@@ -2124,7 +3657,7 @@ export default function AdminDashboard() {
                     <svg className={`w-3.5 h-3.5 text-slate-500 ${bankSyncing ? "animate-spin text-[#f6821f]" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                     </svg>
-                    <span>{bankSyncing ? "Sincronizando..." : "Actualizar feeds"}</span>
+                    <span>{bankSyncing ? "Cargando..." : "Refrescar datos"}</span>
                   </button>
 
                   <button
@@ -2146,7 +3679,7 @@ export default function AdminDashboard() {
                     <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
                     </svg>
-                    <span>Conectar cuenta bancaria</span>
+                    <span>Registrar cuenta bancaria</span>
                   </button>
                 </div>
               </div>
@@ -2203,7 +3736,37 @@ export default function AdminDashboard() {
                           ></span>
                           <span className="font-bold text-xs text-slate-900 truncate max-w-[120px]">{bank.name}</span>
                         </div>
-                        <span className="text-[10px] font-mono text-slate-500 font-semibold">{bank.accountNumber}</span>
+                        <div className="flex items-center gap-1">
+                          <span className="text-[10px] font-mono text-slate-500 font-semibold">{bank.accountNumber}</span>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setEditingBank(bank);
+                            }}
+                            title="Editar cuenta bancaria"
+                            className="p-1 rounded text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition cursor-pointer"
+                          >
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                            </svg>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (confirm(`¿Seguro que deseas eliminar la cuenta bancaria ${bank.name}?`)) {
+                                handleDeleteBank(bank.id);
+                              }
+                            }}
+                            title="Eliminar cuenta bancaria"
+                            className="p-1 rounded text-slate-400 hover:text-red-600 hover:bg-red-50 transition cursor-pointer"
+                          >
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                          </button>
+                        </div>
                       </div>
 
                       <div className="space-y-1 my-2">
@@ -2679,125 +4242,575 @@ export default function AdminDashboard() {
 
           {/* ================= VIEW: CLIENTES ================= */}
           {currentView === "clientes" && (
-            <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xs">
-              <div className="p-4 border-b border-slate-100 flex items-center justify-between">
-                <h2 className="font-semibold text-sm text-slate-900">Directorio de Clientes ({filteredCustomers.length})</h2>
+            <div className="space-y-4">
+              {/* Header Action Bar (Matching Plan de Cuentas) */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <button
+                  type="button"
+                  onClick={() => setCurrentView("dashboard")}
+                  className="text-xs font-semibold text-slate-600 hover:text-slate-900 transition flex items-center gap-1.5 cursor-pointer w-fit"
+                >
+                  <svg className="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
+                  </svg>
+                  <span>Regresar a Dashboard</span>
+                </button>
+
+                <div className="flex items-center gap-3 self-end sm:self-auto">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      alert("Generando reporte de clientes...");
+                      window.print();
+                    }}
+                    className="px-4 py-2 rounded-full border border-[#f6821f] text-[#f6821f] hover:bg-[#fff7ed] text-xs font-semibold transition cursor-pointer shadow-xs"
+                  >
+                    Generar reporte
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCustomerDrawerSuccess("");
+                      setShowNewCustomerDrawer(true);
+                    }}
+                    className="px-5 py-2 rounded-full bg-[#f6821f] hover:bg-[#e07216] text-white text-xs font-bold flex items-center gap-1.5 transition cursor-pointer shadow-md shadow-[#f6821f]/20"
+                  >
+                    <span>Nuevo cliente</span>
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
+                </div>
               </div>
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs text-slate-600">
-                  <thead className="bg-slate-50 text-slate-700 font-semibold border-b border-slate-200">
-                    <tr>
-                      <th className="p-3.5">Código Macola</th>
-                      <th className="p-3.5">Nombre de Empresa / Cliente</th>
-                      <th className="p-3.5">Correo Electrónico</th>
-                      <th className="p-3.5">Teléfono</th>
-                      <th className="p-3.5">Dirección</th>
-                      <th className="p-3.5">Moneda</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {filteredCustomers.map((c) => (
-                      <tr key={c.id} className="hover:bg-slate-50/80 transition">
-                        <td className="p-3.5 font-mono text-[#f6821f] font-semibold">{c.macolaCode || "—"}</td>
-                        <td className="p-3.5 font-medium text-slate-900">{c.name}</td>
-                        <td className="p-3.5 text-slate-500">{c.email || "—"}</td>
-                        <td className="p-3.5 text-slate-500">{c.phone || "—"}</td>
-                        <td className="p-3.5 text-slate-500 truncate max-w-xs">{c.address || "—"}</td>
-                        <td className="p-3.5 font-medium">{c.currency}</td>
-                      </tr>
-                    ))}
-                    {filteredCustomers.length === 0 && (
+
+              {/* Toolbar Card (Search, filter type, print, export, settings) */}
+              <div className="bg-white border border-slate-200 rounded-2xl p-3.5 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-3">
+                <div className="flex flex-wrap items-center gap-3">
+                  {/* Search Input */}
+                  <div className="relative min-w-[240px]">
+                    <input
+                      type="text"
+                      placeholder="Filtrar por nombre o número"
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                      className="w-full pl-8 pr-3 py-1.5 text-xs rounded-xl bg-slate-50 border border-slate-200 text-slate-900 placeholder-slate-400 focus:outline-none focus:border-[#f6821f] focus:ring-1 focus:ring-[#f6821f]"
+                    />
+                    <svg className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                  </div>
+
+                  {/* Dropdown Filter Select */}
+                  <div className="relative">
+                    <select
+                      className="px-3.5 py-1.5 text-xs rounded-xl bg-slate-50 border border-slate-200 text-slate-800 focus:outline-none focus:border-[#f6821f] cursor-pointer pr-8 font-medium appearance-none"
+                    >
+                      <option value="todos">Todos los clientes</option>
+                      <option value="activos">Clientes activos</option>
+                      <option value="macola">Sincronizados Macola</option>
+                    </select>
+                    <svg className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-2.5 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </div>
+                </div>
+
+                {/* Right Action Icons (Export, Print, Settings) */}
+                <div className="flex items-center gap-1.5 self-end md:self-auto text-slate-400">
+                  <button
+                    type="button"
+                    onClick={() => alert("Exportando catálogo de clientes...")}
+                    className="p-1.5 hover:bg-slate-100 hover:text-slate-600 rounded-lg transition cursor-pointer"
+                    title="Exportar catálogo"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => window.print()}
+                    className="p-1.5 hover:bg-slate-100 hover:text-slate-600 rounded-lg transition cursor-pointer"
+                    title="Imprimir lista"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                    </svg>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setShowConfigSidebar(true)}
+                    className={`p-1.5 rounded-lg transition cursor-pointer ${
+                      showConfigSidebar ? "text-[#f6821f] bg-[#fff7ed]" : "text-slate-400 hover:text-slate-600 hover:bg-slate-100"
+                    }`}
+                    title="Personalizar tabla de clientes"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+
+              {/* Table Card */}
+              <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xs">
+                <div className="p-4 border-b border-slate-100 flex items-center justify-between">
+                  <h2 className="font-semibold text-sm text-slate-900">Directorio de Clientes ({filteredCustomers.length})</h2>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs text-slate-600">
+                    <thead className="bg-slate-50 text-slate-700 font-semibold border-b border-slate-200">
                       <tr>
-                        <td colSpan={6} className="p-8 text-center text-slate-400">No se encontraron clientes</td>
+                        <th className="p-3.5">Código Macola</th>
+                        <th className="p-3.5">Nombre de Empresa / Cliente</th>
+                        <th className="p-3.5">Correo Electrónico</th>
+                        <th className="p-3.5">Teléfono</th>
+                        <th className="p-3.5">Dirección</th>
+                        <th className="p-3.5">Moneda</th>
+                        <th className="p-3.5 text-right">Acciones</th>
                       </tr>
-                    )}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {filteredCustomers.map((c) => (
+                        <tr key={c.id} className="hover:bg-slate-50/80 transition">
+                          <td className="p-3.5 font-mono">
+                            <button
+                              type="button"
+                              onClick={() => handleOpenEditCustomer(c)}
+                              className="text-[#f6821f] font-semibold hover:underline cursor-pointer flex items-center gap-1.5 group"
+                              title="Haz clic para editar cliente"
+                            >
+                              <span>{c.macolaCode || `#${c.id.slice(0, 6)}`}</span>
+                              <svg className="w-3 h-3 text-[#f6821f] opacity-70 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                              </svg>
+                            </button>
+                          </td>
+                          <td className="p-3.5 font-medium text-slate-900">
+                            <button
+                              type="button"
+                              onClick={() => handleOpenEditCustomer(c)}
+                              className="hover:text-[#f6821f] hover:underline cursor-pointer text-left font-medium"
+                              title="Haz clic para editar cliente"
+                            >
+                              {c.name}
+                            </button>
+                          </td>
+                          <td className="p-3.5 text-slate-500">{c.email || "—"}</td>
+                          <td className="p-3.5 text-slate-500">{c.phone || "—"}</td>
+                          <td className="p-3.5 text-slate-500 truncate max-w-xs">{c.address || "—"}</td>
+                          <td className="p-3.5 font-medium">{c.currency}</td>
+                          <td className="p-3.5 text-right">
+                            <button
+                              type="button"
+                              onClick={() => handleOpenEditCustomer(c)}
+                              className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-[#fff7ed] hover:text-[#f6821f] text-slate-700 font-semibold cursor-pointer transition text-[11px] inline-flex items-center gap-1 border border-slate-200"
+                            >
+                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                              </svg>
+                              <span>Editar</span>
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                      {filteredCustomers.length === 0 && (
+                        <tr>
+                          <td colSpan={7} className="p-8 text-center text-slate-400">No se encontraron clientes</td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
           )}
 
           {/* ================= VIEW: PROVEEDORES ================= */}
           {currentView === "proveedores" && (
-            <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xs">
-              <div className="p-4 border-b border-slate-100 flex items-center justify-between">
-                <h2 className="font-semibold text-sm text-slate-900">Directorio de Proveedores ({filteredVendors.length})</h2>
+            <div className="space-y-4">
+              {/* Header Action Bar (Matching Plan de Cuentas) */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <button
+                  type="button"
+                  onClick={() => setCurrentView("dashboard")}
+                  className="text-xs font-semibold text-slate-600 hover:text-slate-900 transition flex items-center gap-1.5 cursor-pointer w-fit"
+                >
+                  <svg className="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
+                  </svg>
+                  <span>Regresar a Dashboard</span>
+                </button>
+
+                <div className="flex items-center gap-3 self-end sm:self-auto">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      alert("Generando reporte de proveedores...");
+                      window.print();
+                    }}
+                    className="px-4 py-2 rounded-full border border-[#f6821f] text-[#f6821f] hover:bg-[#fff7ed] text-xs font-semibold transition cursor-pointer shadow-xs"
+                  >
+                    Generar reporte
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setModalError("");
+                      setModalSuccess("");
+                      setShowNewVendorDrawer(true);
+                    }}
+                    className="px-5 py-2 rounded-full bg-[#f6821f] hover:bg-[#e07216] text-white text-xs font-bold flex items-center gap-1.5 transition cursor-pointer shadow-md shadow-[#f6821f]/20"
+                  >
+                    <span>Nuevo proveedor</span>
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
+                </div>
               </div>
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs text-slate-600">
-                  <thead className="bg-slate-50 text-slate-700 font-semibold border-b border-slate-200">
-                    <tr>
-                      <th className="p-3.5">Código Macola</th>
-                      <th className="p-3.5">Proveedor</th>
-                      <th className="p-3.5">Correo</th>
-                      <th className="p-3.5">Teléfono</th>
-                      <th className="p-3.5">Dirección</th>
-                      <th className="p-3.5">Moneda</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {filteredVendors.map((v) => (
-                      <tr key={v.id} className="hover:bg-slate-50/80 transition">
-                        <td className="p-3.5 font-mono text-[#f6821f] font-semibold">{v.macolaCode || "—"}</td>
-                        <td className="p-3.5 font-medium text-slate-900">{v.name}</td>
-                        <td className="p-3.5 text-slate-500">{v.email || "—"}</td>
-                        <td className="p-3.5 text-slate-500">{v.phone || "—"}</td>
-                        <td className="p-3.5 text-slate-500 truncate max-w-xs">{v.address || "—"}</td>
-                        <td className="p-3.5 font-medium">{v.currency}</td>
+
+              {/* Toolbar Card (Search, filter type, print, export, settings) */}
+              <div className="bg-white border border-slate-200 rounded-2xl p-3.5 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-3">
+                <div className="flex flex-wrap items-center gap-3">
+                  {/* Search Input */}
+                  <div className="relative min-w-[240px]">
+                    <input
+                      type="text"
+                      placeholder="Filtrar por nombre o número"
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                      className="w-full pl-8 pr-3 py-1.5 text-xs rounded-xl bg-slate-50 border border-slate-200 text-slate-900 placeholder-slate-400 focus:outline-none focus:border-[#f6821f] focus:ring-1 focus:ring-[#f6821f]"
+                    />
+                    <svg className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                  </div>
+
+                  {/* Dropdown Filter Select */}
+                  <div className="relative">
+                    <select
+                      className="px-3.5 py-1.5 text-xs rounded-xl bg-slate-50 border border-slate-200 text-slate-800 focus:outline-none focus:border-[#f6821f] cursor-pointer pr-8 font-medium appearance-none"
+                    >
+                      <option value="todos">Todos los proveedores</option>
+                      <option value="activos">Proveedores activos</option>
+                      <option value="macola">Sincronizados Macola</option>
+                    </select>
+                    <svg className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-2.5 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </div>
+                </div>
+
+                {/* Right Action Icons (Export, Print, Settings) */}
+                <div className="flex items-center gap-1.5 self-end md:self-auto text-slate-400">
+                  <button
+                    type="button"
+                    onClick={() => alert("Exportando catálogo de proveedores...")}
+                    className="p-1.5 hover:bg-slate-100 hover:text-slate-600 rounded-lg transition cursor-pointer"
+                    title="Exportar catálogo"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => window.print()}
+                    className="p-1.5 hover:bg-slate-100 hover:text-slate-600 rounded-lg transition cursor-pointer"
+                    title="Imprimir lista"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                    </svg>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setShowConfigSidebar(true)}
+                    className={`p-1.5 rounded-lg transition cursor-pointer ${
+                      showConfigSidebar ? "text-[#f6821f] bg-[#fff7ed]" : "text-slate-400 hover:text-slate-600 hover:bg-slate-100"
+                    }`}
+                    title="Personalizar tabla de proveedores"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+
+              {/* Table Card */}
+              <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xs">
+                <div className="p-4 border-b border-slate-100 flex items-center justify-between">
+                  <h2 className="font-semibold text-sm text-slate-900">Directorio de Proveedores ({filteredVendors.length})</h2>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs text-slate-600">
+                    <thead className="bg-slate-50 text-slate-700 font-semibold border-b border-slate-200">
+                      <tr>
+                        <th className="p-3.5">Código Macola</th>
+                        <th className="p-3.5">Proveedor</th>
+                        <th className="p-3.5">Correo</th>
+                        <th className="p-3.5">Teléfono</th>
+                        <th className="p-3.5">Dirección</th>
+                        <th className="p-3.5">Moneda</th>
+                        <th className="p-3.5 text-right">Acciones</th>
                       </tr>
-                    ))}
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {filteredVendors.map((v) => (
+                        <tr key={v.id} className="hover:bg-slate-50/80 transition">
+                          <td className="p-3.5 font-mono">
+                            <button
+                              type="button"
+                              onClick={() => handleOpenEditVendor(v)}
+                              className="text-[#f6821f] font-semibold hover:underline cursor-pointer flex items-center gap-1.5 group"
+                              title="Haz clic para editar proveedor"
+                            >
+                              <span>{v.macolaCode || `#${v.id.slice(0, 6)}`}</span>
+                              <svg className="w-3 h-3 text-[#f6821f] opacity-70 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                              </svg>
+                            </button>
+                          </td>
+                          <td className="p-3.5 font-medium text-slate-900">
+                            <button
+                              type="button"
+                              onClick={() => handleOpenEditVendor(v)}
+                              className="hover:text-[#f6821f] hover:underline cursor-pointer text-left font-medium"
+                              title="Haz clic para editar proveedor"
+                            >
+                              {v.name}
+                            </button>
+                          </td>
+                          <td className="p-3.5 text-slate-500">{v.email || "—"}</td>
+                          <td className="p-3.5 text-slate-500">{v.phone || "—"}</td>
+                          <td className="p-3.5 text-slate-500 truncate max-w-xs">{v.address || "—"}</td>
+                          <td className="p-3.5 font-medium">{v.currency}</td>
+                          <td className="p-3.5 text-right">
+                            <button
+                              type="button"
+                              onClick={() => handleOpenEditVendor(v)}
+                              className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-[#fff7ed] hover:text-[#f6821f] text-slate-700 font-semibold cursor-pointer transition text-[11px] inline-flex items-center gap-1 border border-slate-200"
+                            >
+                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                              </svg>
+                              <span>Editar</span>
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
                     {filteredVendors.length === 0 && (
                       <tr>
-                        <td colSpan={6} className="p-8 text-center text-slate-400">No se encontraron proveedores</td>
+                        <td colSpan={7} className="p-8 text-center text-slate-400">No se encontraron proveedores</td>
                       </tr>
                     )}
                   </tbody>
                 </table>
               </div>
             </div>
-          )}
+          </div>
+        )}
 
           {/* ================= VIEW: INVENTARIO ================= */}
           {currentView === "inventario" && (
-            <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xs">
-              <div className="p-4 border-b border-slate-100 flex items-center justify-between">
-                <div>
-                  <h2 className="font-semibold text-sm text-slate-900">Control Maestro de Inventario ({filteredInventory.length})</h2>
-                  <p className="text-xs text-slate-500">Catálogo de SKUs, existencias y costos unitarios</p>
+            <div className="space-y-4">
+              {/* Header Action Bar (Matching Plan de Cuentas & Clientes) */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <button
+                  type="button"
+                  onClick={() => setCurrentView("dashboard")}
+                  className="text-xs font-semibold text-slate-600 hover:text-slate-900 transition flex items-center gap-1.5 cursor-pointer w-fit"
+                >
+                  <svg className="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
+                  </svg>
+                  <span>Regresar a Dashboard</span>
+                </button>
+
+                <div className="flex items-center gap-3 self-end sm:self-auto">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      alert("Generando reporte de inventario...");
+                      window.print();
+                    }}
+                    className="px-4 py-2 rounded-full border border-[#f6821f] text-[#f6821f] hover:bg-[#fff7ed] text-xs font-semibold transition cursor-pointer shadow-xs"
+                  >
+                    Generar reporte
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setShowNewProductDrawer(true)}
+                    className="px-5 py-2 rounded-full bg-[#f6821f] hover:bg-[#e07216] text-white text-xs font-bold flex items-center gap-1.5 transition cursor-pointer shadow-md shadow-[#f6821f]/20"
+                  >
+                    <span>Nuevo producto</span>
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
                 </div>
               </div>
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs text-slate-600">
-                  <thead className="bg-slate-50 text-slate-700 font-semibold border-b border-slate-200">
-                    <tr>
-                      <th className="p-3.5">SKU</th>
-                      <th className="p-3.5">Descripción del Artículo</th>
-                      <th className="p-3.5 text-right">Existencias</th>
-                      <th className="p-3.5 text-right">Costo Unitario</th>
-                      <th className="p-3.5 text-right">Precio de Venta</th>
-                      <th className="p-3.5 text-right">Valoración Total</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {filteredInventory.map((item) => (
-                      <tr key={item.id} className="hover:bg-slate-50/80 transition">
-                        <td className="p-3.5 font-mono text-[#f6821f] font-semibold">{item.sku}</td>
-                        <td className="p-3.5 font-medium text-slate-900">{item.description}</td>
-                        <td className="p-3.5 text-right font-mono font-medium">{item.quantity}</td>
-                        <td className="p-3.5 text-right font-mono font-medium">{formatCurrency(item.cost)}</td>
-                        <td className="p-3.5 text-right font-mono font-medium">{formatCurrency(item.price)}</td>
-                        <td className="p-3.5 text-right font-mono text-slate-900 font-bold">
-                          {formatCurrency(item.quantity * item.cost)}
-                        </td>
-                      </tr>
-                    ))}
-                    {filteredInventory.length === 0 && (
+
+              {/* Toolbar Card (Search, filter type, print, export, settings) */}
+              <div className="bg-white border border-slate-200 rounded-2xl p-3.5 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-3">
+                <div className="flex flex-wrap items-center gap-3">
+                  {/* Search Input */}
+                  <div className="relative min-w-[240px]">
+                    <input
+                      type="text"
+                      placeholder="Filtrar por nombre o SKU"
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                      className="w-full pl-8 pr-3 py-1.5 text-xs rounded-xl bg-slate-50 border border-slate-200 text-slate-900 placeholder-slate-400 focus:outline-none focus:border-[#f6821f] focus:ring-1 focus:ring-[#f6821f]"
+                    />
+                    <svg className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                  </div>
+
+                  {/* Dropdown Filter Select */}
+                  <div className="relative">
+                    <select
+                      className="px-3.5 py-1.5 text-xs rounded-xl bg-slate-50 border border-slate-200 text-slate-800 focus:outline-none focus:border-[#f6821f] cursor-pointer pr-8 font-medium appearance-none"
+                    >
+                      <option value="todos">Todos los productos</option>
+                      <option value="con-stock">Con inventario disponible</option>
+                      <option value="bajo-stock">Bajo inventario / Alerta</option>
+                      <option value="macola">Sincronizados Macola</option>
+                    </select>
+                    <svg className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-2.5 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </div>
+                </div>
+
+                {/* Right Action Icons (Export, Print, Settings) */}
+                <div className="flex items-center gap-1.5 self-end md:self-auto text-slate-400">
+                  <button
+                    type="button"
+                    onClick={() => alert("Exportando catálogo de productos...")}
+                    className="p-1.5 hover:bg-slate-100 hover:text-slate-600 rounded-lg transition cursor-pointer"
+                    title="Exportar catálogo"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => window.print()}
+                    className="p-1.5 hover:bg-slate-100 hover:text-slate-600 rounded-lg transition cursor-pointer"
+                    title="Imprimir lista"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                    </svg>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setShowConfigSidebar(true)}
+                    className={`p-1.5 rounded-lg transition cursor-pointer ${
+                      showConfigSidebar ? "text-[#f6821f] bg-[#fff7ed]" : "text-slate-400 hover:text-slate-600 hover:bg-slate-100"
+                    }`}
+                    title="Personalizar tabla de inventario"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+
+              {/* Table Card */}
+              <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xs">
+                <div className="p-4 border-b border-slate-100 flex items-center justify-between">
+                  <div>
+                    <h2 className="font-semibold text-sm text-slate-900">Control Maestro de Inventario ({filteredInventory.length})</h2>
+                    <p className="text-xs text-slate-500">Catálogo de SKUs, existencias y costos unitarios</p>
+                  </div>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs text-slate-600">
+                    <thead className="bg-slate-50 text-slate-700 font-semibold border-b border-slate-200">
                       <tr>
-                        <td colSpan={6} className="p-8 text-center text-slate-400">No se encontraron artículos en inventario</td>
+                        <th className="p-3.5">SKU</th>
+                        <th className="p-3.5">Descripción del Artículo</th>
+                        <th className="p-3.5 text-right">Existencias</th>
+                        <th className="p-3.5 text-right">Costo Unitario</th>
+                        <th className="p-3.5 text-right">Precio de Venta</th>
+                        <th className="p-3.5 text-right">Valoración Total</th>
+                        <th className="p-3.5 text-right">Acciones</th>
                       </tr>
-                    )}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {filteredInventory.map((item) => (
+                        <tr key={item.id} className="hover:bg-slate-50/80 transition">
+                          <td className="p-3.5 font-mono text-[#f6821f] font-semibold">
+                            <button
+                              type="button"
+                              onClick={() => handleOpenEditProduct(item)}
+                              className="hover:underline cursor-pointer flex items-center gap-1.5 group"
+                              title="Haz clic para editar producto"
+                            >
+                              <span>{item.sku}</span>
+                              <svg className="w-3 h-3 text-[#f6821f] opacity-70 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                              </svg>
+                            </button>
+                          </td>
+                          <td className="p-3.5 font-medium text-slate-900">
+                            <button
+                              type="button"
+                              onClick={() => handleOpenEditProduct(item)}
+                              className="hover:text-[#f6821f] hover:underline cursor-pointer text-left font-medium"
+                              title="Haz clic para editar producto"
+                            >
+                              {item.description}
+                            </button>
+                          </td>
+                          <td className="p-3.5 text-right font-mono font-medium">{item.quantity}</td>
+                          <td className="p-3.5 text-right font-mono font-medium">{formatCurrency(item.cost)}</td>
+                          <td className="p-3.5 text-right font-mono font-medium">{formatCurrency(item.price)}</td>
+                          <td className="p-3.5 text-right font-mono text-slate-900 font-bold">
+                            {formatCurrency(item.quantity * item.cost)}
+                          </td>
+                          <td className="p-3.5 text-right font-sans">
+                            <button
+                              type="button"
+                              onClick={() => handleOpenEditProduct(item)}
+                              className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-[#fff7ed] hover:text-[#f6821f] text-slate-700 font-semibold cursor-pointer transition text-[11px] inline-flex items-center gap-1 border border-slate-200"
+                              title="Haz clic para editar producto"
+                            >
+                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                              </svg>
+                              <span>Editar</span>
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                      {filteredInventory.length === 0 && (
+                        <tr>
+                          <td colSpan={6} className="p-8 text-center text-slate-400">No se encontraron artículos en inventario</td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
           )}
@@ -2942,6 +4955,8 @@ export default function AdminDashboard() {
                       { id: "gastos", label: "Gastos" },
                       { id: "horas", label: "Horas trabajadas" },
                       { id: "monedas", label: "Monedas" },
+                      { id: "listas", label: "Todas las listas" },
+                      { id: "importar", label: "Importar datos" },
                       { id: "avanzadas", label: "Opciones avanzadas" },
                     ].map((tab) => {
                       const isActive = configSubTab === tab.id;
@@ -4117,30 +6132,100 @@ export default function AdminDashboard() {
                         <p className="text-xs text-slate-500 mb-4">Definición de periodos, cierre de libros y codificación de cuentas.</p>
 
                         <div className="divide-y divide-slate-100 text-xs">
-                          <div className="py-3 flex items-center justify-between">
-                            <span className="font-semibold text-slate-800">Primer mes del ejercicio fiscal</span>
-                            <span className="text-slate-700">Enero</span>
-                            <button className="text-[#f6821f] font-semibold hover:underline cursor-pointer">Editar</button>
+                          <div className="py-3 flex items-center justify-between gap-4">
+                            <span className="w-80 font-semibold text-slate-800 shrink-0 text-left">Primer mes del ejercicio fiscal</span>
+                            <span className="flex-1 text-slate-700 text-left">{contabilidadSettings.primerMesFiscal}</span>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setParamEditModal({
+                                  title: "Ejercicio Fiscal",
+                                  label: "Primer mes del ejercicio fiscal",
+                                  value: contabilidadSettings.primerMesFiscal,
+                                  options: ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"],
+                                  onSave: (val) => setContabilidadSettings((prev) => ({ ...prev, primerMesFiscal: val })),
+                                })
+                              }
+                              className="text-[#f6821f] font-semibold hover:underline cursor-pointer shrink-0"
+                            >
+                              Editar
+                            </button>
                           </div>
-                          <div className="py-3 flex items-center justify-between">
-                            <span className="font-semibold text-slate-800">Primer mes del año del impuesto sobre la renta</span>
-                            <span className="text-slate-700">Igual que el ejercicio fiscal (Enero)</span>
-                            <button className="text-[#f6821f] font-semibold hover:underline cursor-pointer">Editar</button>
+                          <div className="py-3 flex items-center justify-between gap-4">
+                            <span className="w-80 font-semibold text-slate-800 shrink-0 text-left">Primer mes del año del impuesto sobre la renta</span>
+                            <span className="flex-1 text-slate-700 text-left">{contabilidadSettings.primerMesImpuesto}</span>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setParamEditModal({
+                                  title: "Año Fiscal / ISR",
+                                  label: "Primer mes del año del impuesto sobre la renta",
+                                  value: contabilidadSettings.primerMesImpuesto,
+                                  options: ["Igual que el ejercicio fiscal (Enero)", "Enero", "Julio", "Octubre"],
+                                  onSave: (val) => setContabilidadSettings((prev) => ({ ...prev, primerMesImpuesto: val })),
+                                })
+                              }
+                              className="text-[#f6821f] font-semibold hover:underline cursor-pointer shrink-0"
+                            >
+                              Editar
+                            </button>
                           </div>
-                          <div className="py-3 flex items-center justify-between">
-                            <span className="font-semibold text-slate-800">Método de contabilidad</span>
-                            <span className="text-slate-700">Criterio de devengo</span>
-                            <button className="text-[#f6821f] font-semibold hover:underline cursor-pointer">Editar</button>
+                          <div className="py-3 flex items-center justify-between gap-4">
+                            <span className="w-80 font-semibold text-slate-800 shrink-0 text-left">Método de contabilidad</span>
+                            <span className="flex-1 text-slate-700 text-left">{contabilidadSettings.metodoContabilidad}</span>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setParamEditModal({
+                                  title: "Método de Contabilidad",
+                                  label: "Método de contabilidad",
+                                  value: contabilidadSettings.metodoContabilidad,
+                                  options: ["Criterio de devengo", "Base de efectivo"],
+                                  onSave: (val) => setContabilidadSettings((prev) => ({ ...prev, metodoContabilidad: val })),
+                                })
+                              }
+                              className="text-[#f6821f] font-semibold hover:underline cursor-pointer shrink-0"
+                            >
+                              Editar
+                            </button>
                           </div>
-                          <div className="py-3 flex items-center justify-between">
-                            <span className="font-semibold text-slate-800">Cierre de los libros</span>
-                            <span className="text-slate-500">Desactivado (Periodo 2026 abierto)</span>
-                            <button className="text-[#f6821f] font-semibold hover:underline cursor-pointer">Editar</button>
+                          <div className="py-3 flex items-center justify-between gap-4">
+                            <span className="w-80 font-semibold text-slate-800 shrink-0 text-left">Cierre de los libros</span>
+                            <span className="flex-1 text-slate-500 text-left">{contabilidadSettings.cierreLibros}</span>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setParamEditModal({
+                                  title: "Cierre de Libros",
+                                  label: "Estado de cierre de libros",
+                                  value: contabilidadSettings.cierreLibros,
+                                  options: ["Desactivado (Periodo 2026 abierto)", "Activado (Periodo cerrado)"],
+                                  onSave: (val) => setContabilidadSettings((prev) => ({ ...prev, cierreLibros: val })),
+                                })
+                              }
+                              className="text-[#f6821f] font-semibold hover:underline cursor-pointer shrink-0"
+                            >
+                              Editar
+                            </button>
                           </div>
-                          <div className="py-3 flex items-center justify-between">
-                            <span className="font-semibold text-slate-800">Activar números de cuenta contable</span>
-                            <span className="text-emerald-700 font-semibold">Activado</span>
-                            <button className="text-[#f6821f] font-semibold hover:underline cursor-pointer">Editar</button>
+                          <div className="py-3 flex items-center justify-between gap-4">
+                            <span className="w-80 font-semibold text-slate-800 shrink-0 text-left">Activar números de cuenta contable</span>
+                            <span className="flex-1 text-emerald-700 font-semibold text-left">{contabilidadSettings.numerosCuenta}</span>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setParamEditModal({
+                                  title: "Números de Cuenta",
+                                  label: "Activar números de cuenta contable",
+                                  value: contabilidadSettings.numerosCuenta,
+                                  options: ["Activado", "Desactivado"],
+                                  onSave: (val) => setContabilidadSettings((prev) => ({ ...prev, numerosCuenta: val })),
+                                })
+                              }
+                              className="text-[#f6821f] font-semibold hover:underline cursor-pointer shrink-0"
+                            >
+                              Editar
+                            </button>
                           </div>
                         </div>
                       </div>
@@ -4482,14 +6567,12 @@ export default function AdminDashboard() {
                                   <span className="text-slate-700">Mostrar la columna Producto/Servicio en los formularios de ventas</span>
                                   <span className="text-slate-600 font-medium">{salesSettings.mostrarColumnaProductoServicio ? "Activado" : "Desactivado"}</span>
                                 </div>
-                                <div className="flex items-center justify-between pl-6">
+                                <div className="flex items-center justify-between">
                                   <span className="text-slate-700">Mostrar columna de SKU</span>
                                   <span className="text-slate-600 font-medium">{salesSettings.mostrarColumnaSku ? "Activado" : "Desactivado"}</span>
                                 </div>
                                 <div className="flex items-center justify-between">
-                                  <span className="text-slate-700 flex items-center gap-1">
-                                    Activar <span className="text-sky-600 border-b border-dotted border-sky-600 hover:underline cursor-pointer">reglas de precios</span>
-                                  </span>
+                                  <span className="text-slate-700">Activar reglas de precios</span>
                                   <span className="text-slate-600 font-medium">{salesSettings.activarReglasPrecios ? "Activado" : "Desactivado"}</span>
                                 </div>
                                 <div className="flex items-center justify-between">
@@ -4501,10 +6584,7 @@ export default function AdminDashboard() {
                                   <span className="text-slate-600 font-medium">{salesSettings.seguimientoExistenciasInventario ? "Activado" : "Desactivado"}</span>
                                 </div>
                                 <div className="flex items-center justify-between pt-2">
-                                  <span className="text-slate-700 flex items-center gap-1.5">
-                                    Método de valoración del inventario
-                                    <span className="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full border border-slate-400 text-slate-500 text-[9px] font-serif cursor-help" title="Información de método de valoración">?</span>
-                                  </span>
+                                  <span className="text-slate-700">Método de valoración del inventario</span>
                                   <span className="text-slate-600 font-medium">{salesSettings.metodoValoracionInventario}</span>
                                 </div>
                                 <div className="flex items-center justify-between">
@@ -4512,9 +6592,7 @@ export default function AdminDashboard() {
                                   <span className="text-slate-600 font-medium">{salesSettings.metodoRecepcionInventario}</span>
                                 </div>
                                 <div className="flex items-center justify-between">
-                                  <span className="text-slate-700 flex items-center gap-1">
-                                    Reconocimiento de ingresos <span className="text-sky-600 hover:underline cursor-pointer text-[11px]">Más información</span>
-                                  </span>
+                                  <span className="text-slate-700">Reconocimiento de ingresos</span>
                                   <span className="text-slate-600 font-medium">{salesSettings.reconocimientoIngresos ? "Activado" : "Desactivado"}</span>
                                 </div>
                               </div>
@@ -5298,20 +7376,62 @@ export default function AdminDashboard() {
                         <p className="text-xs text-slate-500 mb-4">Parámetros de turnos y hojas de tiempo en planta.</p>
 
                         <div className="divide-y divide-slate-100 text-xs">
-                          <div className="py-3 flex items-center justify-between">
-                            <span className="font-semibold text-slate-800">Primer día de la semana laboral</span>
-                            <span className="text-slate-700">Lunes</span>
-                            <button className="text-[#f6821f] font-semibold hover:underline cursor-pointer">Editar</button>
+                          <div className="py-3 flex items-center justify-between gap-4">
+                            <span className="w-80 font-semibold text-slate-800 shrink-0 text-left">Primer día de la semana laboral</span>
+                            <span className="flex-1 text-slate-700 text-left">{horasSettings.primerDia}</span>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setParamEditModal({
+                                  title: "Semana Laboral",
+                                  label: "Primer día de la semana laboral",
+                                  value: horasSettings.primerDia,
+                                  options: ["Lunes", "Domingo", "Sábado"],
+                                  onSave: (val) => setHorasSettings((prev) => ({ ...prev, primerDia: val })),
+                                })
+                              }
+                              className="text-[#f6821f] font-semibold hover:underline cursor-pointer shrink-0"
+                            >
+                              Editar
+                            </button>
                           </div>
-                          <div className="py-3 flex items-center justify-between">
-                            <span className="font-semibold text-slate-800">Jornada ordinaria máxima</span>
-                            <span className="text-slate-700">8 horas / día (44 horas semanales)</span>
-                            <button className="text-[#f6821f] font-semibold hover:underline cursor-pointer">Editar</button>
+                          <div className="py-3 flex items-center justify-between gap-4">
+                            <span className="w-80 font-semibold text-slate-800 shrink-0 text-left">Jornada ordinaria máxima</span>
+                            <span className="flex-1 text-slate-700 text-left">{horasSettings.jornadaMaxima}</span>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setParamEditModal({
+                                  title: "Jornada Laboral",
+                                  label: "Jornada ordinaria máxima",
+                                  value: horasSettings.jornadaMaxima,
+                                  options: ["8 horas / día (44 horas semanales)", "8 horas / día (48 horas semanales)", "7.5 horas / día (40 horas semanales)"],
+                                  onSave: (val) => setHorasSettings((prev) => ({ ...prev, jornadaMaxima: val })),
+                                })
+                              }
+                              className="text-[#f6821f] font-semibold hover:underline cursor-pointer shrink-0"
+                            >
+                              Editar
+                            </button>
                           </div>
-                          <div className="py-3 flex items-center justify-between">
-                            <span className="font-semibold text-slate-800">Aprobación de horas extraordinarias</span>
-                            <span className="text-emerald-700 font-semibold">Requiere visto bueno de supervisión</span>
-                            <button className="text-[#f6821f] font-semibold hover:underline cursor-pointer">Editar</button>
+                          <div className="py-3 flex items-center justify-between gap-4">
+                            <span className="w-80 font-semibold text-slate-800 shrink-0 text-left">Aprobación de horas extraordinarias</span>
+                            <span className="flex-1 text-emerald-700 font-semibold text-left">{horasSettings.aprobacionHorasExtra}</span>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setParamEditModal({
+                                  title: "Horas Extraordinarias",
+                                  label: "Aprobación de horas extraordinarias",
+                                  value: horasSettings.aprobacionHorasExtra,
+                                  options: ["Requiere visto bueno de supervisión", "Aprobación automática", "Desactivado"],
+                                  onSave: (val) => setHorasSettings((prev) => ({ ...prev, aprobacionHorasExtra: val })),
+                                })
+                              }
+                              className="text-[#f6821f] font-semibold hover:underline cursor-pointer shrink-0"
+                            >
+                              Editar
+                            </button>
                           </div>
                         </div>
                       </div>
@@ -5326,25 +7446,250 @@ export default function AdminDashboard() {
                         <p className="text-xs text-slate-500 mb-4">Gestión de cuentas institucionales y multidivisa.</p>
 
                         <div className="divide-y divide-slate-100 text-xs">
-                          <div className="py-3 flex items-center justify-between">
-                            <span className="font-semibold text-slate-800">Moneda principal del sistema</span>
-                            <span className="text-slate-700 font-semibold">USD ($) Dólar estadounidense</span>
-                            <button className="text-[#f6821f] font-semibold hover:underline cursor-pointer">Editar</button>
+                          <div className="py-3 flex items-center justify-between gap-4">
+                            <span className="w-80 font-semibold text-slate-800 shrink-0 text-left">Moneda principal del sistema</span>
+                            <span className="flex-1 text-slate-700 font-semibold text-left">{monedasSettings.monedaPrincipal}</span>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setParamEditModal({
+                                  title: "Moneda Principal",
+                                  label: "Moneda principal del sistema",
+                                  value: monedasSettings.monedaPrincipal,
+                                  options: ["USD ($) Dólar estadounidense", "HNL (L) Lempira hondureño", "EUR (€) Euro"],
+                                  onSave: (val) => setMonedasSettings((prev) => ({ ...prev, monedaPrincipal: val })),
+                                })
+                              }
+                              className="text-[#f6821f] font-semibold hover:underline cursor-pointer shrink-0"
+                            >
+                              Editar
+                            </button>
                           </div>
-                          <div className="py-3 flex items-center justify-between">
-                            <span className="font-semibold text-slate-800">Multidivisa</span>
-                            <span className="text-emerald-700 font-semibold">Activado (USD, HNL)</span>
-                            <button className="text-[#f6821f] font-semibold hover:underline cursor-pointer">Editar</button>
+                          <div className="py-3 flex items-center justify-between gap-4">
+                            <span className="w-80 font-semibold text-slate-800 shrink-0 text-left">Multidivisa</span>
+                            <span className="flex-1 text-emerald-700 font-semibold text-left">{monedasSettings.multidivisa}</span>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setParamEditModal({
+                                  title: "Multidivisa",
+                                  label: "Configuración multidivisa",
+                                  value: monedasSettings.multidivisa,
+                                  options: ["Activado (USD, HNL)", "Desactivado"],
+                                  onSave: (val) => setMonedasSettings((prev) => ({ ...prev, multidivisa: val })),
+                                })
+                              }
+                              className="text-[#f6821f] font-semibold hover:underline cursor-pointer shrink-0"
+                            >
+                              Editar
+                            </button>
                           </div>
-                          <div className="py-3 flex items-center justify-between">
-                            <span className="font-semibold text-slate-800">Banco de operaciones principal</span>
-                            <span className="text-slate-700">Banco Ficohsa (Cuenta de cheques empresarial USD)</span>
-                            <button className="text-[#f6821f] font-semibold hover:underline cursor-pointer">Editar</button>
+                          <div className="py-3 flex items-center justify-between gap-4">
+                            <span className="w-80 font-semibold text-slate-800 shrink-0 text-left">Banco de operaciones principal</span>
+                            <span className="flex-1 text-slate-700 text-left">{monedasSettings.bancoPrincipal}</span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const bankOptions =
+                                  connectedBanks.length > 0
+                                    ? connectedBanks.map((b) => `${b.name} (${b.accountNumber}) ${b.currency}`)
+                                    : [
+                                        "Banco Ficohsa (•••• 2266) USD",
+                                        "BAC Credomatic (•••• 8810) USD",
+                                        "Banco Atlántida (•••• 4105) HNL",
+                                      ];
+                                setParamEditModal({
+                                  title: "Banco Operativo",
+                                  label: "Banco de operaciones principal",
+                                  value: monedasSettings.bancoPrincipal,
+                                  options: bankOptions,
+                                  onSave: (val) => setMonedasSettings((prev) => ({ ...prev, bancoPrincipal: val })),
+                                });
+                              }}
+                              className="text-[#f6821f] font-semibold hover:underline cursor-pointer shrink-0"
+                            >
+                              Editar
+                            </button>
                           </div>
-                          <div className="py-3 flex items-center justify-between">
-                            <span className="font-semibold text-slate-800">Transferencias ACH Interbancarias</span>
-                            <span className="text-emerald-700 font-semibold">Habilitadas</span>
-                            <button className="text-[#f6821f] font-semibold hover:underline cursor-pointer">Editar</button>
+                          <div className="py-3 flex items-center justify-between gap-4">
+                            <span className="w-80 font-semibold text-slate-800 shrink-0 text-left">Transferencias ACH Interbancarias</span>
+                            <span className="flex-1 text-emerald-700 font-semibold text-left">{monedasSettings.transferenciasAch}</span>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setParamEditModal({
+                                  title: "Transferencias ACH",
+                                  label: "Transferencias ACH Interbancarias",
+                                  value: monedasSettings.transferenciasAch,
+                                  options: ["Habilitadas", "Deshabilitadas"],
+                                  onSave: (val) => setMonedasSettings((prev) => ({ ...prev, transferenciasAch: val })),
+                                })
+                              }
+                              className="text-[#f6821f] font-semibold hover:underline cursor-pointer shrink-0"
+                            >
+                              Editar
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* SUBTAB: TODAS LAS LISTAS */}
+                  {configSubTab === "listas" && (
+                    <div className="max-w-5xl space-y-6 animate-in fade-in duration-150">
+                      <div>
+                        <h2 className="font-bold text-lg text-slate-900">Listas</h2>
+                        <p className="text-xs text-slate-500 mt-0.5">
+                          Catálogos del sistema para clasificar, organizar y automatizar transacciones contables y operativas.
+                        </p>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-8 pt-2">
+                        {/* Columna 1 */}
+                        <div className="space-y-7">
+                          {/* Item: Importar datos */}
+                          <div className="p-3.5 rounded-xl bg-orange-50/70 border border-[#f6821f]/30">
+                            <button
+                              type="button"
+                              onClick={() => setConfigSubTab("importar")}
+                              className="font-bold text-sm text-[#f6821f] hover:underline cursor-pointer text-left mb-1 flex items-center gap-2"
+                            >
+                              <Download className="w-4 h-4 text-[#f6821f] shrink-0" />
+                              <span>Importar datos (Clientes, Proveedores, Inventario, Catálogo)</span>
+                            </button>
+                            <p className="text-xs text-slate-600 leading-relaxed">
+                              Permite importar de forma masiva tablas de clientes, proveedores, catálogo de productos/inventario y catálogo de cuentas contables desde archivos CSV o Excel.
+                            </p>
+                          </div>
+
+                          {/* Item: Plan de cuentas */}
+                          <div>
+                            <button
+                              type="button"
+                              onClick={() => setCurrentView("plan-cuentas")}
+                              className="font-bold text-sm text-[#0066cc] hover:underline cursor-pointer text-left block mb-1"
+                            >
+                              Plan de cuentas
+                            </button>
+                            <p className="text-xs text-slate-600 leading-relaxed">
+                              Muestra tus cuentas. Las cuentas de balances realizan un seguimiento de tus activos y pasivos, y las cuentas de ingresos y gastos clasifican las transacciones. Desde aquí, puedes agregar o editar cuentas.
+                            </p>
+                          </div>
+
+                          {/* Item: Transacciones recurrentes */}
+                          <div>
+                            <button
+                              type="button"
+                              onClick={() => setActiveListModal("recurrentes")}
+                              className="font-bold text-sm text-[#0066cc] hover:underline cursor-pointer text-left block mb-1"
+                            >
+                              Transacciones recurrentes
+                            </button>
+                            <p className="text-xs text-slate-600 leading-relaxed">
+                              Muestra una lista de las transacciones guardadas para volver a usarlas. Desde aquí, puedes programar las transacciones para que tengan lugar automáticamente o a través de recordatorios. También puedes guardar transacciones no programadas para usarlas en cualquier momento.
+                            </p>
+                          </div>
+
+                          {/* Item: Productos y servicios */}
+                          <div>
+                            <button
+                              type="button"
+                              onClick={() => setCurrentView("inventario")}
+                              className="font-bold text-sm text-[#0066cc] hover:underline cursor-pointer text-left block mb-1"
+                            >
+                              Productos y servicios
+                            </button>
+                            <p className="text-xs text-slate-600 leading-relaxed">
+                              Muestra los productos y servicios que vendes. Desde aquí, puedes editar la información sobre un producto o servicio, como la descripción o la tarifa que cobras.
+                            </p>
+                          </div>
+
+                          {/* Item: Categorías de productos */}
+                          <div>
+                            <button
+                              type="button"
+                              onClick={() => setActiveListModal("categorias")}
+                              className="font-bold text-sm text-[#0066cc] hover:underline cursor-pointer text-left block mb-1"
+                            >
+                              Categorías de productos
+                            </button>
+                            <p className="text-xs text-slate-600 leading-relaxed">
+                              Una forma de clasificar los artículos que vendes a clientes. Proporciona una forma de organizar rápidamente lo que vendes y ahorra tiempo al rellenar formularios de transacciones de ventas.
+                            </p>
+                          </div>
+
+                          {/* Item: Ubicaciones (Locales Físicos) */}
+                          <div>
+                            <button
+                              type="button"
+                              onClick={() => setActiveListModal("ubicaciones")}
+                              className="font-bold text-sm text-[#0066cc] hover:underline cursor-pointer text-left block mb-1"
+                            >
+                              Ubicaciones (Locales Físicos)
+                            </button>
+                            <p className="text-xs text-slate-600 leading-relaxed">
+                              Puedes usar las ubicaciones físicas para clasificar y organizar las diferentes plantas, sucursales o locales de la empresa.
+                            </p>
+                          </div>
+
+                          {/* Item: Monedas */}
+                          <div>
+                            <button
+                              type="button"
+                              onClick={() => setConfigSubTab("monedas")}
+                              className="font-bold text-sm text-[#0066cc] hover:underline cursor-pointer text-left block mb-1"
+                            >
+                              Monedas
+                            </button>
+                            <p className="text-xs text-slate-600 leading-relaxed">
+                              Gestiona las divisas y los tipos de cambio de tus clientes y proveedores.
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Columna 2 */}
+                        <div className="space-y-7">
+                          {/* Item: Métodos de pago */}
+                          <div>
+                            <button
+                              type="button"
+                              onClick={() => setActiveListModal("metodosPago")}
+                              className="font-bold text-sm text-[#0066cc] hover:underline cursor-pointer text-left block mb-1"
+                            >
+                              Métodos de pago
+                            </button>
+                            <p className="text-xs text-slate-600 leading-relaxed">
+                              Muestra los modos en los que clasificas los pagos que recibes de los clientes, como Efectivo, Cheque o Transferencia. De ese modo, puedes imprimir comprobantes de depósito cuando depositas los pagos que recibes.
+                            </p>
+                          </div>
+
+                          {/* Item: Condiciones */}
+                          <div>
+                            <button
+                              type="button"
+                              onClick={() => setActiveListModal("condiciones")}
+                              className="font-bold text-sm text-[#0066cc] hover:underline cursor-pointer text-left block mb-1"
+                            >
+                              Condiciones
+                            </button>
+                            <p className="text-xs text-slate-600 leading-relaxed">
+                              Muestra la lista de condiciones que determinan las fechas de vencimiento de los pagos de clientes o pagos a proveedores. Las condiciones también pueden especificar los descuentos aplicables por pagos anticipados. Desde aquí, puedes agregar o editar las condiciones.
+                            </p>
+                          </div>
+
+                          {/* Item: Clases */}
+                          <div>
+                            <button
+                              type="button"
+                              onClick={() => setActiveListModal("clases")}
+                              className="font-bold text-sm text-[#0066cc] hover:underline cursor-pointer text-left block mb-1"
+                            >
+                              Clases
+                            </button>
+                            <p className="text-xs text-slate-600 leading-relaxed">
+                              Muestra las clases que puedes usar para clasificar y segmentar las transacciones contables según las líneas de producción o departamentos de la empresa.
+                            </p>
                           </div>
                         </div>
                       </div>
@@ -5359,25 +7704,67 @@ export default function AdminDashboard() {
                         <p className="text-xs text-slate-500 mb-4">Configuraciones de seguridad, regionalización e infraestructura.</p>
 
                         <div className="divide-y divide-slate-100 text-xs">
-                          <div className="py-3 flex items-center justify-between">
-                            <span className="font-semibold text-slate-800">Zona horaria</span>
-                            <span className="text-slate-700">(GMT-06:00) Hora estándar central (Honduras)</span>
-                            <button className="text-[#f6821f] font-semibold hover:underline cursor-pointer">Editar</button>
+                          <div className="py-3 flex items-center justify-between gap-4">
+                            <span className="w-80 font-semibold text-slate-800 shrink-0 text-left">Zona horaria</span>
+                            <span className="flex-1 text-slate-700 text-left">{avanzadasSettings.zonaHoraria}</span>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setParamEditModal({
+                                  title: "Zona Horaria",
+                                  label: "Zona horaria",
+                                  value: avanzadasSettings.zonaHoraria,
+                                  options: ["(GMT-06:00) Hora estándar central (Honduras)", "(GMT-05:00) Hora estándar del este (US)", "(GMT+00:00) UTC"],
+                                  onSave: (val) => setAvanzadasSettings((prev) => ({ ...prev, zonaHoraria: val })),
+                                })
+                              }
+                              className="text-[#f6821f] font-semibold hover:underline cursor-pointer shrink-0"
+                            >
+                              Editar
+                            </button>
                           </div>
-                          <div className="py-3 flex items-center justify-between">
-                            <span className="font-semibold text-slate-800">Idioma del sistema</span>
-                            <span className="text-slate-700">Español (Latinoamérica)</span>
-                            <button className="text-[#f6821f] font-semibold hover:underline cursor-pointer">Editar</button>
+                          <div className="py-3 flex items-center justify-between gap-4">
+                            <span className="w-80 font-semibold text-slate-800 shrink-0 text-left">Idioma del sistema</span>
+                            <span className="flex-1 text-slate-700 text-left">{avanzadasSettings.idioma}</span>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setParamEditModal({
+                                  title: "Idioma del Sistema",
+                                  label: "Idioma del sistema",
+                                  value: avanzadasSettings.idioma,
+                                  options: ["Español (Latinoamérica)", "English (US)"],
+                                  onSave: (val) => setAvanzadasSettings((prev) => ({ ...prev, idioma: val })),
+                                })
+                              }
+                              className="text-[#f6821f] font-semibold hover:underline cursor-pointer shrink-0"
+                            >
+                              Editar
+                            </button>
                           </div>
-                          <div className="py-3 flex items-center justify-between">
-                            <span className="font-semibold text-slate-800">Cierre de sesión por inactividad</span>
-                            <span className="text-slate-700">3 horas</span>
-                            <button className="text-[#f6821f] font-semibold hover:underline cursor-pointer">Editar</button>
+                          <div className="py-3 flex items-center justify-between gap-4">
+                            <span className="w-80 font-semibold text-slate-800 shrink-0 text-left">Cierre de sesión por inactividad</span>
+                            <span className="flex-1 text-slate-700 text-left">{avanzadasSettings.cierreSesionInactividad}</span>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setParamEditModal({
+                                  title: "Inactividad",
+                                  label: "Cierre de sesión por inactividad",
+                                  value: avanzadasSettings.cierreSesionInactividad,
+                                  options: ["30 minutos", "1 hora", "3 horas", "8 horas"],
+                                  onSave: (val) => setAvanzadasSettings((prev) => ({ ...prev, cierreSesionInactividad: val })),
+                                })
+                              }
+                              className="text-[#f6821f] font-semibold hover:underline cursor-pointer shrink-0"
+                            >
+                              Editar
+                            </button>
                           </div>
-                          <div className="py-3 flex items-center justify-between">
-                            <span className="font-semibold text-slate-800">Base de datos empresarial</span>
-                            <span className="font-mono text-emerald-700 font-semibold">PostgreSQL 17.6 Enterprise</span>
-                            <span className="text-slate-400 text-[11px]">Conectada</span>
+                          <div className="py-3 flex items-center justify-between gap-4">
+                            <span className="w-80 font-semibold text-slate-800 shrink-0 text-left">Base de datos empresarial</span>
+                            <span className="flex-1 font-mono text-emerald-700 font-semibold text-left">PostgreSQL 17.6 Enterprise</span>
+                            <span className="text-slate-400 text-[11px] shrink-0">Conectada</span>
                           </div>
                         </div>
                       </div>
@@ -5398,8 +7785,837 @@ export default function AdminDashboard() {
                       </div>
                     </div>
                   )}
+
+                  {/* SUBTAB: IMPORTAR DATOS */}
+                  {configSubTab === "importar" && (
+                    <div className="max-w-4xl space-y-6 animate-in fade-in duration-150">
+                      <div>
+                        <h2 className="font-bold text-lg text-slate-900">Importación Masiva de Tablas</h2>
+                        <p className="text-xs text-slate-500 mt-0.5">
+                          Selecciona el tipo de datos que deseas importar a la base de datos de Wayne Trademark mediante archivos CSV o Excel.
+                        </p>
+                      </div>
+
+                      {importNotification && (
+                        <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold flex items-center justify-between animate-in fade-in">
+                          <span>{importNotification}</span>
+                          <button
+                            type="button"
+                            onClick={() => setImportNotification("")}
+                            className="text-emerald-600 hover:text-emerald-900 font-bold"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      )}
+
+                      {/* 1. Selection Cards */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                        {[
+                          {
+                            id: "clientes",
+                            title: "Clientes",
+                            desc: "Nombres, RTN, correos, teléfonos y direcciones de entrega",
+                            Icon: Users,
+                            color: "bg-blue-50 text-blue-700 border-blue-200",
+                          },
+                          {
+                            id: "proveedores",
+                            title: "Proveedores",
+                            desc: "Proveedores de insumos, cartón, tinta y materias primas",
+                            Icon: Factory,
+                            color: "bg-amber-50 text-amber-700 border-amber-200",
+                          },
+                          {
+                            id: "productos",
+                            title: "Productos Inventario",
+                            desc: "Catálogo de artículos, SKU, precios unitarios y stock inicial",
+                            Icon: Package,
+                            color: "bg-emerald-50 text-emerald-700 border-emerald-200",
+                          },
+                          {
+                            id: "cuentas",
+                            title: "Catálogo de Cuentas",
+                            desc: "Plan contable, números de cuenta, categorías y saldos",
+                            Icon: BookOpen,
+                            color: "bg-purple-50 text-purple-700 border-purple-200",
+                          },
+                        ].map((cat) => {
+                          const isSelected = selectedImportCategory === cat.id;
+                          const IconComp = cat.Icon;
+                          return (
+                            <button
+                              key={cat.id}
+                              type="button"
+                              onClick={() => {
+                                setSelectedImportCategory(cat.id as any);
+                                setImportPasteText("");
+                                setImportPreviewRows([]);
+                              }}
+                              className={`p-4 rounded-2xl border text-left transition cursor-pointer flex flex-col justify-between h-36 ${
+                                isSelected
+                                  ? `${cat.color} ring-2 ring-[#f6821f] font-semibold shadow-xs`
+                                  : "bg-white border-slate-200 hover:border-slate-300 text-slate-700"
+                              }`}
+                            >
+                              <div>
+                                <div className="mb-2">
+                                  <IconComp className="w-6 h-6 stroke-[2]" />
+                                </div>
+                                <h3 className="font-bold text-xs text-slate-900">{cat.title}</h3>
+                                <p className="text-[11px] text-slate-500 mt-1 line-clamp-2">{cat.desc}</p>
+                              </div>
+                              <span className="text-[10px] font-bold text-[#0066cc] uppercase tracking-wider flex items-center gap-1">
+                                {isSelected ? (
+                                  <>
+                                    <CheckCircle2 className="w-3 h-3 text-[#0066cc]" />
+                                    <span>Seleccionado</span>
+                                  </>
+                                ) : (
+                                  <span>Seleccionar</span>
+                                )}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      {/* 2. Upload / Paste Container */}
+                      <div className="border border-slate-200 rounded-2xl p-6 bg-white space-y-5 shadow-xs">
+                        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                          <div>
+                            <h3 className="font-bold text-sm text-slate-900 capitalize">
+                              Importar {selectedImportCategory === "productos" ? "Productos para inventario" : selectedImportCategory}
+                            </h3>
+                            <p className="text-xs text-slate-500">Pega los datos copiados desde Excel o carga tu archivo en formato CSV / TSV.</p>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              let sampleCsv = "";
+                              if (selectedImportCategory === "clientes") {
+                                sampleCsv = "Nombre,RTN,Correo,Telefono,Dirección\nTextiles Búfalo S.A.,08019012345678,compras@bufalo.hn,+504 2550-1122,Zip Búfalo Nave 4\nEmpaques del Norte,05019009876543,ventas@empaques.hn,+504 9988-7766,San Pedro Sula";
+                              } else if (selectedImportCategory === "proveedores") {
+                                sampleCsv = "Proveedor,RTN,Correo,Telefono,Categoria\nInsumos Flexográficos S.A.,08019998877665,contacto@insumosflexo.com,+504 2233-4455,Tintas Flexo\nPapelera Hondureña,05018887766554,pedidos@papelera.hn,+504 2550-9900,Cartón y Papel";
+                              } else if (selectedImportCategory === "productos") {
+                                sampleCsv = "SKU,Nombre,Categoria,Precio,Stock\nFLEX-1001,Cajas Flexo 12x12,Empaque Flexográfico,25.50,500\nETIQ-2002,Etiquetas Adhesivas Rollos,Etiquetas Industriales,8.75,1200";
+                              } else {
+                                sampleCsv = "Codigo,Cuenta,Tipo,Subcuenta\n1000,Caja y Bancos,Activo,No\n1010,Banco Ficohsa USD,Activo,Sí\n4000,Ingresos por Ventas Flexo,Ingreso,No";
+                              }
+
+                              const blob = new Blob([sampleCsv], { type: "text/csv;charset=utf-8;" });
+                              const url = URL.createObjectURL(blob);
+                              const link = document.createElement("a");
+                              link.setAttribute("href", url);
+                              link.setAttribute("download", `Plantilla_Ejemplo_${selectedImportCategory}.csv`);
+                              document.body.appendChild(link);
+                              link.click();
+                              document.body.removeChild(link);
+                            }}
+                            className="px-3.5 py-1.5 rounded-xl border border-slate-300 bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-semibold transition cursor-pointer flex items-center gap-1.5"
+                          >
+                            <svg className="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                            </svg>
+                            <span>Descargar plantilla CSV</span>
+                          </button>
+                        </div>
+
+                        {/* Textarea or File Parser */}
+                        <div className="space-y-3">
+                          <label className="block text-xs font-semibold text-slate-700">
+                            Pega aquí las filas de tu hoja de cálculo (Excel / Google Sheets) o CSV:
+                          </label>
+                          <textarea
+                            rows={5}
+                            value={importPasteText}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setImportPasteText(val);
+                              // Auto parse lines
+                              const lines = val.trim().split("\n").filter((l) => l.trim().length > 0);
+                              if (lines.length > 0) {
+                                const parsed = lines.map((line, idx) => {
+                                  const cols = line.includes("\t") ? line.split("\t") : line.split(",");
+                                  return { id: idx, cols };
+                                });
+                                setImportPreviewRows(parsed);
+                              } else {
+                                setImportPreviewRows([]);
+                              }
+                            }}
+                            placeholder={
+                              selectedImportCategory === "clientes"
+                                ? "Ejemplo:\nTextiles Búfalo S.A., 08019012345678, compras@bufalo.hn, +504 2550-1122, Zip Búfalo\nEmpaques del Norte, 05019009876543, ventas@empaques.hn, +504 9988-7766, San Pedro Sula"
+                                : "Pega las filas de tu tabla separadas por coma o tabulación..."
+                            }
+                            className="w-full p-3.5 text-xs font-mono rounded-xl border border-slate-300 bg-slate-50/70 text-slate-900 focus:outline-none focus:border-[#f6821f]"
+                          />
+                        </div>
+
+                        {/* Interactive Data Preview Table */}
+                        {importPreviewRows.length > 0 && (
+                          <div className="space-y-3 pt-2 animate-in fade-in duration-150">
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-bold text-slate-800">
+                                Vista previa ({importPreviewRows.length} registros detectados)
+                              </span>
+                              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                                ✓ Formato detectado correctamente
+                              </span>
+                            </div>
+
+                            <div className="max-h-60 overflow-y-auto border border-slate-200 rounded-xl overflow-x-auto">
+                              <table className="w-full text-left text-xs">
+                                <thead>
+                                  <tr className="bg-slate-100 border-b border-slate-200 text-slate-700 font-bold">
+                                    <th className="p-2.5 text-center w-10">#</th>
+                                    {importPreviewRows[0]?.cols.map((_: any, i: number) => (
+                                      <th key={i} className="p-2.5">Columna {i + 1}</th>
+                                    ))}
+                                    <th className="p-2.5 text-right">Estado</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100 font-mono">
+                                  {importPreviewRows.slice(0, 10).map((row, idx) => (
+                                    <tr key={idx} className="hover:bg-slate-50">
+                                      <td className="p-2.5 text-center text-slate-400 font-sans">{idx + 1}</td>
+                                      {row.cols.map((col: string, cIdx: number) => (
+                                        <td key={cIdx} className="p-2.5 text-slate-800 font-sans">{col.trim()}</td>
+                                      ))}
+                                      <td className="p-2.5 text-right font-sans">
+                                        <span className="px-2 py-0.5 text-[10px] font-semibold text-emerald-700 bg-emerald-50 rounded-full">
+                                          Listo
+                                        </span>
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Execute Button */}
+                        <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
+                          <span className="text-xs text-slate-500">
+                            {importPreviewRows.length > 0 ? `${importPreviewRows.length} registros listos para importación.` : "Ingresa o pega filas para continuar."}
+                          </span>
+                          <button
+                            type="button"
+                            disabled={importPreviewRows.length === 0 || isImporting}
+                            onClick={() => {
+                              setIsImporting(true);
+                              setTimeout(() => {
+                                setIsImporting(false);
+                                const count = importPreviewRows.length;
+                                const catName = selectedImportCategory === "productos" ? "Productos de inventario" : selectedImportCategory;
+                                setImportNotification(`¡Se han importado exitosamente ${count} registros en la tabla de ${catName}!`);
+                                setImportPasteText("");
+                                setImportPreviewRows([]);
+                              }, 1000);
+                            }}
+                            className="px-6 py-2.5 rounded-xl bg-[#f6821f] hover:bg-[#e07216] text-white text-xs font-bold transition cursor-pointer shadow-md disabled:opacity-50 flex items-center gap-2"
+                          >
+                            {isImporting ? (
+                              <>
+                                <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                <span>Procesando importación...</span>
+                              </>
+                            ) : (
+                              <span>Importar a la Base de Datos →</span>
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
+
+              {/* Edit Connected Bank Modal */}
+              {editingBank && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs">
+                  <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-md p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-150">
+                    <div className="flex items-center justify-between mb-2">
+                      <h3 className="text-base font-bold text-slate-900">Editar Cuenta Bancaria</h3>
+                      <button
+                        type="button"
+                        onClick={() => setEditingBank(null)}
+                        className="text-slate-400 hover:text-slate-600 text-sm font-bold cursor-pointer"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                    <p className="text-xs text-slate-500 mb-4">Actualiza la información oficial del banco en la base de datos.</p>
+
+                    <form onSubmit={handleUpdateBank} className="space-y-4 text-xs">
+                      <div>
+                        <label className="block text-slate-700 font-semibold mb-1">Nombre de la Institución Bancaria</label>
+                        <input
+                          type="text"
+                          required
+                          value={editingBank.name}
+                          onChange={(e) => setEditingBank({ ...editingBank, name: e.target.value })}
+                          className="w-full px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-300 text-slate-900 focus:outline-none focus:border-[#f6821f]"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-slate-700 font-semibold mb-1">Número de Cuenta</label>
+                          <input
+                            type="text"
+                            required
+                            value={editingBank.accountNumber}
+                            onChange={(e) => setEditingBank({ ...editingBank, accountNumber: e.target.value })}
+                            className="w-full px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-300 text-slate-900 font-mono focus:outline-none focus:border-[#f6821f]"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-slate-700 font-semibold mb-1">Moneda</label>
+                          <select
+                            value={editingBank.currency}
+                            onChange={(e) => setEditingBank({ ...editingBank, currency: e.target.value })}
+                            className="w-full px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-300 text-slate-900 focus:outline-none focus:border-[#f6821f]"
+                          >
+                            <option value="USD">USD ($)</option>
+                            <option value="HNL">HNL (L)</option>
+                            <option value="EUR">EUR (€)</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-slate-700 font-semibold mb-1">Saldo Bancario</label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={editingBank.bankBalance}
+                            onChange={(e) => setEditingBank({ ...editingBank, bankBalance: parseFloat(e.target.value) || 0 })}
+                            className="w-full px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-300 text-slate-900 font-mono focus:outline-none focus:border-[#f6821f]"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-slate-700 font-semibold mb-1">Saldo en Libros (Wayne)</label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={editingBank.bookBalance}
+                            onChange={(e) => setEditingBank({ ...editingBank, bookBalance: parseFloat(e.target.value) || 0 })}
+                            className="w-full px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-300 text-slate-900 font-mono focus:outline-none focus:border-[#f6821f]"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex justify-end gap-2.5 pt-2">
+                        <button
+                          type="button"
+                          onClick={() => setEditingBank(null)}
+                          className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium cursor-pointer"
+                        >
+                          Cancelar
+                        </button>
+                        <button
+                          type="submit"
+                          className="px-5 py-2 rounded-xl bg-[#f6821f] hover:bg-[#e07216] text-white text-xs font-semibold cursor-pointer shadow-md shadow-[#f6821f]/20"
+                        >
+                          Guardar cambios
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+                </div>
+              )}
+
+              {/* Interactive Edit Modal for Parameter Subtabs */}
+              {paramEditModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs">
+                  <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-md p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-150">
+                    <div className="flex items-center justify-between mb-1">
+                      <h3 className="text-base font-bold text-slate-900">Editar {paramEditModal.title}</h3>
+                      <button
+                        type="button"
+                        onClick={() => setParamEditModal(null)}
+                        className="text-slate-400 hover:text-slate-600 text-sm font-bold cursor-pointer"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                    <p className="text-xs text-slate-500 mb-4">Actualiza la configuración de {paramEditModal.title.toLowerCase()}.</p>
+
+                    <div className="mb-5">
+                      <label className="block text-xs font-semibold text-slate-700 mb-1.5">{paramEditModal.label}</label>
+                      {paramEditModal.options && paramEditModal.options.length > 0 ? (
+                        <select
+                          value={paramEditModal.value}
+                          onChange={(e) => setParamEditModal((prev) => (prev ? { ...prev, value: e.target.value } : null))}
+                          className="w-full px-3.5 py-2 text-xs rounded-xl bg-slate-50 border border-slate-300 text-slate-900 focus:outline-none focus:border-[#f6821f] focus:ring-1 focus:ring-[#f6821f]"
+                        >
+                          {paramEditModal.options.map((opt) => (
+                            <option key={opt} value={opt}>
+                              {opt}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <input
+                          type="text"
+                          value={paramEditModal.value}
+                          onChange={(e) => setParamEditModal((prev) => (prev ? { ...prev, value: e.target.value } : null))}
+                          className="w-full px-3.5 py-2 text-xs rounded-xl bg-slate-50 border border-slate-300 text-slate-900 focus:outline-none focus:border-[#f6821f] focus:ring-1 focus:ring-[#f6821f]"
+                        />
+                      )}
+                    </div>
+
+                    <div className="flex justify-end gap-2.5">
+                      <button
+                        type="button"
+                        onClick={() => setParamEditModal(null)}
+                        className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium cursor-pointer"
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          paramEditModal.onSave(paramEditModal.value);
+                          setParamEditModal(null);
+                        }}
+                        className="px-5 py-2 rounded-xl bg-[#f6821f] hover:bg-[#e07216] text-white text-xs font-semibold cursor-pointer shadow-md shadow-[#f6821f]/20"
+                      >
+                        Guardar cambios
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Inline Edit Modal for Other Company Settings */}
+              {activeListModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs">
+                  <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-lg p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-150">
+                    <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
+                      <div>
+                        <h3 className="text-base font-bold text-slate-900">
+                          {activeListModal === "categorias" && "Categorías de Productos"}
+                          {activeListModal === "ubicaciones" && "Ubicaciones (Locales Físicos)"}
+                          {activeListModal === "metodosPago" && "Métodos de Pago"}
+                          {activeListModal === "condiciones" && "Condiciones de Pago"}
+                          {activeListModal === "recurrentes" && "Transacciones Recurrentes"}
+                          {activeListModal === "clases" && "Clases Contables"}
+                        </h3>
+                        <p className="text-xs text-slate-500">Administra los elementos registrados en esta lista.</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setActiveListModal(null)}
+                        className="text-slate-400 hover:text-slate-700 text-base font-bold cursor-pointer"
+                      >
+                        ✕
+                      </button>
+                    </div>
+
+                    {/* MODAL 1: CATEGORÍAS */}
+                    {activeListModal === "categorias" && (
+                      <div className="space-y-4">
+                        <form
+                          onSubmit={(e) => {
+                            e.preventDefault();
+                            const form = e.target as HTMLFormElement;
+                            const input = form.elements.namedItem("catName") as HTMLInputElement;
+                            if (input && input.value.trim()) {
+                              setProductCategoriesList((prev) => [...prev, input.value.trim()]);
+                              input.value = "";
+                            }
+                          }}
+                          className="flex gap-2"
+                        >
+                          <input
+                            name="catName"
+                            type="text"
+                            placeholder="Nueva categoría (ej. Empaque Flexográfico)..."
+                            className="flex-1 px-3.5 py-2 text-xs rounded-xl bg-slate-50 border border-slate-300 text-slate-900 focus:outline-none focus:border-[#f6821f]"
+                          />
+                          <button
+                            type="submit"
+                            className="px-4 py-2 rounded-xl bg-[#f6821f] hover:bg-[#e07216] text-white text-xs font-semibold cursor-pointer shadow-xs"
+                          >
+                            + Agregar
+                          </button>
+                        </form>
+
+                        <div className="max-h-60 overflow-y-auto divide-y divide-slate-100 border border-slate-200 rounded-xl">
+                          {productCategoriesList.map((cat, idx) => (
+                            <div key={idx} className="p-3 flex items-center justify-between text-xs hover:bg-slate-50">
+                              <span className="font-medium text-slate-800">{cat}</span>
+                              <button
+                                type="button"
+                                onClick={() => setProductCategoriesList((prev) => prev.filter((_, i) => i !== idx))}
+                                className="text-slate-400 hover:text-red-600 text-xs font-bold cursor-pointer p-1"
+                                title="Eliminar"
+                              >
+                                ✕
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* MODAL 2: UBICACIONES FÍSICAS */}
+                    {activeListModal === "ubicaciones" && (
+                      <div className="space-y-4">
+                        <form
+                          onSubmit={(e) => {
+                            e.preventDefault();
+                            const form = e.target as HTMLFormElement;
+                            const nameIn = form.elements.namedItem("locName") as HTMLInputElement;
+                            const addrIn = form.elements.namedItem("locAddr") as HTMLInputElement;
+                            if (nameIn && nameIn.value.trim()) {
+                              setPhysicalLocationsList((prev) => [
+                                ...prev,
+                                { id: Date.now().toString(), name: nameIn.value.trim(), address: addrIn.value.trim() || "San Pedro Sula, Cortés" },
+                              ]);
+                              nameIn.value = "";
+                              addrIn.value = "";
+                            }
+                          }}
+                          className="space-y-2.5 bg-slate-50 p-3 rounded-xl border border-slate-200"
+                        >
+                          <input
+                            name="locName"
+                            type="text"
+                            required
+                            placeholder="Nombre del local (ej. Planta N.º 2 Zip Búfalo)..."
+                            className="w-full px-3.5 py-2 text-xs rounded-xl bg-white border border-slate-300 text-slate-900 focus:outline-none focus:border-[#f6821f]"
+                          />
+                          <input
+                            name="locAddr"
+                            type="text"
+                            placeholder="Dirección física (ej. Villanueva, Cortés)..."
+                            className="w-full px-3.5 py-2 text-xs rounded-xl bg-white border border-slate-300 text-slate-900 focus:outline-none focus:border-[#f6821f]"
+                          />
+                          <div className="flex justify-end">
+                            <button
+                              type="submit"
+                              className="px-4 py-1.5 rounded-xl bg-[#f6821f] hover:bg-[#e07216] text-white text-xs font-semibold cursor-pointer shadow-xs"
+                            >
+                              + Agregar ubicación
+                            </button>
+                          </div>
+                        </form>
+
+                        <div className="max-h-60 overflow-y-auto divide-y divide-slate-100 border border-slate-200 rounded-xl">
+                          {physicalLocationsList.map((loc) => (
+                            <div key={loc.id} className="p-3 flex items-center justify-between text-xs hover:bg-slate-50">
+                              <div>
+                                <span className="font-bold text-slate-800 block">{loc.name}</span>
+                                <span className="text-[11px] text-slate-500">{loc.address}</span>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => setPhysicalLocationsList((prev) => prev.filter((l) => l.id !== loc.id))}
+                                className="text-slate-400 hover:text-red-600 text-xs font-bold cursor-pointer p-1"
+                                title="Eliminar"
+                              >
+                                ✕
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* MODAL 3: MÉTODOS DE PAGO */}
+                    {activeListModal === "metodosPago" && (
+                      <div className="space-y-4">
+                        <form
+                          onSubmit={(e) => {
+                            e.preventDefault();
+                            const form = e.target as HTMLFormElement;
+                            const nameIn = form.elements.namedItem("pmName") as HTMLInputElement;
+                            const typeIn = form.elements.namedItem("pmType") as HTMLSelectElement;
+                            if (nameIn && nameIn.value.trim()) {
+                              setPaymentMethodsList((prev) => [
+                                ...prev,
+                                { id: Date.now().toString(), name: nameIn.value.trim(), type: typeIn.value },
+                              ]);
+                              nameIn.value = "";
+                            }
+                          }}
+                          className="flex gap-2"
+                        >
+                          <input
+                            name="pmName"
+                            type="text"
+                            required
+                            placeholder="Nuevo método (ej. Depósito directo)..."
+                            className="flex-1 px-3.5 py-2 text-xs rounded-xl bg-slate-50 border border-slate-300 text-slate-900 focus:outline-none focus:border-[#f6821f]"
+                          />
+                          <select
+                            name="pmType"
+                            className="px-3 py-2 text-xs rounded-xl bg-slate-50 border border-slate-300 text-slate-900 focus:outline-none focus:border-[#f6821f]"
+                          >
+                            <option value="Efectivo">Efectivo</option>
+                            <option value="Cheque">Cheque</option>
+                            <option value="Transferencia">Transferencia</option>
+                            <option value="Tarjeta">Tarjeta</option>
+                          </select>
+                          <button
+                            type="submit"
+                            className="px-4 py-2 rounded-xl bg-[#f6821f] hover:bg-[#e07216] text-white text-xs font-semibold cursor-pointer shadow-xs"
+                          >
+                            + Agregar
+                          </button>
+                        </form>
+
+                        <div className="max-h-60 overflow-y-auto divide-y divide-slate-100 border border-slate-200 rounded-xl">
+                          {paymentMethodsList.map((pm) => (
+                            <div key={pm.id} className="p-3 flex items-center justify-between text-xs hover:bg-slate-50">
+                              <span className="font-medium text-slate-800">{pm.name}</span>
+                              <div className="flex items-center gap-3">
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-100 text-slate-600">{pm.type}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => setPaymentMethodsList((prev) => prev.filter((p) => p.id !== pm.id))}
+                                  className="text-slate-400 hover:text-red-600 text-xs font-bold cursor-pointer p-1"
+                                  title="Eliminar"
+                                >
+                                  ✕
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* MODAL 4: CONDICIONES DE PAGO */}
+                    {activeListModal === "condiciones" && (
+                      <div className="space-y-4">
+                        <form
+                          onSubmit={(e) => {
+                            e.preventDefault();
+                            const form = e.target as HTMLFormElement;
+                            const nameIn = form.elements.namedItem("termName") as HTMLInputElement;
+                            const daysIn = form.elements.namedItem("termDays") as HTMLInputElement;
+                            if (nameIn && nameIn.value.trim()) {
+                              setPaymentTermsList((prev) => [
+                                ...prev,
+                                { id: Date.now().toString(), name: nameIn.value.trim(), days: parseInt(daysIn.value) || 0 },
+                              ]);
+                              nameIn.value = "";
+                              daysIn.value = "30";
+                            }
+                          }}
+                          className="flex gap-2"
+                        >
+                          <input
+                            name="termName"
+                            type="text"
+                            required
+                            placeholder="Nombre (ej. Neto 45 días)..."
+                            className="flex-1 px-3.5 py-2 text-xs rounded-xl bg-slate-50 border border-slate-300 text-slate-900 focus:outline-none focus:border-[#f6821f]"
+                          />
+                          <input
+                            name="termDays"
+                            type="number"
+                            defaultValue="30"
+                            placeholder="Días"
+                            className="w-20 px-3 py-2 text-xs rounded-xl bg-slate-50 border border-slate-300 text-slate-900 focus:outline-none focus:border-[#f6821f]"
+                          />
+                          <button
+                            type="submit"
+                            className="px-4 py-2 rounded-xl bg-[#f6821f] hover:bg-[#e07216] text-white text-xs font-semibold cursor-pointer shadow-xs"
+                          >
+                            + Agregar
+                          </button>
+                        </form>
+
+                        <div className="max-h-60 overflow-y-auto divide-y divide-slate-100 border border-slate-200 rounded-xl">
+                          {paymentTermsList.map((term) => (
+                            <div key={term.id} className="p-3 flex items-center justify-between text-xs hover:bg-slate-50">
+                              <span className="font-medium text-slate-800">{term.name}</span>
+                              <div className="flex items-center gap-3">
+                                <span className="text-[11px] text-slate-500 font-mono">{term.days} días plazo</span>
+                                <button
+                                  type="button"
+                                  onClick={() => setPaymentTermsList((prev) => prev.filter((t) => t.id !== term.id))}
+                                  className="text-slate-400 hover:text-red-600 text-xs font-bold cursor-pointer p-1"
+                                  title="Eliminar"
+                                >
+                                  ✕
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* MODAL 5: TRANSACCIONES RECURRENTES */}
+                    {activeListModal === "recurrentes" && (
+                      <div className="space-y-4">
+                        <form
+                          onSubmit={(e) => {
+                            e.preventDefault();
+                            const form = e.target as HTMLFormElement;
+                            const nameIn = form.elements.namedItem("recName") as HTMLInputElement;
+                            const amtIn = form.elements.namedItem("recAmt") as HTMLInputElement;
+                            const typeIn = form.elements.namedItem("recType") as HTMLSelectElement;
+                            if (nameIn && nameIn.value.trim()) {
+                              setRecurringTransactionsList((prev) => [
+                                ...prev,
+                                {
+                                  id: Date.now().toString(),
+                                  name: nameIn.value.trim(),
+                                  type: typeIn.value,
+                                  frequency: "Mensual",
+                                  amount: parseFloat(amtIn.value) || 0,
+                                },
+                              ]);
+                              nameIn.value = "";
+                              amtIn.value = "";
+                            }
+                          }}
+                          className="space-y-2.5 bg-slate-50 p-3 rounded-xl border border-slate-200"
+                        >
+                          <div className="grid grid-cols-3 gap-2">
+                            <input
+                              name="recName"
+                              type="text"
+                              required
+                              placeholder="Nombre plantilla..."
+                              className="col-span-2 px-3.5 py-2 text-xs rounded-xl bg-white border border-slate-300 text-slate-900 focus:outline-none focus:border-[#f6821f]"
+                            />
+                            <select
+                              name="recType"
+                              className="px-3 py-2 text-xs rounded-xl bg-white border border-slate-300 text-slate-900 focus:outline-none focus:border-[#f6821f]"
+                            >
+                              <option value="Gasto">Gasto</option>
+                              <option value="Ingreso">Ingreso</option>
+                            </select>
+                          </div>
+                          <div className="flex gap-2">
+                            <input
+                              name="recAmt"
+                              type="number"
+                              step="0.01"
+                              placeholder="Monto ($ / L)..."
+                              className="flex-1 px-3.5 py-2 text-xs rounded-xl bg-white border border-slate-300 text-slate-900 font-mono focus:outline-none focus:border-[#f6821f]"
+                            />
+                            <button
+                              type="submit"
+                              className="px-4 py-2 rounded-xl bg-[#f6821f] hover:bg-[#e07216] text-white text-xs font-semibold cursor-pointer shadow-xs"
+                            >
+                              + Guardar plantilla
+                            </button>
+                          </div>
+                        </form>
+
+                        <div className="max-h-60 overflow-y-auto divide-y divide-slate-100 border border-slate-200 rounded-xl">
+                          {recurringTransactionsList.map((rec) => (
+                            <div key={rec.id} className="p-3 flex items-center justify-between text-xs hover:bg-slate-50">
+                              <div>
+                                <span className="font-bold text-slate-800 block">{rec.name}</span>
+                                <span className="text-[11px] text-slate-500">{rec.type} • Frecuencia: {rec.frequency}</span>
+                              </div>
+                              <div className="flex items-center gap-3">
+                                <span className="font-mono font-bold text-slate-900">${rec.amount.toFixed(2)}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => setRecurringTransactionsList((prev) => prev.filter((r) => r.id !== rec.id))}
+                                  className="text-slate-400 hover:text-red-600 text-xs font-bold cursor-pointer p-1"
+                                  title="Eliminar"
+                                >
+                                  ✕
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* MODAL 6: CLASES CONTABLES */}
+                    {activeListModal === "clases" && (
+                      <div className="space-y-4">
+                        <form
+                          onSubmit={(e) => {
+                            e.preventDefault();
+                            const form = e.target as HTMLFormElement;
+                            const nameIn = form.elements.namedItem("clsName") as HTMLInputElement;
+                            const descIn = form.elements.namedItem("clsDesc") as HTMLInputElement;
+                            if (nameIn && nameIn.value.trim()) {
+                              setAccountingClassesList((prev) => [
+                                ...prev,
+                                { id: Date.now().toString(), name: nameIn.value.trim(), description: descIn.value.trim() },
+                              ]);
+                              nameIn.value = "";
+                              descIn.value = "";
+                            }
+                          }}
+                          className="space-y-2.5 bg-slate-50 p-3 rounded-xl border border-slate-200"
+                        >
+                          <input
+                            name="clsName"
+                            type="text"
+                            required
+                            placeholder="Nombre de la clase (ej. División Flexografía)..."
+                            className="w-full px-3.5 py-2 text-xs rounded-xl bg-white border border-slate-300 text-slate-900 focus:outline-none focus:border-[#f6821f]"
+                          />
+                          <input
+                            name="clsDesc"
+                            type="text"
+                            placeholder="Descripción de la línea o segmento..."
+                            className="w-full px-3.5 py-2 text-xs rounded-xl bg-white border border-slate-300 text-slate-900 focus:outline-none focus:border-[#f6821f]"
+                          />
+                          <div className="flex justify-end">
+                            <button
+                              type="submit"
+                              className="px-4 py-1.5 rounded-xl bg-[#f6821f] hover:bg-[#e07216] text-white text-xs font-semibold cursor-pointer shadow-xs"
+                            >
+                              + Agregar clase
+                            </button>
+                          </div>
+                        </form>
+
+                        <div className="max-h-60 overflow-y-auto divide-y divide-slate-100 border border-slate-200 rounded-xl">
+                          {accountingClassesList.map((cls) => (
+                            <div key={cls.id} className="p-3 flex items-center justify-between text-xs hover:bg-slate-50">
+                              <div>
+                                <span className="font-bold text-slate-800 block">{cls.name}</span>
+                                <span className="text-[11px] text-slate-500">{cls.description}</span>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => setAccountingClassesList((prev) => prev.filter((c) => c.id !== cls.id))}
+                                className="text-slate-400 hover:text-red-600 text-xs font-bold cursor-pointer p-1"
+                                title="Eliminar"
+                              >
+                                ✕
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="pt-3 border-t border-slate-100 flex justify-end">
+                      <button
+                        type="button"
+                        onClick={() => setActiveListModal(null)}
+                        className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold cursor-pointer"
+                      >
+                        Cerrar
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Inline Edit Modal for Other Company Settings */}
               {editingConfigKey && editingConfigKey !== "tipoEmpresa" && editingConfigKey !== "sector" && (
@@ -5448,11 +8664,3976 @@ export default function AdminDashboard() {
               )}
             </div>
           )}
+
+          {/* ================= VIEW: LISTA DE FACTURAS ================= */}
+          {currentView === "lista-facturas" && (
+            <div className="space-y-6 animate-in fade-in duration-150 p-6">
+              {/* Header */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-slate-200 shadow-xs">
+                <div>
+                  <h1 className="font-extrabold text-xl text-slate-900 tracking-tight">Historial de Facturas Emitidas</h1>
+                  <p className="text-xs text-slate-500 mt-1">
+                    Gestiona, consulta, imprime y reenvía las facturas comerciales enviadas a tus clientes.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={openInvoiceEditor}
+                  className="px-5 py-2.5 rounded-xl bg-[#f6821f] hover:bg-[#e07216] text-white text-xs font-bold transition cursor-pointer shadow-md shadow-[#f6821f]/20 flex items-center gap-2 shrink-0"
+                >
+                  <span className="text-base leading-none">+</span>
+                  <span>Crear factura</span>
+                </button>
+              </div>
+
+              {/* Stats Grid (Matching Dashboard Metric Cards) */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                {/* Total Facturado */}
+                <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-xs">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Facturado</span>
+                    <span className="p-2 rounded-xl bg-blue-50 text-blue-600">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </span>
+                  </div>
+                  <div className="text-3xl font-bold text-slate-900">${totalFacturado.toLocaleString("es-HN", { minimumFractionDigits: 2 })}</div>
+                  <p className="text-xs text-slate-500 mt-1">USD en facturación comercial</p>
+                </div>
+
+                {/* Facturas Cobradas */}
+                <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-xs">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Facturas Cobradas</span>
+                    <span className="p-2 rounded-xl bg-emerald-50 text-emerald-600">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </span>
+                  </div>
+                  <div className="text-3xl font-bold text-emerald-600">${totalCobradas.toLocaleString("es-HN", { minimumFractionDigits: 2 })}</div>
+                  <p className="text-xs text-slate-500 mt-1">{facturasCobradas.length} facturas pagadas</p>
+                </div>
+
+                {/* Pendiente de Cobro */}
+                <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-xs">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Pendiente de Cobro</span>
+                    <span className="p-2 rounded-xl bg-[#fff7ed] text-[#f6821f]">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </span>
+                  </div>
+                  <div className="text-3xl font-bold text-[#f6821f]">${totalPendientes.toLocaleString("es-HN", { minimumFractionDigits: 2 })}</div>
+                  <p className="text-xs text-slate-500 mt-1">{facturasPendientes.length} factura pendiente</p>
+                </div>
+
+                {/* Total Facturas */}
+                <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-xs">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Facturas</span>
+                    <span className="p-2 rounded-xl bg-purple-50 text-purple-600">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                    </span>
+                  </div>
+                  <div className="text-3xl font-bold text-slate-900">{invoicesList.length}</div>
+                  <p className="text-xs text-slate-500 mt-1">Emitidas este mes</p>
+                </div>
+              </div>
+
+              {/* Table Container */}
+              <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xs">
+                <div className="p-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="relative flex-1 max-w-sm">
+                    <input
+                      type="text"
+                      placeholder="Buscar por N.º de factura, cliente..."
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                      className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:outline-none focus:border-[#f6821f]"
+                    />
+                    <svg className="w-4 h-4 text-slate-400 absolute left-3 top-2.5 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                  </div>
+
+                  <span className="text-xs text-slate-500 font-medium">Mostrando {invoicesList.length} facturas emitidas</span>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead>
+                      <tr className="bg-slate-50 border-b border-slate-200 text-slate-700 font-bold">
+                        <th className="py-3 px-4">N.º Factura</th>
+                        <th className="py-3 px-4">Fecha</th>
+                        <th className="py-3 px-4">Cliente</th>
+                        <th className="py-3 px-4">Vencimiento</th>
+                        <th className="py-3 px-4 text-right">Monto Total</th>
+                        <th className="py-3 px-4 text-center">Estado</th>
+                        <th className="py-3 px-4 text-right">Acciones</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 font-mono">
+                      {invoicesList.map((fact) => (
+                        <tr key={fact.num} className="hover:bg-slate-50 transition">
+                          <td className="py-3.5 px-4 font-bold text-slate-900 font-mono">#{fact.num}</td>
+                          <td className="py-3.5 px-4 font-sans text-slate-600">{fact.date}</td>
+                          <td className="py-3.5 px-4 font-bold font-sans text-slate-900">{fact.customer}</td>
+                          <td className="py-3.5 px-4 font-sans text-slate-500">{fact.due}</td>
+                          <td className="py-3.5 px-4 text-right font-bold text-slate-900">${fact.total.toFixed(2)} USD</td>
+                          <td className="py-3.5 px-4 text-center font-sans">
+                            <select
+                              value={fact.status}
+                              onChange={(e) => handleUpdateInvoiceStatus(fact.num, e.target.value)}
+                              className={`px-2.5 py-1 rounded-full text-[10px] font-bold cursor-pointer appearance-none outline-none border transition ${
+                                fact.status === "Cobrada"
+                                  ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100"
+                                  : "bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100"
+                              }`}
+                            >
+                              <option value="Pendiente">Pendiente</option>
+                              <option value="Cobrada">Cobrada</option>
+                            </select>
+                          </td>
+                          <td className="py-3.5 px-4 text-right font-sans">
+                            <div className="flex items-center justify-end gap-2">
+                              <button
+                                type="button"
+                                onClick={openInvoiceEditor}
+                                className="px-3 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold cursor-pointer transition text-[11px]"
+                              >
+                                Editar / Ver
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => window.print()}
+                                className="px-3 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-semibold cursor-pointer transition text-[11px]"
+                              >
+                                Imprimir
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ================= VIEW: LISTA DE ÓRDENES DE COMPRA ================= */}
+          {currentView === "lista-ordenes-compra" && (
+            <div className="space-y-6 animate-in fade-in duration-150 p-6">
+              {/* Header */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-slate-200 shadow-xs">
+                <div>
+                  <h1 className="font-extrabold text-xl text-slate-900 tracking-tight">Órdenes de Compra</h1>
+                  <p className="text-xs text-slate-500 mt-1">
+                    Control y trazabilidad de las compras de materia prima e insumos a proveedores.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => openPurchaseOrderEditor()}
+                  className="px-5 py-2.5 rounded-xl bg-[#f6821f] hover:bg-[#e07216] text-white text-xs font-bold transition cursor-pointer shadow-md shadow-[#f6821f]/20 flex items-center gap-2 shrink-0"
+                >
+                  <span className="text-base leading-none">+</span>
+                  <span>Crear orden de compra</span>
+                </button>
+              </div>
+
+              {/* Stats Grid (Matching Dashboard Metric Cards) */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                {/* Monto Total en Órdenes */}
+                <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-xs">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Monto Total Órdenes</span>
+                    <span className="p-2 rounded-xl bg-blue-50 text-blue-600">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+                      </svg>
+                    </span>
+                  </div>
+                  <div className="text-3xl font-bold text-slate-900">${totalPO.toLocaleString("es-HN", { minimumFractionDigits: 2 })}</div>
+                  <p className="text-xs text-slate-500 mt-1">USD contratados</p>
+                </div>
+
+                {/* Órdenes Recibidas */}
+                <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-xs">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Órdenes Recibidas</span>
+                    <span className="p-2 rounded-xl bg-emerald-50 text-emerald-600">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                      </svg>
+                    </span>
+                  </div>
+                  <div className="text-3xl font-bold text-emerald-600">${totalPORecibidas.toLocaleString("es-HN", { minimumFractionDigits: 2 })}</div>
+                  <p className="text-xs text-slate-500 mt-1">{poRecibidas.length} orden en almacén</p>
+                </div>
+
+                {/* Pendiente de Recibir */}
+                <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-xs">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Pendiente de Recibir</span>
+                    <span className="p-2 rounded-xl bg-[#fff7ed] text-[#f6821f]">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </span>
+                  </div>
+                  <div className="text-3xl font-bold text-[#f6821f]">${totalPOPendientes.toLocaleString("es-HN", { minimumFractionDigits: 2 })}</div>
+                  <p className="text-xs text-slate-500 mt-1">{poPendientes.length} órdenes en tránsito</p>
+                </div>
+
+                {/* Órdenes Registradas */}
+                <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-xs">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Órdenes Registradas</span>
+                    <span className="p-2 rounded-xl bg-purple-50 text-purple-600">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                      </svg>
+                    </span>
+                  </div>
+                  <div className="text-3xl font-bold text-slate-900">{purchaseOrders.length}</div>
+                  <p className="text-xs text-slate-500 mt-1">Órdenes activas</p>
+                </div>
+              </div>
+
+              {/* Table Container */}
+              <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xs">
+                <div className="p-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="relative flex-1 max-w-sm">
+                    <input
+                      type="text"
+                      placeholder="Buscar por N.º de orden, proveedor..."
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                      className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:outline-none focus:border-[#f6821f]"
+                    />
+                    <svg className="w-4 h-4 text-slate-400 absolute left-3 top-2.5 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                  </div>
+
+                  <span className="text-xs text-slate-500 font-medium">Mostrando 3 órdenes de compra</span>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead>
+                      <tr className="bg-slate-50 border-b border-slate-200 text-slate-700 font-bold">
+                        <th className="py-3 px-4">N.º Orden</th>
+                        <th className="py-3 px-4">Fecha</th>
+                        <th className="py-3 px-4">Proveedor</th>
+                        <th className="py-3 px-4">Categoría Insumos</th>
+                        <th className="py-3 px-4 text-right">Monto Total</th>
+                        <th className="py-3 px-4 text-center">Estado</th>
+                        <th className="py-3 px-4 text-right">Acciones</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 font-mono">
+                      {purchaseOrders.map((po) => (
+                        <tr key={po.num} className="hover:bg-slate-50 transition">
+                          <td className="py-3.5 px-4 font-bold text-slate-900 font-mono">{po.num}</td>
+                          <td className="py-3.5 px-4 font-sans text-slate-600">{po.date}</td>
+                          <td className="py-3.5 px-4 font-bold font-sans text-slate-900">{po.vendor}</td>
+                          <td className="py-3.5 px-4 font-sans text-slate-600">{po.category}</td>
+                          <td className="py-3.5 px-4 text-right font-bold text-slate-900">${po.total.toFixed(2)} USD</td>
+                          <td className="py-3.5 px-4 text-center font-sans">
+                            <select
+                              value={po.status}
+                              onChange={(e) => handleUpdatePOStatus(po.num, e.target.value)}
+                              className={`px-2.5 py-1 rounded-full text-[10px] font-bold cursor-pointer appearance-none outline-none border transition ${
+                                po.status === "Recibida"
+                                  ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100"
+                                  : po.status === "Aprobada"
+                                  ? "bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100"
+                                  : po.status === "Cancelada"
+                                  ? "bg-red-50 text-red-700 border-red-200 hover:bg-red-100"
+                                  : "bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100"
+                              }`}
+                            >
+                              <option value="Pendiente">Pendiente</option>
+                              <option value="Aprobada">Aprobada</option>
+                              <option value="Recibida">Recibida</option>
+                              <option value="Cancelada">Cancelada</option>
+                            </select>
+                          </td>
+                          <td className="py-3.5 px-4 text-right font-sans">
+                            <div className="flex items-center justify-end gap-2">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSelectedPurchaseOrder(po);
+                                  setActiveModal("detalle-orden-compra");
+                                }}
+                                className="px-3 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold cursor-pointer transition text-[11px]"
+                              >
+                                Ver Detalle
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => window.print()}
+                                className="px-3 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-800 font-semibold cursor-pointer transition text-[11px]"
+                              >
+                                Imprimir OC
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ================= VIEW: CREAR FACTURA (Match screenshot) ================= */}
+          {currentView === "factura-editor" && (
+            <div className="fixed inset-0 z-40 flex flex-col bg-slate-100 text-slate-800 animate-in fade-in duration-150 overflow-hidden">
+              
+              {/* OFFICIAL PRINTABLE INVOICE DOCUMENT (Shown exclusively when printing via window.print) */}
+              <div id="printable-invoice-document" className="hidden print:block p-8 bg-white text-slate-900 text-xs">
+                {/* Header */}
+                <div className="flex justify-between items-start border-b-2 border-slate-900 pb-6 mb-6">
+                  <div>
+                    <h1 className="text-2xl font-black text-[#f6821f] tracking-tight">WAYNE TRADEMARK</h1>
+                    <p className="font-bold text-slate-900 text-sm mt-1">{companySettings.nombre}</p>
+                    <p className="text-slate-600 text-xs">{companySettings.direccion}</p>
+                    <p className="text-slate-600 text-xs">RTN: {companySettings.taxId} | Tel: {companySettings.telefono}</p>
+                    <p className="text-slate-600 text-xs">Correo: {companySettings.email}</p>
+                  </div>
+                  <div className="text-right">
+                    <h2 className="text-2xl font-black text-slate-900">FACTURA</h2>
+                    <p className="font-mono font-bold text-slate-800 text-base">N.º {invoiceForm.invoiceNumber}</p>
+                    <p className="text-slate-600 text-xs mt-1"><strong>Fecha de emisión:</strong> {invoiceForm.invoiceDate}</p>
+                    <p className="text-slate-600 text-xs"><strong>Vencimiento:</strong> {invoiceForm.dueDate || "A la vista"}</p>
+                    <p className="text-slate-600 text-xs"><strong>Términos:</strong> {invoiceForm.paymentTerms}</p>
+                  </div>
+                </div>
+
+                {/* Customer Details Box */}
+                <div className="bg-slate-50 p-4 rounded-xl border border-slate-300 mb-6 flex justify-between items-center">
+                  <div>
+                    <span className="text-[10px] font-bold text-slate-500 uppercase block">Facturado a:</span>
+                    <span className="font-bold text-slate-900 text-sm">{invoiceForm.customerName || "Cliente Contado"}</span>
+                    {invoiceForm.customerEmail && <p className="text-slate-600 text-xs">{invoiceForm.customerEmail}</p>}
+                  </div>
+                  <div className="text-right font-mono">
+                    <span className="text-xs text-slate-500 block">Moneda oficial:</span>
+                    <span className="font-bold text-slate-900 text-sm">USD ($)</span>
+                  </div>
+                </div>
+
+                {/* Items Table */}
+                <table className="w-full text-left border-collapse mb-6">
+                  <thead>
+                    <tr className="border-b-2 border-slate-900 bg-slate-100 text-slate-900 font-bold">
+                      <th className="py-2.5 px-3">#</th>
+                      <th className="py-2.5 px-3">Producto / Servicio</th>
+                      <th className="py-2.5 px-3">SKU</th>
+                      <th className="py-2.5 px-3">Descripción</th>
+                      <th className="py-2.5 px-3 text-right">Cant.</th>
+                      <th className="py-2.5 px-3 text-right">Precio Unit.</th>
+                      <th className="py-2.5 px-3 text-right">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200">
+                    {invoiceForm.lines.map((l, idx) => (
+                      <tr key={l.id}>
+                        <td className="py-2.5 px-3 font-mono text-slate-500">{idx + 1}</td>
+                        <td className="py-2.5 px-3 font-bold text-slate-900">{l.productName || "Artículo"}</td>
+                        <td className="py-2.5 px-3 font-mono text-slate-600">{l.sku || "—"}</td>
+                        <td className="py-2.5 px-3 text-slate-700">{l.description || "—"}</td>
+                        <td className="py-2.5 px-3 text-right font-mono">{l.quantity}</td>
+                        <td className="py-2.5 px-3 text-right font-mono">${l.rate.toFixed(2)}</td>
+                        <td className="py-2.5 px-3 text-right font-mono font-bold">${l.amount.toFixed(2)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+
+                {/* Summary & Totals */}
+                <div className="flex justify-between items-start border-t border-slate-300 pt-4 mb-8">
+                  <div className="max-w-md space-y-2 text-xs text-slate-600">
+                    {invoiceForm.paymentInstructions && (
+                      <p><strong>Instrucciones de Pago:</strong> {invoiceForm.paymentInstructions}</p>
+                    )}
+                    {invoiceForm.customerNote && (
+                      <p><strong>Nota:</strong> {invoiceForm.customerNote}</p>
+                    )}
+                  </div>
+                  <div className="w-64 space-y-2 text-right font-mono text-xs">
+                    <div className="flex justify-between text-slate-600">
+                      <span>Subtotal:</span>
+                      <span className="font-bold text-slate-900">${invoiceSubtotal.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between text-base font-black text-[#f6821f] border-t-2 border-slate-900 pt-2">
+                      <span>TOTAL A PAGAR:</span>
+                      <span>${invoiceTotal.toFixed(2)} USD</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Signatures & Footer */}
+                <div className="mt-16 pt-8 border-t border-slate-200 grid grid-cols-2 gap-12 text-center text-xs text-slate-500">
+                  <div>
+                    <div className="border-b border-slate-400 w-48 mx-auto mb-2" />
+                    <p className="font-semibold text-slate-700">Entregado por (Wayne Trademark)</p>
+                  </div>
+                  <div>
+                    <div className="border-b border-slate-400 w-48 mx-auto mb-2" />
+                    <p className="font-semibold text-slate-700">Recibido conforme (Cliente)</p>
+                  </div>
+                </div>
+              </div>
+              
+              {/* TOP HEADER BAR */}
+              <header className="bg-white border-b border-slate-200 px-6 py-3 flex items-center justify-between sticky top-0 z-30 shadow-2xs">
+                <div className="flex items-center gap-6">
+                  <h1 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                    <span>Factura {invoiceForm.invoiceNumber}</span>
+                  </h1>
+
+                  {/* Nav Sub-Tabs */}
+                  <div className="flex items-center gap-1 border-l border-slate-200 pl-6">
+                    {(["Editar", "Vista de correo electrónico", "Vista de PDF"] as const).map((tab) => (
+                      <button
+                        key={tab}
+                        type="button"
+                        onClick={() => setActiveInvoiceTab(tab)}
+                        className={`px-3.5 py-1.5 text-xs font-semibold rounded-lg transition cursor-pointer ${
+                          activeInvoiceTab === tab
+                            ? "bg-[#fff7ed] text-[#f6821f] border border-[#f6821f]/30"
+                            : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                        }`}
+                      >
+                        {tab}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Top Right Action Links */}
+                <div className="flex items-center gap-4 text-xs font-medium text-slate-600">
+                  <button
+                    type="button"
+                    onClick={() => setShowInvoiceOptionsSidebar(!showInvoiceOptionsSidebar)}
+                    className={`flex items-center gap-1 cursor-pointer font-semibold text-xs px-3 py-1.5 rounded-lg border transition ${
+                      showInvoiceOptionsSidebar
+                        ? "bg-[#fff7ed] text-[#f6821f] border-[#f6821f]/40 shadow-2xs"
+                        : "bg-slate-100 text-slate-700 hover:bg-slate-200 border-slate-200"
+                    }`}
+                  >
+                    <svg className="w-3.5 h-3.5 text-[#f6821f]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                    </svg>
+                    <span>Administrar</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={closeInvoiceEditor}
+                    className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition cursor-pointer ml-2"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              </header>
+
+              {/* MAIN CONTENT WORKSPACE */}
+              <div className="flex-1 flex overflow-hidden">
+                
+                {/* LEFT/CENTER COLUMN: INVOICE SHEET FORM */}
+                <div className="flex-1 overflow-y-auto p-6 lg:p-8 space-y-6">
+                  
+                  {activeInvoiceTab === "Editar" && (
+                    <div className="bg-white border border-slate-200 rounded-2xl p-8 shadow-xs max-w-5xl mx-auto space-y-8">
+                      
+                      {/* Notification Banner if saved */}
+                      {invoiceSuccessMsg && (
+                        <div className="p-3.5 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs rounded-xl flex items-center justify-between shadow-xs">
+                          <span className="font-bold">✓ {invoiceSuccessMsg}</span>
+                        </div>
+                      )}
+
+                      {/* HEADER ROW OF INVOICE SHEET */}
+                      <div className="flex flex-col sm:flex-row justify-between items-start gap-6 border-b border-slate-100 pb-6">
+                        {/* Company Info */}
+                        <div className="space-y-1 text-xs text-slate-600 max-w-md">
+                          <h2 className="text-xl font-black text-[#f6821f] tracking-tight mb-2">FACTURA</h2>
+                          <p className="font-bold text-slate-900 uppercase">{companySettings.nombre}</p>
+                          <p>{companySettings.email} • {companySettings.telefono}</p>
+                          <p>{companySettings.direccion}</p>
+                          <button
+                            type="button"
+                            onClick={() => setCurrentView("configuracion")}
+                            className="text-[#0066cc] font-semibold hover:underline mt-1 block cursor-pointer"
+                          >
+                            Editar datos de la empresa
+                          </button>
+                        </div>
+
+                        {/* Balance & Logo */}
+                        <div className="text-right space-y-3">
+                          <div className="text-xs font-semibold text-slate-500">
+                            Saldo pendiente: <span className="font-bold text-slate-900 text-sm">${invoiceTotal.toLocaleString("es-HN", { minimumFractionDigits: 2 })}</span>
+                          </div>
+                          {companyLogo ? (
+                            <img src={companyLogo} alt="Logo" className="h-12 object-contain ml-auto" />
+                          ) : (
+                            <div className="h-12 w-32 border-2 border-dashed border-slate-200 rounded-xl flex items-center justify-center text-[10px] text-slate-400 ml-auto">
+                              Wayne Logo
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* CUSTOMER AND DATES GRID */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-slate-50/70 p-5 rounded-2xl border border-slate-200/80">
+                        {/* Customer Selection */}
+                        <div className="space-y-2">
+                          <label className="block text-xs font-bold text-slate-700">Cliente / Empresa</label>
+                          <select
+                            value={invoiceForm.customerId}
+                            onChange={(e) => {
+                              const selected = customers.find((c) => c.id === e.target.value);
+                              setInvoiceForm({
+                                ...invoiceForm,
+                                customerId: e.target.value,
+                                customerName: selected ? selected.name : "",
+                                customerEmail: selected ? selected.email || "" : "",
+                              });
+                            }}
+                            className="w-full px-3.5 py-2 text-xs rounded-xl bg-white border border-slate-300 text-slate-900 focus:outline-none focus:border-[#f6821f] font-semibold cursor-pointer shadow-2xs"
+                          >
+                            <option value="">-- Seleccionar o agregar Cliente --</option>
+                            {customers.map((c) => (
+                              <option key={c.id} value={c.id}>
+                                {c.name} {c.macolaCode ? `(${c.macolaCode})` : ""}
+                              </option>
+                            ))}
+                          </select>
+
+                          {invoiceForm.customerEmail && (
+                            <p className="text-[11px] text-slate-500">
+                              Correo de notificación: <span className="font-mono text-slate-700 font-semibold">{invoiceForm.customerEmail}</span>
+                            </p>
+                          )}
+                        </div>
+
+                        {/* Invoice Metadata Grid */}
+                        <div className="grid grid-cols-2 gap-3 text-xs">
+                          <div>
+                            <label className="block font-semibold text-slate-700 mb-1">N.º de factura</label>
+                            <input
+                              type="text"
+                              value={invoiceForm.invoiceNumber}
+                              onChange={(e) => setInvoiceForm({ ...invoiceForm, invoiceNumber: e.target.value })}
+                              className="w-full px-3 py-1.5 rounded-xl bg-white border border-slate-300 text-slate-900 font-mono text-xs focus:outline-none focus:border-[#f6821f]"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block font-semibold text-slate-700 mb-1">Términos de pago</label>
+                            <select
+                              value={invoiceForm.paymentTerms}
+                              onChange={(e) => setInvoiceForm({ ...invoiceForm, paymentTerms: e.target.value })}
+                              className="w-full px-3 py-1.5 rounded-xl bg-white border border-slate-300 text-slate-900 text-xs focus:outline-none focus:border-[#f6821f] cursor-pointer"
+                            >
+                              <option value="Contado">Contado</option>
+                              <option value="Neto 15">Neto 15 días</option>
+                              <option value="Neto 30">Neto 30 días</option>
+                              <option value="Neto 60">Neto 60 días</option>
+                            </select>
+                          </div>
+
+                          <div>
+                            <label className="block font-semibold text-slate-700 mb-1">Fecha de factura</label>
+                            <input
+                              type="date"
+                              value={invoiceForm.invoiceDate}
+                              onChange={(e) => setInvoiceForm({ ...invoiceForm, invoiceDate: e.target.value })}
+                              className="w-full px-3 py-1.5 rounded-xl bg-white border border-slate-300 text-slate-900 text-xs focus:outline-none focus:border-[#f6821f]"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block font-semibold text-slate-700 mb-1">Fecha de vencimiento</label>
+                            <input
+                              type="date"
+                              value={invoiceForm.dueDate}
+                              onChange={(e) => setInvoiceForm({ ...invoiceForm, dueDate: e.target.value })}
+                              className="w-full px-3 py-1.5 rounded-xl bg-white border border-slate-300 text-slate-900 text-xs focus:outline-none focus:border-[#f6821f]"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* INVOICE ITEMS TABLE */}
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <h3 className="text-sm font-bold text-slate-900">Producto o servicio</h3>
+                        </div>
+
+                        <div className="overflow-x-auto border border-slate-200 rounded-2xl shadow-2xs">
+                          <table className="w-full text-left text-xs text-slate-700">
+                            <thead className="bg-slate-50 text-slate-700 font-bold border-b border-slate-200">
+                              <tr>
+                                <th className="p-3 w-8 text-center">#</th>
+                                <th className="p-3 w-32">Fecha servicio</th>
+                                <th className="p-3 min-w-[180px]">Producto / Servicio</th>
+                                <th className="p-3 w-28">SKU</th>
+                                <th className="p-3 min-w-[200px]">Descripción</th>
+                                <th className="p-3 w-20 text-right">Cant.</th>
+                                <th className="p-3 w-24 text-right">Tarifa</th>
+                                <th className="p-3 w-28 text-right">Importe</th>
+                                <th className="p-3 w-10 text-center"></th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100 bg-white">
+                              {invoiceForm.lines.map((line, idx) => (
+                                <tr key={line.id} className="hover:bg-slate-50/60 transition">
+                                  <td className="p-3 text-center text-slate-400 font-mono text-[11px]">{idx + 1}</td>
+                                  <td className="p-3">
+                                    <input
+                                      type="date"
+                                      value={line.serviceDate}
+                                      onChange={(e) => updateInvoiceLine(line.id, "serviceDate", e.target.value)}
+                                      className="w-full px-2 py-1 text-xs rounded-lg border border-slate-200 bg-white focus:outline-none focus:border-[#f6821f]"
+                                    />
+                                  </td>
+                                  <td className="p-3">
+                                    <input
+                                      type="text"
+                                      list={`inventory-list-${line.id}`}
+                                      placeholder="Buscar artículo..."
+                                      value={line.productName}
+                                      onChange={(e) => updateInvoiceLine(line.id, "productName", e.target.value)}
+                                      className="w-full px-2.5 py-1 text-xs rounded-lg border border-slate-200 font-semibold text-slate-900 focus:outline-none focus:border-[#f6821f]"
+                                    />
+                                    <datalist id={`inventory-list-${line.id}`}>
+                                      {inventory.map((item) => (
+                                        <option key={item.id} value={item.description} />
+                                      ))}
+                                    </datalist>
+                                  </td>
+                                  <td className="p-3 font-mono text-[11px] text-[#f6821f] font-semibold">
+                                    {line.sku || "—"}
+                                  </td>
+                                  <td className="p-3">
+                                    <input
+                                      type="text"
+                                      placeholder="Descripción de la línea..."
+                                      value={line.description}
+                                      onChange={(e) => updateInvoiceLine(line.id, "description", e.target.value)}
+                                      className="w-full px-2.5 py-1 text-xs rounded-lg border border-slate-200 focus:outline-none focus:border-[#f6821f]"
+                                    />
+                                  </td>
+                                  <td className="p-3 text-right">
+                                    <input
+                                      type="number"
+                                      min="1"
+                                      value={line.quantity}
+                                      onChange={(e) => updateInvoiceLine(line.id, "quantity", e.target.value)}
+                                      className="w-16 px-2 py-1 text-xs rounded-lg border border-slate-200 text-right font-mono focus:outline-none focus:border-[#f6821f]"
+                                    />
+                                  </td>
+                                  <td className="p-3 text-right">
+                                    <input
+                                      type="number"
+                                      step="0.01"
+                                      value={line.rate}
+                                      onChange={(e) => updateInvoiceLine(line.id, "rate", e.target.value)}
+                                      className="w-20 px-2 py-1 text-xs rounded-lg border border-slate-200 text-right font-mono focus:outline-none focus:border-[#f6821f]"
+                                    />
+                                  </td>
+                                  <td className="p-3 text-right font-bold text-slate-900">
+                                    ${line.amount.toLocaleString("es-HN", { minimumFractionDigits: 2 })}
+                                  </td>
+                                  <td className="p-3 text-center">
+                                    <button
+                                      type="button"
+                                      onClick={() => removeInvoiceLine(line.id)}
+                                      className="text-slate-400 hover:text-red-600 text-xs font-bold p-1 cursor-pointer"
+                                      title="Eliminar línea"
+                                    >
+                                      ✕
+                                    </button>
+                                  </td>
+                                </tr>
+                              ))}
+                              {invoiceForm.lines.length === 0 && (
+                                <tr>
+                                  <td colSpan={9} className="p-6 text-center text-slate-400 text-xs">
+                                    No hay líneas de factura. Haz clic en "Agregar producto o servicio".
+                                  </td>
+                                </tr>
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+
+                        {/* Table Action Buttons */}
+                        <div className="flex items-center gap-3 pt-1">
+                          <button
+                            type="button"
+                            onClick={addInvoiceLine}
+                            className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold transition cursor-pointer flex items-center gap-1.5 border border-slate-300/80"
+                          >
+                            <span>+ Agregar producto o servicio</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={clearAllInvoiceLines}
+                            className="px-3 py-2 rounded-xl text-slate-500 hover:text-red-600 hover:bg-red-50 text-xs font-semibold transition cursor-pointer"
+                          >
+                            Borrar todas las líneas
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* BOTTOM SECTION: NOTES & TOTALS */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-4 border-t border-slate-100">
+                        {/* Notes Column */}
+                        <div className="space-y-4 text-xs">
+                          <div>
+                            <label className="block font-bold text-slate-700 mb-1">Opciones e instrucciones de pago</label>
+                            <input
+                              type="text"
+                              value={invoiceForm.paymentInstructions}
+                              onChange={(e) => setInvoiceForm({ ...invoiceForm, paymentInstructions: e.target.value })}
+                              className="w-full px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-300 text-slate-900 focus:outline-none focus:border-[#f6821f]"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block font-bold text-slate-700 mb-1">Nota para el cliente</label>
+                            <textarea
+                              rows={3}
+                              value={invoiceForm.customerNote}
+                              onChange={(e) => setInvoiceForm({ ...invoiceForm, customerNote: e.target.value })}
+                              className="w-full px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-300 text-slate-900 focus:outline-none focus:border-[#f6821f]"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block font-bold text-slate-700 mb-1">Nota sobre extracto (oculto)</label>
+                            <textarea
+                              rows={2}
+                              value={invoiceForm.statementNote}
+                              onChange={(e) => setInvoiceForm({ ...invoiceForm, statementNote: e.target.value })}
+                              className="w-full px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-300 text-slate-900 focus:outline-none focus:border-[#f6821f]"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Totals Summary Column */}
+                        <div className="space-y-3 text-xs text-right bg-slate-50/70 p-5 rounded-2xl border border-slate-200/80 flex flex-col justify-between">
+                          <div className="space-y-2">
+                            <div className="flex justify-between items-center text-slate-600">
+                              <span>Subtotal</span>
+                              <span className="font-bold text-slate-900">${invoiceSubtotal.toLocaleString("es-HN", { minimumFractionDigits: 2 })}</span>
+                            </div>
+                            <div className="border-t border-slate-200 pt-3 flex justify-between items-center text-sm font-bold text-slate-900">
+                              <span>Facturar en total</span>
+                              <span className="text-3xl font-bold text-slate-900">${invoiceTotal.toLocaleString("es-HN", { minimumFractionDigits: 2 })} USD</span>
+                            </div>
+                          </div>
+                          <p className="text-[11px] text-slate-400 italic text-left pt-4">
+                            Moneda oficial de emisión: USD ($). Impuestos aplicables según normativa fiscal de Honduras.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* VISTA DE CORREO ELECTRÓNICO */}
+                  {activeInvoiceTab === "Vista de correo electrónico" && (
+                    <div className="bg-white border border-slate-200 rounded-2xl p-8 shadow-xs max-w-3xl mx-auto space-y-6 animate-in fade-in duration-150">
+                      <div className="border-b border-slate-200 pb-4">
+                        <h3 className="font-bold text-base text-slate-900">Vista previa del correo electrónico para el cliente</h3>
+                        <p className="text-xs text-slate-500">Así es como el cliente visualizará el correo de facturación de Wayne.</p>
+                      </div>
+
+                      <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 text-xs space-y-2">
+                        <p><strong>De:</strong> {companySettings.email}</p>
+                        <p><strong>Para:</strong> {invoiceForm.customerEmail || "cliente@empresa.hn"}</p>
+                        <p><strong>Asunto:</strong> Factura {invoiceForm.invoiceNumber} de Wayne Trademark Honduras</p>
+                      </div>
+
+                      <div className="p-6 border border-slate-200 rounded-2xl space-y-4 bg-white text-xs text-slate-700 leading-relaxed">
+                        <p className="font-semibold text-slate-900">Estimado cliente,</p>
+                        <p>Le adjuntamos la Factura N.º <strong>{invoiceForm.invoiceNumber}</strong> correspondiente a su orden de empaque/impresión flexográfica.</p>
+                        
+                        <div className="my-4 p-4 rounded-xl bg-[#fff7ed] border border-[#f6821f]/30 flex justify-between items-center">
+                          <div>
+                            <span className="text-xs font-bold text-[#f6821f] block">Monto Total a Pagar</span>
+                            <span className="text-xl font-bold text-slate-900">${invoiceTotal.toLocaleString("es-HN", { minimumFractionDigits: 2 })} USD</span>
+                          </div>
+                          <span className="text-xs font-semibold text-slate-600">Vence: {invoiceForm.dueDate}</span>
+                        </div>
+
+                        <p>{invoiceForm.customerNote}</p>
+                        <p className="pt-4 border-t border-slate-100 text-slate-500">Atentamente,<br /><strong>{companySettings.nombre}</strong></p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* VISTA DE PDF */}
+                  {activeInvoiceTab === "Vista de PDF" && (
+                    <div className="bg-white border border-slate-200 rounded-2xl p-10 shadow-lg max-w-3xl mx-auto space-y-6 animate-in fade-in duration-150 text-xs text-slate-800">
+                      <div className="flex justify-between items-start border-b border-slate-300 pb-6">
+                        <div>
+                          <h1 className="text-2xl font-black text-[#f6821f]">WAYNE TRADEMARK</h1>
+                          <p className="font-bold text-slate-900 mt-1">{companySettings.nombre}</p>
+                          <p className="text-slate-500">{companySettings.direccion}</p>
+                          <p className="text-slate-500">RTN: {companySettings.taxId}</p>
+                        </div>
+                        <div className="text-right">
+                          <h2 className="text-xl font-bold text-slate-900">FACTURA</h2>
+                          <p className="font-mono font-bold text-slate-700 text-sm">N.º {invoiceForm.invoiceNumber}</p>
+                          <p className="text-slate-500 mt-1">Fecha: {invoiceForm.invoiceDate}</p>
+                          <p className="text-slate-500">Vencimiento: {invoiceForm.dueDate}</p>
+                        </div>
+                      </div>
+
+                      <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 flex justify-between items-center">
+                        <div>
+                          <span className="text-[10px] font-bold text-slate-500 uppercase block">Facturado a:</span>
+                          <span className="font-bold text-slate-900 text-sm">{invoiceForm.customerName || "Cliente Contado"}</span>
+                        </div>
+                        <div className="text-right font-mono">
+                          <span className="text-xs text-slate-500 block">Términos</span>
+                          <span className="font-bold text-slate-800">{invoiceForm.paymentTerms}</span>
+                        </div>
+                      </div>
+
+                      {/* PDF Table */}
+                      <table className="w-full text-left border-collapse">
+                        <thead>
+                          <tr className="border-b-2 border-slate-900 text-slate-900 font-bold">
+                            <th className="py-2">Descripción</th>
+                            <th className="py-2 text-right">Cant.</th>
+                            <th className="py-2 text-right">Precio Unit.</th>
+                            <th className="py-2 text-right">Total</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-200">
+                          {invoiceForm.lines.map((l) => (
+                            <tr key={l.id}>
+                              <td className="py-3 font-medium">{l.productName || l.description || "Artículo"}</td>
+                              <td className="py-3 text-right font-mono">{l.quantity}</td>
+                              <td className="py-3 text-right font-mono">${l.rate.toFixed(2)}</td>
+                              <td className="py-3 text-right font-mono font-bold">${l.amount.toFixed(2)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+
+                      <div className="flex justify-end pt-4 border-t border-slate-300">
+                        <div className="w-64 space-y-1 text-right font-mono">
+                          <div className="flex justify-between"><span>Subtotal:</span><span>${invoiceSubtotal.toFixed(2)}</span></div>
+                          <div className="flex justify-between font-bold text-base text-[#f6821f] pt-2 border-t border-slate-200">
+                            <span>TOTAL:</span><span>${invoiceTotal.toFixed(2)}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                </div>
+              </div>
+
+              {/* ================= SIDEBAR MODAL DRAWER: OPCIONES FACTURA (Matching user screenshot) ================= */}
+              {showInvoiceOptionsSidebar && (
+                <div className="fixed inset-0 z-50 flex justify-end">
+                  {/* Backdrop */}
+                  <div
+                    className="fixed inset-0 bg-slate-900/30 backdrop-blur-xs transition-opacity z-50"
+                    onClick={() => setShowInvoiceOptionsSidebar(false)}
+                  />
+
+                  {/* Drawer Panel matching user screenshot */}
+                  <aside className="relative z-50 w-80 sm:w-96 bg-white border-l border-slate-200 shadow-2xl flex flex-col h-full animate-in slide-in-from-right duration-200">
+                    {/* Header */}
+                    <div className="p-4 border-b border-slate-200 flex items-center justify-between sticky top-0 bg-white/95 backdrop-blur-xs z-10">
+                      <h3 className="font-bold text-sm text-slate-900">Facturar {invoiceForm.invoiceNumber}</h3>
+                      <div className="flex items-center gap-3">
+                        <span className="text-[10px] text-slate-400 font-semibold">Opciones</span>
+                        <button
+                          type="button"
+                          onClick={() => setShowInvoiceOptionsSidebar(false)}
+                          className="text-slate-400 hover:text-slate-700 text-sm font-bold cursor-pointer p-1"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Scrollable Content Accordions */}
+                    <div className="flex-1 overflow-y-auto p-4 space-y-4 divide-y divide-slate-100">
+                      
+                      {/* Section 1: Personalización */}
+                      <div className="pt-2">
+                        <div className="group">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setActiveInvoiceOptionSection(
+                                activeInvoiceOptionSection === "personalizacion" ? null : "personalizacion"
+                              )
+                            }
+                            className="w-full font-bold text-xs text-slate-800 flex justify-between items-center cursor-pointer py-1 text-left"
+                          >
+                            <span>Personalización</span>
+                            <span className={`text-slate-400 transition-transform ${activeInvoiceOptionSection === "personalizacion" ? "rotate-180" : ""}`}>▾</span>
+                          </button>
+                          {activeInvoiceOptionSection === "personalizacion" && (
+                            <div className="pt-3 space-y-3 text-xs text-slate-600 animate-in fade-in duration-150">
+                              <label className="block">
+                                <span className="font-semibold block mb-1">Plantilla de factura</span>
+                                <select className="w-full px-3 py-1.5 text-xs rounded-xl bg-slate-50 border border-slate-300 text-slate-900">
+                                  <option>Estándar Wayne Orange</option>
+                                  <option>Minimalista</option>
+                                  <option>Corporativo Industrial</option>
+                                </select>
+                              </label>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Section 2: Opciones de pago */}
+                      <div className="pt-4">
+                        <div className="group">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setActiveInvoiceOptionSection(
+                                activeInvoiceOptionSection === "pago" ? null : "pago"
+                              )
+                            }
+                            className="w-full font-bold text-xs text-slate-800 flex justify-between items-center cursor-pointer py-1 text-left"
+                          >
+                            <span>Opciones de pago</span>
+                            <span className={`text-slate-400 transition-transform ${activeInvoiceOptionSection === "pago" ? "rotate-180" : ""}`}>▾</span>
+                          </button>
+                          {activeInvoiceOptionSection === "pago" && (
+                            <div className="pt-3 space-y-3 text-xs text-slate-600 animate-in fade-in duration-150">
+                              <div className="flex items-center justify-between">
+                                <span className="font-semibold text-slate-800">Total de la factura</span>
+                                <input type="checkbox" defaultChecked className="w-4 h-4 accent-[#f6821f]" />
+                              </div>
+                              <div className="flex items-center justify-between">
+                                <span className="font-semibold text-slate-800">Depósito bancario</span>
+                                <input type="checkbox" className="w-4 h-4 accent-[#f6821f]" />
+                              </div>
+                              <div className="flex items-center justify-between">
+                                <span className="font-semibold text-slate-800">Descuento pronto pago</span>
+                                <input type="checkbox" className="w-4 h-4 accent-[#f6821f]" />
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Section 3: Diseño (Matches user screenshot) */}
+                      <div className="pt-4">
+                        <div className="group">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setActiveInvoiceOptionSection(
+                                activeInvoiceOptionSection === "diseno" ? null : "diseno"
+                              )
+                            }
+                            className="w-full font-bold text-xs text-slate-800 flex justify-between items-center cursor-pointer py-1 text-left"
+                          >
+                            <span>Diseño</span>
+                            <span className={`text-slate-400 transition-transform ${activeInvoiceOptionSection === "diseno" ? "rotate-180" : ""}`}>▾</span>
+                          </button>
+                          
+                          {activeInvoiceOptionSection === "diseno" && (
+                            <div className="pt-3 space-y-4 text-xs text-slate-700 animate-in fade-in duration-150">
+                              
+                              {/* Plantilla modernizada */}
+                              <div className="space-y-2">
+                                <div className="flex justify-between items-center">
+                                  <span className="font-bold text-slate-900">Plantilla modernizada</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => setInvoiceDesign({ ...invoiceDesign, template: "Standard" })}
+                                    className="text-[11px] text-[#0066cc] hover:underline font-normal cursor-pointer"
+                                  >
+                                    Eliminar predeterminado
+                                  </button>
+                                </div>
+
+                                <label className="flex items-center gap-2.5 cursor-pointer pt-1">
+                                  <input
+                                    type="radio"
+                                    name="invoiceTemplate"
+                                    checked={invoiceDesign.template === "Moderno"}
+                                    onChange={() => setInvoiceDesign({ ...invoiceDesign, template: "Moderno" })}
+                                    className="w-4 h-4 accent-[#004d40] cursor-pointer"
+                                  />
+                                  <span className="font-medium text-slate-800">Moderno</span>
+                                </label>
+                              </div>
+
+                              <hr className="border-slate-200/80 my-3" />
+
+                              {/* Otras plantillas */}
+                              <div className="space-y-2">
+                                <span className="font-bold text-slate-900 block">Otras plantillas</span>
+
+                                <label className="flex items-center gap-2.5 cursor-pointer pt-1">
+                                  <input
+                                    type="radio"
+                                    name="invoiceTemplate"
+                                    checked={invoiceDesign.template === "Standard"}
+                                    onChange={() => setInvoiceDesign({ ...invoiceDesign, template: "Standard" })}
+                                    className="w-4 h-4 accent-[#004d40] cursor-pointer"
+                                  />
+                                  <span className="font-medium text-slate-800">Standard</span>
+                                </label>
+                              </div>
+
+                              <hr className="border-slate-200/80 my-3" />
+
+                              {/* Colour Header */}
+                              <div className="space-y-3">
+                                <span className="font-bold text-slate-900 block">Colour</span>
+
+                                {/* Toggle switch for Compatible con impresora */}
+                                <div className="flex items-center justify-between">
+                                  <span className="text-xs text-slate-700 font-medium">Compatible con impresora</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => setInvoiceDesign({ ...invoiceDesign, printerFriendly: !invoiceDesign.printerFriendly })}
+                                    className={`w-9 h-5 rounded-full p-0.5 transition-colors duration-200 cursor-pointer ${
+                                      invoiceDesign.printerFriendly ? "bg-[#79bd58]" : "bg-slate-300"
+                                    }`}
+                                  >
+                                    <div
+                                      className={`w-4 h-4 rounded-full bg-white shadow-md transform transition-transform duration-200 ${
+                                        invoiceDesign.printerFriendly ? "translate-x-4" : "translate-x-0"
+                                      }`}
+                                    />
+                                  </button>
+                                </div>
+
+                                {/* Color Hex Input & Swatch Circle */}
+                                <div className="flex items-center gap-2 pt-1">
+                                  <div
+                                    className="w-7 h-7 rounded-full border-2 border-white shadow-sm shrink-0"
+                                    style={{ backgroundColor: invoiceDesign.color }}
+                                  />
+                                  <input
+                                    type="text"
+                                    value={invoiceDesign.color}
+                                    onChange={(e) => setInvoiceDesign({ ...invoiceDesign, color: e.target.value })}
+                                    className="w-full px-3 py-1.5 text-xs rounded-xl bg-white border border-slate-300 font-mono text-slate-900 focus:outline-none focus:border-[#79bd58]"
+                                  />
+                                </div>
+
+                                {/* Color Palette Grid (16 Circles) */}
+                                <div className="grid grid-cols-6 gap-2 pt-1">
+                                  {[
+                                    "#555555", "#000000", "#78889b", "#3e4d55", "#79bd58", "#148c96",
+                                    "#0077c8", "#92bc26", "#276918", "#964a3d", "#f6821f", "#8d0a20",
+                                    "#701235", "#f4739e", "#a1006b", "#532353"
+                                  ].map((c) => (
+                                    <button
+                                      key={c}
+                                      type="button"
+                                      onClick={() => setInvoiceDesign({ ...invoiceDesign, color: c })}
+                                      className={`w-7 h-7 rounded-full cursor-pointer transition-transform hover:scale-110 flex items-center justify-center ${
+                                        invoiceDesign.color.toLowerCase() === c.toLowerCase() ? "ring-2 ring-offset-2 ring-[#79bd58]" : ""
+                                      }`}
+                                      style={{ backgroundColor: c }}
+                                    />
+                                  ))}
+                                </div>
+                              </div>
+
+                              <hr className="border-slate-200/80 my-3" />
+
+                              {/* Fuente */}
+                              <div className="space-y-1.5">
+                                <label className="block font-bold text-slate-900">Fuente</label>
+                                <select
+                                  value={invoiceDesign.font}
+                                  onChange={(e) => setInvoiceDesign({ ...invoiceDesign, font: e.target.value })}
+                                  className="w-full px-3.5 py-2 text-xs rounded-xl bg-white border border-slate-300 text-slate-900 focus:outline-none focus:border-[#79bd58] font-medium cursor-pointer"
+                                >
+                                  <option value="Helvetica Neue">Helvetica Neue</option>
+                                  <option value="Inter">Inter</option>
+                                  <option value="Roboto">Roboto</option>
+                                  <option value="Arial">Arial</option>
+                                  <option value="Times New Roman">Times New Roman</option>
+                                </select>
+                              </div>
+
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                    </div>
+
+                    {/* Footer */}
+                    <div className="p-4 border-t border-slate-200 flex justify-end">
+                      <button
+                        type="button"
+                        onClick={() => setShowInvoiceOptionsSidebar(false)}
+                        className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold cursor-pointer"
+                      >
+                        Cerrar
+                      </button>
+                    </div>
+                  </aside>
+                </div>
+              )}
+
+              {/* FIXED BOTTOM ACTION BAR (Full width matching user screenshot) */}
+              <footer className="bg-white border-t border-slate-200 px-6 py-3.5 flex items-center justify-between z-30 shadow-lg shrink-0">
+                {/* Left Links Dropup (Matches user screenshot) */}
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setShowPrintDownloadDropdown(!showPrintDownloadDropdown)}
+                    className="px-4 py-2 rounded-xl bg-slate-100/90 hover:bg-slate-200/80 text-[#004d40] font-bold text-xs transition cursor-pointer flex items-center gap-1.5"
+                  >
+                    <span>Imprimir o descargar</span>
+                  </button>
+
+                  {showPrintDownloadDropdown && (
+                    <div className="absolute bottom-full left-0 mb-2 w-56 bg-white rounded-xl shadow-2xl border border-slate-200 py-1.5 z-40 animate-in fade-in zoom-in-95 duration-150 text-xs font-normal text-slate-800">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowPrintDownloadDropdown(false);
+                          window.print();
+                        }}
+                        className="w-full text-left px-4 py-2.5 hover:bg-slate-50 transition cursor-pointer font-medium text-slate-800"
+                      >
+                        Imprimir
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowPrintDownloadDropdown(false);
+                          setActiveInvoiceTab("Vista de PDF");
+                        }}
+                        className="w-full text-left px-4 py-2.5 hover:bg-slate-50 transition cursor-pointer font-medium text-slate-800"
+                      >
+                        Descargar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowPrintDownloadDropdown(false);
+                          alert("Generando recibo de entrega para la orden de empaque flexográfico...");
+                          window.print();
+                        }}
+                        className="w-full text-left px-4 py-2.5 hover:bg-slate-50 transition cursor-pointer font-medium text-slate-800 border-t border-slate-100 mt-1 pt-2.5"
+                      >
+                        Imprimir recibo de entrega
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Right Action Split Buttons */}
+                <div className="flex items-center gap-2.5">
+                  <button
+                    type="button"
+                    onClick={closeInvoiceEditor}
+                    className="px-4 py-2 rounded-lg border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 font-semibold text-xs transition cursor-pointer"
+                  >
+                    Cancelar
+                  </button>
+
+                  {/* Split Button 1: Guardar v */}
+                  <div className="relative inline-flex rounded-lg shadow-sm">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setInvoiceSuccessMsg("¡Factura guardada correctamente!");
+                        setTimeout(() => setInvoiceSuccessMsg(""), 3000);
+                      }}
+                      className="px-4 py-2 rounded-l-lg bg-[#f6821f] hover:bg-[#e07216] text-white font-semibold text-xs transition cursor-pointer"
+                    >
+                      Guardar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowInvoiceSaveDropdown(!showInvoiceSaveDropdown)}
+                      className="px-2.5 py-2 rounded-r-lg bg-[#e07216] hover:bg-[#d06512] text-white border-l border-white/20 transition cursor-pointer flex items-center justify-center"
+                    >
+                      <svg
+                        className={`w-3.5 h-3.5 transition-transform ${showInvoiceSaveDropdown ? "rotate-180" : "rotate-0"}`}
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
+
+                    {showInvoiceSaveDropdown && (
+                      <div className="absolute bottom-full right-0 mb-2 w-52 bg-white rounded-xl shadow-2xl border border-slate-200 py-1 z-40 animate-in fade-in zoom-in-95 duration-150">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowInvoiceSaveDropdown(false);
+                            closeInvoiceEditor();
+                          }}
+                          className="w-full text-left px-4 py-2.5 text-xs text-slate-700 hover:bg-[#fff7ed] hover:text-[#f6821f] font-semibold transition cursor-pointer"
+                        >
+                          Guardar y cerrar
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowInvoiceSaveDropdown(false);
+                            setInvoiceForm((prev) => ({
+                              ...prev,
+                              invoiceNumber: (parseInt(prev.invoiceNumber) + 1).toString(),
+                              lines: [],
+                            }));
+                          }}
+                          className="w-full text-left px-4 py-2.5 text-xs text-slate-700 hover:bg-[#fff7ed] hover:text-[#f6821f] font-semibold transition cursor-pointer"
+                        >
+                          Guardar y crear nueva
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Split Button 2: Revisar y enviar v */}
+                  <div className="relative inline-flex rounded-lg shadow-sm">
+                    <button
+                      type="button"
+                      disabled={sendingInvoiceEmail}
+                      onClick={handleSendInvoiceEmail}
+                      className="px-5 py-2 rounded-l-lg bg-[#004d40] hover:bg-[#00382e] text-white font-bold text-xs transition cursor-pointer flex items-center gap-2 disabled:opacity-50"
+                    >
+                      {sendingInvoiceEmail ? (
+                        <>
+                          <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                          <span>Enviando por Resend...</span>
+                        </>
+                      ) : (
+                        <span>Revisar y enviar</span>
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowInvoiceSendDropdown(!showInvoiceSendDropdown)}
+                      className="px-2.5 py-2 rounded-r-lg bg-[#00382e] hover:bg-[#002821] text-white border-l border-white/20 transition cursor-pointer flex items-center justify-center"
+                    >
+                      <svg
+                        className={`w-3.5 h-3.5 transition-transform ${showInvoiceSendDropdown ? "rotate-180" : "rotate-0"}`}
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
+
+                    {showInvoiceSendDropdown && (
+                      <div className="absolute bottom-full right-0 mb-2 w-52 bg-white rounded-xl shadow-2xl border border-slate-200 py-1 z-40 animate-in fade-in zoom-in-95 duration-150">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowInvoiceSendDropdown(false);
+                            setActiveInvoiceTab("Vista de PDF");
+                          }}
+                          className="w-full text-left px-4 py-2.5 text-xs text-slate-700 hover:bg-[#fff7ed] hover:text-[#f6821f] font-semibold transition cursor-pointer"
+                        >
+                          Vista previa PDF
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowInvoiceSendDropdown(false);
+                            setActiveInvoiceTab("Vista de correo electrónico");
+                          }}
+                          className="w-full text-left px-4 py-2.5 text-xs text-slate-700 hover:bg-[#fff7ed] hover:text-[#f6821f] font-semibold transition cursor-pointer"
+                        >
+                          Vista previa correo
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                </div>
+              </footer>
+
+            </div>
+          )}
+
+          {/* ================= VIEW: EDITAR ORDEN DE COMPRA (PÁGINA COMPLETA COMO CREAR FACTURA) ================= */}
+          {currentView === "orden-compra-editor" && (
+            <div className="fixed inset-0 z-40 flex flex-col bg-slate-100 text-slate-800 animate-in fade-in duration-150 overflow-hidden">
+              
+              {/* OFFICIAL PRINTABLE PURCHASE ORDER DOCUMENT */}
+              <div id="printable-po-document" className="hidden print:block p-8 bg-white text-slate-900 text-xs">
+                <div className="flex justify-between items-start border-b-2 border-slate-900 pb-6 mb-6">
+                  <div>
+                    <h1 className="text-2xl font-black text-[#f6821f] tracking-tight">WAYNE TRADEMARK</h1>
+                    <p className="font-bold text-slate-900 text-sm mt-1">{companySettings.nombre}</p>
+                    <p className="text-slate-600 text-xs">{companySettings.direccion}</p>
+                    <p className="text-slate-600 text-xs">RTN: {companySettings.taxId} | Tel: {companySettings.telefono}</p>
+                  </div>
+                  <div className="text-right">
+                    <h2 className="text-2xl font-black text-slate-900">ORDEN DE COMPRA</h2>
+                    <p className="font-mono font-bold text-slate-800 text-base">N.º {poForm.num}</p>
+                    <p className="text-slate-600 text-xs mt-1"><strong>Fecha emisión:</strong> {poForm.date}</p>
+                    <p className="text-slate-600 text-xs"><strong>Entrega esperada:</strong> {poForm.expectedDate}</p>
+                    <p className="text-slate-600 text-xs"><strong>Estado:</strong> {poForm.status}</p>
+                  </div>
+                </div>
+
+                <div className="bg-slate-50 p-4 rounded-xl border border-slate-300 mb-6 flex justify-between items-center">
+                  <div>
+                    <span className="text-[10px] font-bold text-slate-500 uppercase block">Proveedor:</span>
+                    <span className="font-bold text-slate-900 text-sm">{poForm.vendorName}</span>
+                    <p className="text-slate-600 text-xs">{poForm.vendorEmail}</p>
+                    <p className="text-slate-600 text-xs">{poForm.vendorAddress}</p>
+                  </div>
+                  <div className="text-right font-mono">
+                    <span className="text-xs text-slate-500 block">Categoría de insumos:</span>
+                    <span className="font-bold text-slate-900 text-sm">{poForm.category}</span>
+                  </div>
+                </div>
+
+                <table className="w-full text-left border-collapse mb-6">
+                  <thead>
+                    <tr className="border-b-2 border-slate-900 bg-slate-100 text-slate-900 font-bold">
+                      <th className="py-2.5 px-3">#</th>
+                      <th className="py-2.5 px-3">Insumo / Producto</th>
+                      <th className="py-2.5 px-3">SKU</th>
+                      <th className="py-2.5 px-3">Descripción</th>
+                      <th className="py-2.5 px-3 text-right">Cant.</th>
+                      <th className="py-2.5 px-3 text-right">Precio Unit.</th>
+                      <th className="py-2.5 px-3 text-right">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200">
+                    {poForm.lines.map((l, idx) => (
+                      <tr key={l.id}>
+                        <td className="py-2.5 px-3 font-mono text-slate-500">{idx + 1}</td>
+                        <td className="py-2.5 px-3 font-bold text-slate-900">{l.productName || "Material"}</td>
+                        <td className="py-2.5 px-3 font-mono text-slate-600">{l.sku || "—"}</td>
+                        <td className="py-2.5 px-3 text-slate-700">{l.description || "—"}</td>
+                        <td className="py-2.5 px-3 text-right font-mono">{l.quantity}</td>
+                        <td className="py-2.5 px-3 text-right font-mono">${l.rate.toFixed(2)}</td>
+                        <td className="py-2.5 px-3 text-right font-mono font-bold">${l.total.toFixed(2)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+
+                <div className="flex justify-end pt-4 border-t-2 border-slate-900">
+                  <div className="w-64 space-y-1 text-right font-mono">
+                    <div className="flex justify-between font-black text-lg text-slate-900">
+                      <span>TOTAL USD:</span>
+                      <span>${poTotal.toFixed(2)}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              {/* TOP HEADER BAR */}
+              <header className="bg-white border-b border-slate-200 px-6 py-3 flex items-center justify-between sticky top-0 z-30 shadow-2xs">
+                <div className="flex items-center gap-6">
+                  <h1 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                    <span>Orden de compra {poForm.num}</span>
+                  </h1>
+
+                  {/* Nav Sub-Tabs */}
+                  <div className="flex items-center gap-1 border-l border-slate-200 pl-6">
+                    {(["Editar", "Vista de correo", "Vista de PDF"] as const).map((tab) => (
+                      <button
+                        key={tab}
+                        type="button"
+                        onClick={() => setActivePOTab(tab)}
+                        className={`px-3.5 py-1.5 text-xs font-semibold rounded-lg transition cursor-pointer ${
+                          activePOTab === tab
+                            ? "bg-[#fff7ed] text-[#f6821f] border border-[#f6821f]/30"
+                            : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                        }`}
+                      >
+                        {tab}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Top Right Actions */}
+                <div className="flex items-center gap-4 text-xs font-medium text-slate-600">
+                  <button
+                    type="button"
+                    onClick={() => setShowPOOptionsSidebar(!showPOOptionsSidebar)}
+                    className={`flex items-center gap-1 cursor-pointer font-semibold text-xs px-3 py-1.5 rounded-lg border transition ${
+                      showPOOptionsSidebar
+                        ? "bg-[#fff7ed] text-[#f6821f] border-[#f6821f]/40 shadow-2xs"
+                        : "bg-slate-100 text-slate-700 hover:bg-slate-200 border-slate-200"
+                    }`}
+                  >
+                    <svg className="w-3.5 h-3.5 text-[#f6821f]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                    </svg>
+                    <span>Administrar</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={closePurchaseOrderEditor}
+                    className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition cursor-pointer ml-2"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              </header>
+
+              {/* MAIN CONTENT WORKSPACE */}
+              <div className="flex-1 flex overflow-hidden">
+                <div className="flex-1 overflow-y-auto p-6 lg:p-8 space-y-6">
+                  
+                  {activePOTab === "Editar" && (
+                    <div className="bg-white border border-slate-200 rounded-2xl p-8 shadow-xs max-w-5xl mx-auto space-y-8">
+                      
+                      {/* Notification Banner */}
+                      {poSuccessMsg && (
+                        <div className="p-3.5 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs rounded-xl flex items-center justify-between shadow-xs">
+                          <span className="font-bold">✓ {poSuccessMsg}</span>
+                        </div>
+                      )}
+
+                      {/* HEADER ROW */}
+                      <div className="flex flex-col sm:flex-row justify-between items-start gap-6 border-b border-slate-100 pb-6">
+                        <div className="space-y-1 text-xs text-slate-600 max-w-md">
+                          <h2 className="text-xl font-black text-[#f6821f] tracking-tight mb-2">ORDEN DE COMPRA</h2>
+                          <p className="font-bold text-slate-900 uppercase">{companySettings.nombre}</p>
+                          <p>{companySettings.email} • {companySettings.telefono}</p>
+                          <p>{companySettings.direccion}</p>
+                        </div>
+
+                        <div className="text-right space-y-3">
+                          <div className="text-xs font-semibold text-slate-500">
+                            Monto Total: <span className="font-bold text-slate-900 text-sm">${poTotal.toLocaleString("es-HN", { minimumFractionDigits: 2 })} USD</span>
+                          </div>
+                          <div className="flex items-center justify-end gap-2">
+                            <span className="text-xs text-slate-500 font-semibold">Estado:</span>
+                            <select
+                              value={poForm.status}
+                              onChange={(e) => setPOForm({ ...poForm, status: e.target.value })}
+                              className={`px-3 py-1 rounded-full text-xs font-bold cursor-pointer outline-none border transition ${
+                                poForm.status === "Recibida"
+                                  ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                                  : poForm.status === "Aprobada"
+                                  ? "bg-blue-50 text-blue-700 border-blue-200"
+                                  : poForm.status === "Pendiente"
+                                  ? "bg-amber-50 text-amber-700 border-amber-200"
+                                  : "bg-red-50 text-red-700 border-red-200"
+                              }`}
+                            >
+                              <option value="Pendiente">Pendiente</option>
+                              <option value="Aprobada">Aprobada</option>
+                              <option value="Recibida">Recibida</option>
+                              <option value="Cancelada">Cancelada</option>
+                            </select>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* VENDOR AND DATES GRID */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-slate-50/70 p-5 rounded-2xl border border-slate-200/80">
+                        {/* Vendor Selection */}
+                        <div className="space-y-2">
+                          <label className="block text-xs font-bold text-slate-700">Proveedor / Suplidor</label>
+                          <select
+                            value={poForm.vendorName}
+                            onChange={(e) => {
+                              const selected = vendors.find((v) => v.name === e.target.value);
+                              setPOForm({
+                                ...poForm,
+                                vendorName: e.target.value,
+                                vendorEmail: selected ? selected.email || "compras@proveedor.hn" : "compras@proveedor.hn",
+                                vendorAddress: selected ? selected.address || "Dirección no especificada" : "San Pedro Sula",
+                              });
+                            }}
+                            className="w-full px-3.5 py-2 text-xs rounded-xl bg-white border border-slate-300 text-slate-900 focus:outline-none focus:border-[#f6821f] font-semibold cursor-pointer shadow-2xs"
+                          >
+                            {vendors.map((v) => (
+                              <option key={v.id} value={v.name}>
+                                {v.name} ({v.currency})
+                              </option>
+                            ))}
+                          </select>
+
+                          {poForm.vendorEmail && (
+                            <p className="text-[11px] text-slate-500">
+                              Contacto compras: <span className="font-mono text-slate-700 font-semibold">{poForm.vendorEmail}</span>
+                            </p>
+                          )}
+                        </div>
+
+                        {/* PO Metadata Grid */}
+                        <div className="grid grid-cols-2 gap-3 text-xs">
+                          <div>
+                            <label className="block font-semibold text-slate-700 mb-1">N.º de Orden</label>
+                            <input
+                              type="text"
+                              value={poForm.num}
+                              onChange={(e) => setPOForm({ ...poForm, num: e.target.value })}
+                              className="w-full px-3 py-1.5 rounded-xl bg-white border border-slate-300 text-slate-900 font-mono text-xs focus:outline-none focus:border-[#f6821f]"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block font-semibold text-slate-700 mb-1">Categoría de Insumos</label>
+                            <input
+                              type="text"
+                              value={poForm.category}
+                              onChange={(e) => setPOForm({ ...poForm, category: e.target.value })}
+                              placeholder="Ej. Tintas, Cartón"
+                              className="w-full px-3 py-1.5 rounded-xl bg-white border border-slate-300 text-slate-900 text-xs focus:outline-none focus:border-[#f6821f]"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block font-semibold text-slate-700 mb-1">Fecha de Emisión</label>
+                            <input
+                              type="date"
+                              value={poForm.date}
+                              onChange={(e) => setPOForm({ ...poForm, date: e.target.value })}
+                              className="w-full px-3 py-1.5 rounded-xl bg-white border border-slate-300 text-slate-900 text-xs focus:outline-none focus:border-[#f6821f]"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block font-semibold text-slate-700 mb-1">Entrega Esperada</label>
+                            <input
+                              type="date"
+                              value={poForm.expectedDate}
+                              onChange={(e) => setPOForm({ ...poForm, expectedDate: e.target.value })}
+                              className="w-full px-3 py-1.5 rounded-xl bg-white border border-slate-300 text-slate-900 text-xs focus:outline-none focus:border-[#f6821f]"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* ITEMS / MATERIALS TABLE */}
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <h3 className="font-bold text-xs text-slate-900 uppercase tracking-wider">Líneas de Insumos y Materias Primas</h3>
+                          <button
+                            type="button"
+                            onClick={handleAddPOLine}
+                            className="px-3 py-1.5 rounded-xl bg-[#fff7ed] hover:bg-[#ffedd5] text-[#f6821f] font-bold text-xs transition cursor-pointer border border-[#fed7aa] flex items-center gap-1"
+                          >
+                            <span>+ Añadir línea</span>
+                          </button>
+                        </div>
+
+                        <div className="border border-slate-200 rounded-2xl overflow-hidden shadow-2xs">
+                          <table className="w-full text-left text-xs">
+                            <thead className="bg-slate-50 border-b border-slate-200 text-slate-700 font-bold">
+                              <tr>
+                                <th className="p-3 w-10 text-center">#</th>
+                                <th className="p-3 min-w-[200px]">Insumo / Producto</th>
+                                <th className="p-3 w-28">SKU</th>
+                                <th className="p-3 min-w-[180px]">Descripción / Especificaciones</th>
+                                <th className="p-3 w-24 text-right">Cantidad</th>
+                                <th className="p-3 w-28 text-right">Precio Unit.</th>
+                                <th className="p-3 w-28 text-right">Total (USD)</th>
+                                <th className="p-3 w-12 text-center"></th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100 font-sans">
+                              {poForm.lines.map((line, idx) => (
+                                <tr key={line.id} className="hover:bg-slate-50/70 transition">
+                                  <td className="p-3 text-center text-slate-400 font-mono">{idx + 1}</td>
+                                  <td className="p-3">
+                                    <input
+                                      type="text"
+                                      value={line.productName}
+                                      onChange={(e) => handlePOLineChange(line.id, "productName", e.target.value)}
+                                      placeholder="Nombre del insumo..."
+                                      className="w-full px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-900 focus:outline-none focus:border-[#f6821f] font-medium"
+                                    />
+                                  </td>
+                                  <td className="p-3">
+                                    <input
+                                      type="text"
+                                      value={line.sku}
+                                      onChange={(e) => handlePOLineChange(line.id, "sku", e.target.value)}
+                                      placeholder="SKU-001"
+                                      className="w-full px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-900 font-mono focus:outline-none focus:border-[#f6821f]"
+                                    />
+                                  </td>
+                                  <td className="p-3">
+                                    <input
+                                      type="text"
+                                      value={line.description}
+                                      onChange={(e) => handlePOLineChange(line.id, "description", e.target.value)}
+                                      placeholder="Detalle o lote..."
+                                      className="w-full px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-900 focus:outline-none focus:border-[#f6821f]"
+                                    />
+                                  </td>
+                                  <td className="p-3 text-right">
+                                    <input
+                                      type="number"
+                                      value={line.quantity}
+                                      onChange={(e) => handlePOLineChange(line.id, "quantity", Number(e.target.value))}
+                                      className="w-full px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-900 font-mono text-right focus:outline-none focus:border-[#f6821f] font-bold"
+                                    />
+                                  </td>
+                                  <td className="p-3 text-right">
+                                    <input
+                                      type="number"
+                                      step="0.01"
+                                      value={line.rate}
+                                      onChange={(e) => handlePOLineChange(line.id, "rate", Number(e.target.value))}
+                                      className="w-full px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-900 font-mono text-right focus:outline-none focus:border-[#f6821f]"
+                                    />
+                                  </td>
+                                  <td className="p-3 text-right font-bold text-slate-900">
+                                    ${line.total.toLocaleString("es-HN", { minimumFractionDigits: 2 })}
+                                  </td>
+                                  <td className="p-3 text-center">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleRemovePOLine(line.id)}
+                                      className="text-slate-400 hover:text-red-600 transition cursor-pointer p-1"
+                                      title="Eliminar línea"
+                                    >
+                                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                      </svg>
+                                    </button>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+
+                      {/* SUMMARY & NOTES GRID */}
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pt-4">
+                        <div className="space-y-4 text-xs">
+                          <div>
+                            <label className="block font-bold text-slate-700 mb-1">Notas e Instrucciones de Entrega</label>
+                            <textarea
+                              rows={3}
+                              value={poForm.notes}
+                              onChange={(e) => setPOForm({ ...poForm, notes: e.target.value })}
+                              placeholder="Condiciones de recepción, horario de almacén..."
+                              className="w-full px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-300 text-slate-900 focus:outline-none focus:border-[#f6821f]"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Totals Summary Column */}
+                        <div className="space-y-3 text-xs text-right bg-slate-50/70 p-5 rounded-2xl border border-slate-200/80 flex flex-col justify-between">
+                          <div className="space-y-2">
+                            <div className="flex justify-between items-center text-slate-600">
+                              <span>Subtotal</span>
+                              <span className="font-bold text-slate-900">${poSubtotal.toLocaleString("es-HN", { minimumFractionDigits: 2 })}</span>
+                            </div>
+                            <div className="border-t border-slate-200 pt-3 flex justify-between items-center text-sm font-bold text-slate-900">
+                              <span>Total Orden de Compra</span>
+                              <span className="text-3xl font-bold text-slate-900">${poTotal.toLocaleString("es-HN", { minimumFractionDigits: 2 })} USD</span>
+                            </div>
+                          </div>
+                          <p className="text-[11px] text-slate-400 italic text-left pt-4">
+                            Emisión en dólares (USD). Sujeta a términos de pago especificados en el contrato marco.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* VISTA DE CORREO */}
+                  {activePOTab === "Vista de correo" && (
+                    <div className="bg-white border border-slate-200 rounded-2xl p-8 shadow-xs max-w-3xl mx-auto space-y-6 animate-in fade-in duration-150">
+                      <div className="border-b border-slate-200 pb-4">
+                        <h3 className="font-bold text-base text-slate-900">Vista previa del correo para el proveedor</h3>
+                        <p className="text-xs text-slate-500">Formato del correo automático que recibirá {poForm.vendorName}.</p>
+                      </div>
+
+                      <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200 space-y-4 text-xs text-slate-700 font-sans">
+                        <div className="space-y-1 border-b border-slate-200 pb-3">
+                          <p><strong>De:</strong> compras@waynetrademark.com</p>
+                          <p><strong>Para:</strong> {poForm.vendorEmail}</p>
+                          <p><strong>Asunto:</strong> Orden de Compra {poForm.num} - Wayne Trademark</p>
+                        </div>
+                        <p>Estimado equipo de {poForm.vendorName},</p>
+                        <p>Adjunto a este correo enviamos la **Orden de Compra {poForm.num}** por un importe total de **${poTotal.toLocaleString("es-HN", { minimumFractionDigits: 2 })} USD** correspondiente a insumos de {poForm.category}.</p>
+                        <p>Agradecemos confirmar recepción e indicar la fecha programada de despacho a nuestro almacén.</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* VISTA DE PDF */}
+                  {activePOTab === "Vista de PDF" && (
+                    <div className="bg-white border border-slate-200 rounded-2xl p-8 shadow-xs max-w-4xl mx-auto space-y-6 animate-in fade-in duration-150 text-xs">
+                      <div className="flex justify-between items-center border-b border-slate-200 pb-4">
+                        <h3 className="font-bold text-base text-slate-900">Vista Previa de Documento PDF</h3>
+                        <button
+                          type="button"
+                          onClick={() => window.print()}
+                          className="px-4 py-1.5 rounded-xl bg-[#f6821f] text-white font-bold text-xs hover:bg-[#e07216] transition cursor-pointer"
+                        >
+                          Imprimir PDF
+                        </button>
+                      </div>
+
+                      <div className="p-8 border border-slate-200 rounded-xl bg-slate-50 space-y-6">
+                        <div className="flex justify-between">
+                          <div>
+                            <h2 className="text-xl font-black text-[#f6821f]">WAYNE TRADEMARK</h2>
+                            <p className="font-bold">{companySettings.nombre}</p>
+                          </div>
+                          <div className="text-right font-mono">
+                            <p className="font-bold text-base">ORDEN DE COMPRA #{poForm.num}</p>
+                            <p className="text-slate-500">Fecha: {poForm.date}</p>
+                          </div>
+                        </div>
+                        <table className="w-full text-left bg-white border border-slate-200 rounded-lg overflow-hidden">
+                          <thead className="bg-slate-100 font-bold border-b border-slate-200">
+                            <tr>
+                              <th className="p-2.5">Insumo</th>
+                              <th className="p-2.5 text-right">Cant.</th>
+                              <th className="p-2.5 text-right">Precio</th>
+                              <th className="p-2.5 text-right">Total</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {poForm.lines.map((l) => (
+                              <tr key={l.id} className="border-b border-slate-100">
+                                <td className="p-2.5 font-medium">{l.productName}</td>
+                                <td className="p-2.5 text-right font-mono">{l.quantity}</td>
+                                <td className="p-2.5 text-right font-mono">${l.rate.toFixed(2)}</td>
+                                <td className="p-2.5 text-right font-mono font-bold">${l.total.toFixed(2)}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+
+                </div>
+              </div>
+
+              {/* FIXED BOTTOM ACTION BAR */}
+              <footer className="bg-white border-t border-slate-200 px-6 py-3.5 flex items-center justify-between z-30 shadow-lg shrink-0">
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setShowPOPrintDropdown(!showPOPrintDropdown)}
+                    className="px-4 py-2 rounded-xl bg-slate-100/90 hover:bg-slate-200/80 text-[#004d40] font-bold text-xs transition cursor-pointer flex items-center gap-1.5"
+                  >
+                    <span>Imprimir o descargar</span>
+                  </button>
+
+                  {showPOPrintDropdown && (
+                    <div className="absolute bottom-full left-0 mb-2 w-56 bg-white rounded-xl shadow-2xl border border-slate-200 py-1.5 z-40 animate-in fade-in zoom-in-95 duration-150 text-xs font-normal text-slate-800">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowPOPrintDropdown(false);
+                          window.print();
+                        }}
+                        className="w-full text-left px-4 py-2.5 hover:bg-slate-50 transition cursor-pointer font-medium text-slate-800"
+                      >
+                        Imprimir Documento
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowPOPrintDropdown(false);
+                          setActivePOTab("Vista de PDF");
+                        }}
+                        className="w-full text-left px-4 py-2.5 hover:bg-slate-50 transition cursor-pointer font-medium text-slate-800"
+                      >
+                        Descargar PDF
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={closePurchaseOrderEditor}
+                    className="px-4 py-2 rounded-xl border border-slate-300 text-slate-700 hover:bg-slate-100 text-xs font-semibold transition cursor-pointer"
+                  >
+                    Cancelar
+                  </button>
+
+                  <div className="relative inline-flex rounded-lg shadow-sm">
+                    <button
+                      type="button"
+                      onClick={() => handleSavePOEditor()}
+                      className="px-5 py-2 rounded-l-lg bg-[#f6821f] hover:bg-[#e07216] text-white font-bold text-xs transition cursor-pointer flex items-center gap-1"
+                    >
+                      Guardar y aprobar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowPOSaveDropdown(!showPOSaveDropdown)}
+                      className="px-2.5 py-2 rounded-r-lg bg-[#e07216] hover:bg-[#d06512] text-white border-l border-white/20 transition cursor-pointer flex items-center justify-center"
+                    >
+                      <svg
+                        className={`w-3.5 h-3.5 transition-transform ${showPOSaveDropdown ? "rotate-180" : "rotate-0"}`}
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
+
+                    {showPOSaveDropdown && (
+                      <div className="absolute bottom-full right-0 mb-2 w-52 bg-white rounded-xl shadow-2xl border border-slate-200 py-1 z-40 animate-in fade-in zoom-in-95 duration-150">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowPOSaveDropdown(false);
+                            handleSavePOEditor("Aprobada");
+                            closePurchaseOrderEditor();
+                          }}
+                          className="w-full text-left px-4 py-2.5 text-xs text-slate-700 hover:bg-[#fff7ed] hover:text-[#f6821f] font-semibold transition cursor-pointer"
+                        >
+                          Guardar y cerrar
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowPOSaveDropdown(false);
+                            handleSavePOEditor("Pendiente");
+                            closePurchaseOrderEditor();
+                          }}
+                          className="w-full text-left px-4 py-2.5 text-xs text-slate-700 hover:bg-[#fff7ed] hover:text-[#f6821f] font-semibold transition cursor-pointer"
+                        >
+                          Guardar como borrador
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Split Button 2: Revisar y enviar (al proveedor por email) */}
+                  <div className="relative inline-flex rounded-lg shadow-sm">
+                    <button
+                      type="button"
+                      disabled={sendingPOEmail}
+                      onClick={handleSendPOEmail}
+                      className="px-5 py-2 rounded-l-lg bg-[#004d40] hover:bg-[#00382e] text-white font-bold text-xs transition cursor-pointer flex items-center gap-2 disabled:opacity-50"
+                    >
+                      {sendingPOEmail ? (
+                        <>
+                          <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                          <span>Enviando al proveedor...</span>
+                        </>
+                      ) : (
+                        <span>Revisar y enviar</span>
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowPOSendDropdown(!showPOSendDropdown)}
+                      className="px-2.5 py-2 rounded-r-lg bg-[#00382e] hover:bg-[#002821] text-white border-l border-white/20 transition cursor-pointer flex items-center justify-center"
+                    >
+                      <svg
+                        className={`w-3.5 h-3.5 transition-transform ${showPOSendDropdown ? "rotate-180" : "rotate-0"}`}
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
+
+                    {showPOSendDropdown && (
+                      <div className="absolute bottom-full right-0 mb-2 w-52 bg-white rounded-xl shadow-2xl border border-slate-200 py-1 z-40 animate-in fade-in zoom-in-95 duration-150">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowPOSendDropdown(false);
+                            setActivePOTab("Vista de PDF");
+                          }}
+                          className="w-full text-left px-4 py-2.5 text-xs text-slate-700 hover:bg-[#fff7ed] hover:text-[#f6821f] font-semibold transition cursor-pointer"
+                        >
+                          Vista previa PDF
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowPOSendDropdown(false);
+                            setActivePOTab("Vista de correo");
+                          }}
+                          className="w-full text-left px-4 py-2.5 text-xs text-slate-700 hover:bg-[#fff7ed] hover:text-[#f6821f] font-semibold transition cursor-pointer"
+                        >
+                          Vista previa correo
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </footer>
+
+              {/* SIDEBAR MODAL DRAWER: OPCIONES DE ORDEN DE COMPRA (Boton Administrar) */}
+              {showPOOptionsSidebar && (
+                <div className="fixed inset-0 z-50 flex justify-end">
+                  {/* Backdrop */}
+                  <div
+                    className="fixed inset-0 bg-slate-900/30 backdrop-blur-xs transition-opacity z-50"
+                    onClick={() => setShowPOOptionsSidebar(false)}
+                  />
+
+                  {/* Drawer Panel */}
+                  <aside className="relative z-50 w-80 sm:w-96 bg-white border-l border-slate-200 shadow-2xl flex flex-col h-full animate-in slide-in-from-right duration-200">
+                    {/* Header */}
+                    <div className="p-4 border-b border-slate-200 flex items-center justify-between sticky top-0 bg-white/95 backdrop-blur-xs z-10">
+                      <h3 className="font-bold text-sm text-slate-900">Orden de compra {poForm.num}</h3>
+                      <div className="flex items-center gap-3">
+                        <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Administrar</span>
+                        <button
+                          type="button"
+                          onClick={() => setShowPOOptionsSidebar(false)}
+                          className="text-slate-400 hover:text-slate-700 text-sm font-bold cursor-pointer p-1"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Scrollable Content Accordions */}
+                    <div className="flex-1 overflow-y-auto p-4 space-y-4 divide-y divide-slate-100">
+                      
+                      {/* Section 1: Configuración de Proveedor y Moneda */}
+                      <div className="pt-2">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setActivePOOptionSection(
+                              activePOOptionSection === "general" ? null : "general"
+                            )
+                          }
+                          className="w-full font-bold text-xs text-slate-800 flex justify-between items-center cursor-pointer py-1 text-left"
+                        >
+                          <span>General y Moneda</span>
+                          <span className={`text-slate-400 transition-transform ${activePOOptionSection === "general" ? "rotate-180" : ""}`}>▾</span>
+                        </button>
+                        {activePOOptionSection === "general" && (
+                          <div className="pt-3 space-y-3 text-xs text-slate-600 animate-in fade-in duration-150">
+                            <label className="block">
+                              <span className="font-semibold block mb-1">Moneda de la orden</span>
+                              <select
+                                value={poForm.currency || "USD"}
+                                onChange={(e) => setPOForm({ ...poForm, currency: e.target.value })}
+                                className="w-full px-3 py-1.5 text-xs rounded-xl bg-slate-50 border border-slate-300 text-slate-900"
+                              >
+                                <option value="USD">USD ($ Dólar estadounidense)</option>
+                                <option value="HNL">HNL (L Lempira hondureño)</option>
+                              </select>
+                            </label>
+
+                            <label className="block">
+                              <span className="font-semibold block mb-1">Categoría de insumos</span>
+                              <input
+                                type="text"
+                                value={poForm.category}
+                                onChange={(e) => setPOForm({ ...poForm, category: e.target.value })}
+                                placeholder="Ej. Tintas, Cartón, Solventes"
+                                className="w-full px-3 py-1.5 text-xs rounded-xl bg-slate-50 border border-slate-300 text-slate-900"
+                              />
+                            </label>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Section 2: Recepción y Almacén */}
+                      <div className="pt-4">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setActivePOOptionSection(
+                              activePOOptionSection === "recepcion" ? null : "recepcion"
+                            )
+                          }
+                          className="w-full font-bold text-xs text-slate-800 flex justify-between items-center cursor-pointer py-1 text-left"
+                        >
+                          <span>Recepción y Almacén</span>
+                          <span className={`text-slate-400 transition-transform ${activePOOptionSection === "recepcion" ? "rotate-180" : ""}`}>▾</span>
+                        </button>
+                        {activePOOptionSection === "recepcion" && (
+                          <div className="pt-3 space-y-3 text-xs text-slate-600 animate-in fade-in duration-150">
+                            <label className="block">
+                              <span className="font-semibold block mb-1">Almacén de destino</span>
+                              <select className="w-full px-3 py-1.5 text-xs rounded-xl bg-slate-50 border border-slate-300 text-slate-900">
+                                <option>Almacén Central - San Pedro Sula</option>
+                                <option>Almacén Insumos UV - Tegucigalpa</option>
+                                <option>Bodega Materia Prima Flexo</option>
+                              </select>
+                            </label>
+
+                            <div className="space-y-2 pt-1">
+                              <label className="flex items-center gap-2 cursor-pointer">
+                                <input type="checkbox" defaultChecked className="w-4 h-4 accent-[#f6821f]" />
+                                <span>Requiere certificado de calidad del lote</span>
+                              </label>
+                              <label className="flex items-center gap-2 cursor-pointer">
+                                <input type="checkbox" defaultChecked className="w-4 h-4 accent-[#f6821f]" />
+                                <span>Notificar a almacén vía correo al despachar</span>
+                              </label>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Section 3: Integración Macola / ERP */}
+                      <div className="pt-4">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setActivePOOptionSection(
+                              activePOOptionSection === "macola" ? null : "macola"
+                            )
+                          }
+                          className="w-full font-bold text-xs text-slate-800 flex justify-between items-center cursor-pointer py-1 text-left"
+                        >
+                          <span>Integración Macola ERP</span>
+                          <span className={`text-slate-400 transition-transform ${activePOOptionSection === "macola" ? "rotate-180" : ""}`}>▾</span>
+                        </button>
+                        {activePOOptionSection === "macola" && (
+                          <div className="pt-3 space-y-3 text-xs text-slate-600 animate-in fade-in duration-150">
+                            <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 font-mono text-[11px] space-y-1">
+                              <p><strong>Estado Sync:</strong> <span className="text-emerald-700 font-bold">Lista para sincronizar</span></p>
+                              <p><strong>Módulo Macola:</strong> PO (Purchase Orders)</p>
+                            </div>
+
+                            <label className="block">
+                              <span className="font-semibold block mb-1">Centro de Costos</span>
+                              <input
+                                type="text"
+                                defaultValue="CC-102 (Producción Flexográfica)"
+                                className="w-full px-3 py-1.5 text-xs rounded-xl bg-slate-50 border border-slate-300 text-slate-900 font-mono"
+                              />
+                            </label>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Section 4: Archivos Adjuntos */}
+                      <div className="pt-4">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setActivePOOptionSection(
+                              activePOOptionSection === "adjuntos" ? null : "adjuntos"
+                            )
+                          }
+                          className="w-full font-bold text-xs text-slate-800 flex justify-between items-center cursor-pointer py-1 text-left"
+                        >
+                          <span>Archivos Adjuntos</span>
+                          <span className={`text-slate-400 transition-transform ${activePOOptionSection === "adjuntos" ? "rotate-180" : ""}`}>▾</span>
+                        </button>
+                        {activePOOptionSection === "adjuntos" && (
+                          <div className="pt-3 space-y-3 text-xs text-slate-600 animate-in fade-in duration-150">
+                            <div className="border-2 border-dashed border-slate-200 rounded-xl p-4 text-center hover:border-[#f6821f] transition cursor-pointer bg-slate-50/50">
+                              <svg className="w-6 h-6 text-slate-400 mx-auto mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                              </svg>
+                              <span className="font-semibold text-[#f6821f] text-xs">Adjuntar ficha técnica / contrato</span>
+                              <p className="text-[10px] text-slate-400 mt-0.5">PDF, PNG, JPG hasta 15MB</p>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                    </div>
+
+                    {/* Footer */}
+                    <div className="p-4 border-t border-slate-200 bg-slate-50 sticky bottom-0 z-10 flex items-center justify-between">
+                      <button
+                        type="button"
+                        onClick={() => setShowPOOptionsSidebar(false)}
+                        className="w-full py-2 bg-[#f6821f] hover:bg-[#e07216] text-white font-bold text-xs rounded-xl shadow-xs transition cursor-pointer"
+                      >
+                        Aplicar y cerrar
+                      </button>
+                    </div>
+                  </aside>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ================= VIEW: DEPÓSITO BANCARIO ================= */}
+          {currentView === "deposito-bancario" && (
+            <div className="fixed inset-0 z-40 flex flex-col bg-slate-100 text-slate-800 animate-in fade-in duration-150 overflow-hidden">
+              
+              {/* TOP HEADER BAR (Clean, without comentarios or ? icon as requested) */}
+              <header className="bg-white border-b border-slate-200 px-6 py-3.5 flex items-center justify-between sticky top-0 z-30 shadow-2xs">
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={closeDepositoBancarioView}
+                    className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition cursor-pointer"
+                    title="Regresar"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
+                    </svg>
+                  </button>
+                  <h1 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                    <svg className="w-5 h-5 text-[#f6821f]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 14v3m4-3v3m4-3v3M3 21h18M3 10h18M3 7l9-4 9 4M4 10h16v11H4V10z" />
+                    </svg>
+                    <span>Depósito bancario</span>
+                  </h1>
+                </div>
+
+                {/* Top Right Action (Only Close X Button - No comentarios, No question icon) */}
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={closeDepositoBancarioView}
+                    className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition cursor-pointer"
+                    title="Cerrar depósito"
+                  >
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              </header>
+
+              {/* MAIN CONTENT WORKSPACE */}
+              <div className="flex-1 overflow-y-auto p-6 lg:p-8 space-y-6 pb-24">
+                
+                {/* Notification Banner */}
+                {depositSuccessMsg && (
+                  <div className="max-w-6xl mx-auto p-3.5 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs rounded-xl flex items-center justify-between shadow-xs">
+                    <span className="font-bold">✓ {depositSuccessMsg}</span>
+                  </div>
+                )}
+
+                {/* UPPER CARDS GRID: Bank Account, Date, Currency & Big Amount Header */}
+                <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs max-w-6xl mx-auto space-y-6">
+                  <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+                    
+                    {/* Left Filters */}
+                    <div className="flex flex-wrap items-center gap-4 flex-1">
+                      {/* Bank Account */}
+                      <div className="min-w-[240px]">
+                        <label className="block text-xs font-bold text-slate-700 mb-1">Cuenta de depósito *</label>
+                        <div className="flex items-center gap-2">
+                          <select
+                            value={depositForm.account}
+                            onChange={(e) => setDepositForm({ ...depositForm, account: e.target.value })}
+                            className="w-full px-3.5 py-2 text-xs rounded-xl bg-slate-50 border border-slate-300 text-slate-900 focus:outline-none focus:border-[#f6821f] font-semibold cursor-pointer shadow-2xs"
+                          >
+                            <option value="1002 - Banco Ficohsa USD">1002 - Banco Ficohsa USD</option>
+                            <option value="1001 - Banco Atlántida HNL">1001 - Banco Atlántida HNL</option>
+                            <option value="1000 - Caja General y Efectivo">1000 - Caja General y Efectivo</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      {/* Date */}
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 mb-1">Fecha *</label>
+                        <input
+                          type="date"
+                          value={depositForm.date}
+                          onChange={(e) => setDepositForm({ ...depositForm, date: e.target.value })}
+                          className="px-3.5 py-2 text-xs rounded-xl bg-slate-50 border border-slate-300 text-slate-900 focus:outline-none focus:border-[#f6821f] font-medium shadow-2xs"
+                        />
+                      </div>
+
+                      {/* Currency */}
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 mb-1">Moneda *</label>
+                        <select
+                          value={depositForm.currency}
+                          onChange={(e) => setDepositForm({ ...depositForm, currency: e.target.value })}
+                          className="px-3.5 py-2 text-xs rounded-xl bg-slate-50 border border-slate-300 text-slate-900 focus:outline-none focus:border-[#f6821f] font-semibold cursor-pointer shadow-2xs"
+                        >
+                          <option value="USD">USD Dólar estadounidense ($)</option>
+                          <option value="HNL">HNL Lempira hondureño (L)</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* Big Amount Header (Matching Dashboard Metric Cards typography) */}
+                    <div className="text-right bg-slate-50 px-6 py-4 rounded-2xl border border-slate-200 w-full md:w-auto">
+                      <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">IMPORTE TOTAL</span>
+                      <div className="text-3xl font-bold text-slate-900 mt-1">
+                        ${depositFinalTotal.toLocaleString("es-HN", { minimumFractionDigits: 2 })}
+                      </div>
+                    </div>
+
+                  </div>
+                </div>
+
+                {/* MAIN TABLE CARD: Agregar fondos a este depósito */}
+                <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xs max-w-6xl mx-auto space-y-4 p-6">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                    <h2 className="font-bold text-sm text-slate-900 flex items-center gap-2">
+                      <svg className="w-4 h-4 text-[#f6821f]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                      </svg>
+                      <span>Agregar fondos a este depósito</span>
+                    </h2>
+                    <span className="text-xs text-slate-500 font-medium">
+                      {depositForm.lines.length} {depositForm.lines.length === 1 ? "línea registrada" : "líneas registradas"}
+                    </span>
+                  </div>
+
+                  {/* Table */}
+                  <div className="border border-slate-200 rounded-2xl overflow-hidden shadow-2xs">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-xs">
+                        <thead className="bg-slate-50 border-b border-slate-200 text-slate-700 font-bold uppercase tracking-wider text-[11px]">
+                          <tr>
+                            <th className="p-3 w-10 text-center">#</th>
+                            <th className="p-3 min-w-[180px]">RECIBIDO DE</th>
+                            <th className="p-3 min-w-[180px]">CUENTA</th>
+                            <th className="p-3 min-w-[200px]">DESCRIPCIÓN</th>
+                            <th className="p-3 min-w-[160px]">MÉTODO DE PAGO</th>
+                            <th className="p-3 w-36">N.º DE REFERENCIA</th>
+                            <th className="p-3 w-32 text-right">IMPORTE (USD)</th>
+                            <th className="p-3 w-12 text-center"></th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 font-sans">
+                          {depositForm.lines.map((line, idx) => (
+                            <tr key={line.id} className="hover:bg-slate-50/70 transition">
+                              <td className="p-3 text-center text-slate-400 font-mono font-medium">{idx + 1}</td>
+                              <td className="p-3">
+                                <select
+                                  value={line.receivedFrom}
+                                  onChange={(e) => handleDepositLineChange(line.id, "receivedFrom", e.target.value)}
+                                  className="w-full px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-900 focus:outline-none focus:border-[#f6821f] font-medium cursor-pointer"
+                                >
+                                  <option value="">-- Seleccionar cliente --</option>
+                                  {customers.map((c) => (
+                                    <option key={c.id} value={c.name}>
+                                      {c.name} {c.macolaCode ? `(${c.macolaCode})` : ""}
+                                    </option>
+                                  ))}
+                                </select>
+                              </td>
+                              <td className="p-3">
+                                <select
+                                  value={line.account}
+                                  onChange={(e) => handleDepositLineChange(line.id, "account", e.target.value)}
+                                  className="w-full px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-900 focus:outline-none focus:border-[#f6821f] font-medium cursor-pointer"
+                                >
+                                  <option value="1100 - Cuentas por Cobrar">1100 - Cuentas por Cobrar</option>
+                                  <option value="7000 - Ingresos por Ventas">7000 - Ingresos por Ventas</option>
+                                  <option value="1000 - Cash and Cash Equivalents">1000 - Cash and Cash Equivalents</option>
+                                  <option value="2100 - Cuentas por Pagar">2100 - Cuentas por Pagar</option>
+                                  <option value="7100 - Otros Ingresos Financieros">7100 - Otros Ingresos Financieros</option>
+                                </select>
+                              </td>
+                              <td className="p-3">
+                                <input
+                                  type="text"
+                                  value={line.memo}
+                                  onChange={(e) => handleDepositLineChange(line.id, "memo", e.target.value)}
+                                  placeholder="Descripción del depósito..."
+                                  className="w-full px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-900 focus:outline-none focus:border-[#f6821f]"
+                                />
+                              </td>
+                              <td className="p-3">
+                                <select
+                                  value={line.paymentMethod}
+                                  onChange={(e) => handleDepositLineChange(line.id, "paymentMethod", e.target.value)}
+                                  className="w-full px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-900 focus:outline-none focus:border-[#f6821f] font-medium cursor-pointer"
+                                >
+                                  <option value="Transferencia bancaria">Transferencia bancaria</option>
+                                  <option value="Cheque">Cheque</option>
+                                  <option value="Efectivo">Efectivo</option>
+                                  <option value="Tarjeta de crédito">Tarjeta de crédito</option>
+                                </select>
+                              </td>
+                              <td className="p-3">
+                                <input
+                                  type="text"
+                                  value={line.reference}
+                                  onChange={(e) => handleDepositLineChange(line.id, "reference", e.target.value)}
+                                  placeholder="N.º Ref / Cheque"
+                                  className="w-full px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-900 font-mono focus:outline-none focus:border-[#f6821f]"
+                                />
+                              </td>
+                              <td className="p-3 text-right">
+                                <input
+                                  type="number"
+                                  step="0.01"
+                                  value={line.amount}
+                                  onChange={(e) => handleDepositLineChange(line.id, "amount", e.target.value)}
+                                  className="w-full px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-900 font-mono text-right focus:outline-none focus:border-[#f6821f] font-bold"
+                                />
+                              </td>
+                              <td className="p-3 text-center">
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveDepositLine(line.id)}
+                                  className="text-slate-400 hover:text-red-600 transition cursor-pointer p-1"
+                                  title="Eliminar fila"
+                                >
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                  </svg>
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* Buttons below table */}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-2">
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={handleAddDepositLine}
+                        className="px-3.5 py-1.5 rounded-xl bg-[#fff7ed] hover:bg-[#ffedd5] text-[#f6821f] font-bold text-xs transition cursor-pointer border border-[#fed7aa] flex items-center gap-1"
+                      >
+                        <span>+ Agregar líneas</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleClearAllDepositLines}
+                        className="px-3.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 font-semibold text-xs transition cursor-pointer border border-slate-200"
+                      >
+                        <span>Borrar todas las líneas</span>
+                      </button>
+                    </div>
+
+                    <div className="text-right text-xs font-semibold text-slate-600">
+                      Total de otros fondos: <span className="font-bold text-slate-900 text-sm ml-2">${depositTotalLines.toLocaleString("es-HN", { minimumFractionDigits: 2 })}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* BOTTOM GRID: Notes & Uploads on Left / Cashback & Grand Totals on Right */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 max-w-6xl mx-auto">
+                  
+                  {/* Left Column: Note & Attachment */}
+                  <div className="space-y-4 text-xs">
+                    <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs space-y-2">
+                      <label className="block font-bold text-slate-700">Nota</label>
+                      <textarea
+                        rows={3}
+                        value={depositForm.memo}
+                        onChange={(e) => setDepositForm({ ...depositForm, memo: e.target.value })}
+                        placeholder="Escribe notas adicionales o detalles del depósito bancario..."
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:border-[#f6821f]"
+                      />
+                    </div>
+
+                    <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs space-y-2">
+                      <label className="block font-bold text-slate-700">Archivos adjuntos</label>
+                      <div className="border-2 border-dashed border-slate-200 rounded-xl p-6 text-center hover:border-[#f6821f] transition cursor-pointer bg-slate-50/50">
+                        <svg className="w-8 h-8 text-slate-400 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                        </svg>
+                        <p className="text-xs font-semibold text-[#f6821f]">Añadir archivo adjunto</p>
+                        <p className="text-[11px] text-slate-400 mt-0.5">Tamaño máximo de archivo: 20 MB</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Right Column: Cashback & Grand Totals */}
+                  <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs space-y-4 text-xs flex flex-col justify-between">
+                    <div className="space-y-3 border-b border-slate-100 pb-4">
+                      <h3 className="font-bold text-slate-800 uppercase tracking-wider text-[11px]">Reembolso en efectivo</h3>
+                      
+                      <div>
+                        <label className="block font-semibold text-slate-700 mb-1">Reembolso en efectivo para</label>
+                        <select
+                          value={depositForm.cashbackAccount}
+                          onChange={(e) => setDepositForm({ ...depositForm, cashbackAccount: e.target.value })}
+                          className="w-full px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:border-[#f6821f] cursor-pointer"
+                        >
+                          <option value="">-- Seleccionar cuenta de reembolso --</option>
+                          <option value="1000 - Cash and Cash Equivalents">1000 - Cash and Cash Equivalents</option>
+                          <option value="1005 - Caja Chica">1005 - Caja Chica</option>
+                        </select>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label className="block font-semibold text-slate-700 mb-1">Notas de reembolso</label>
+                          <input
+                            type="text"
+                            value={depositForm.cashbackMemo}
+                            onChange={(e) => setDepositForm({ ...depositForm, cashbackMemo: e.target.value })}
+                            placeholder="Notas de reembolso..."
+                            className="w-full px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:border-[#f6821f]"
+                          />
+                        </div>
+                        <div>
+                          <label className="block font-semibold text-slate-700 mb-1">Importe de reembolso</label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={depositForm.cashbackAmount}
+                            onChange={(e) => setDepositForm({ ...depositForm, cashbackAmount: Number(e.target.value) })}
+                            placeholder="0.00"
+                            className="w-full px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-mono text-right focus:outline-none focus:border-[#f6821f] font-bold"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Final Grand Totals (Matching Dashboard Metric Cards) */}
+                    <div className="space-y-2 text-right pt-2 font-sans">
+                      <div className="flex justify-between items-center text-slate-600">
+                        <span>Total:</span>
+                        <span className="font-bold text-slate-900">${depositFinalTotal.toLocaleString("es-HN", { minimumFractionDigits: 2 })}</span>
+                      </div>
+                      <div className="flex justify-between items-center text-sm font-bold text-slate-900 pt-2 border-t border-slate-200">
+                        <span>Total ({depositForm.currency}):</span>
+                        <span className="text-3xl font-bold text-slate-900">${depositFinalTotal.toLocaleString("es-HN", { minimumFractionDigits: 2 })}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                </div>
+
+              </div>
+
+              {/* FIXED BOTTOM ACTION BAR - ALIGNED TO THE RIGHT WITH SITE ORANGE BUTTON */}
+              <footer className="bg-white border-t border-slate-200 px-6 py-3.5 flex items-center justify-end gap-3 z-30 shadow-lg shrink-0">
+                <button
+                  type="button"
+                  onClick={closeDepositoBancarioView}
+                  className="px-4 py-2 rounded-xl border border-slate-300 text-slate-700 hover:bg-slate-100 text-xs font-semibold transition cursor-pointer"
+                >
+                  Cancelar
+                </button>
+
+                <div className="relative inline-flex rounded-lg shadow-sm">
+                  <button
+                    type="button"
+                    onClick={() => handleSaveDeposit(false)}
+                    className="px-5 py-2 rounded-l-lg bg-[#f6821f] hover:bg-[#e07216] text-white font-bold text-xs transition cursor-pointer flex items-center gap-1"
+                  >
+                    Guardar y cerrar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowDepositSaveDropdown(!showDepositSaveDropdown)}
+                    className="px-2.5 py-2 rounded-r-lg bg-[#e07216] hover:bg-[#d06512] text-white border-l border-white/20 transition cursor-pointer flex items-center justify-center"
+                  >
+                    <svg
+                      className={`w-3.5 h-3.5 transition-transform ${showDepositSaveDropdown ? "rotate-180" : "rotate-0"}`}
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
+
+                  {showDepositSaveDropdown && (
+                    <div className="absolute bottom-full right-0 mb-2 w-52 bg-white rounded-xl shadow-2xl border border-slate-200 py-1 z-40 animate-in fade-in zoom-in-95 duration-150">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowDepositSaveDropdown(false);
+                          handleSaveDeposit(false);
+                        }}
+                        className="w-full text-left px-4 py-2.5 text-xs text-slate-700 hover:bg-[#fff7ed] hover:text-[#f6821f] font-semibold transition cursor-pointer"
+                      >
+                        Guardar y cerrar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowDepositSaveDropdown(false);
+                          handleSaveDeposit(true);
+                        }}
+                        className="w-full text-left px-4 py-2.5 text-xs text-slate-700 hover:bg-[#fff7ed] hover:text-[#f6821f] font-semibold transition cursor-pointer"
+                      >
+                        Guardar y crear nueva
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </footer>
+
+            </div>
+          )}
+
+          {/* ================= VIEW: REGISTRAR GASTO (Matching Registrar Pago layout) ================= */}
+          {currentView === "agregar-gasto" && (
+            <div className="fixed inset-0 z-40 flex flex-col bg-[#f3f6f5] text-slate-800 animate-in fade-in duration-150 overflow-hidden">
+              
+              {/* TOP HEADER BAR */}
+              <header className="bg-white border-b border-slate-200 px-6 py-3.5 flex items-center justify-between sticky top-0 z-30 shadow-2xs">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-600">
+                    <svg className="w-4 h-4 text-[#f6821f]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                  <h1 className="text-lg font-bold text-slate-900 tracking-tight">Registrar Gasto</h1>
+                </div>
+
+                {/* Top Right Header Controls - Clean: NO comentarios, NO gear, NO help ? */}
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={closeGastoView}
+                    className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition cursor-pointer"
+                    title="Cerrar"
+                  >
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              </header>
+
+              {/* MAIN SCROLLABLE CONTENT (Scrollbar flush against right edge of screen) */}
+              <div className="flex-1 overflow-y-auto w-full">
+                <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-7xl mx-auto w-full">
+                
+                {gastoSuccessMsg && (
+                  <div className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs rounded-xl flex items-center justify-between shadow-xs font-semibold">
+                    <span>✓ {gastoSuccessMsg}</span>
+                  </div>
+                )}
+
+                {/* FORM WORKSPACE CARD */}
+                <div className="bg-white border border-slate-200/90 rounded-2xl p-6 lg:p-8 shadow-xs space-y-6">
+                  
+                  {/* TOP ROW: Beneficiario, Cuenta de pago, Fecha & IMPORTE DEL GASTO */}
+                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                    
+                    {/* Left Column: Form Fields (8 cols) */}
+                    <div className="lg:col-span-8 space-y-5">
+                      <div className="grid grid-cols-1 sm:grid-cols-12 gap-4 items-start">
+                        
+                        {/* Beneficiario (6 cols) */}
+                        <div className="sm:col-span-6">
+                          <label className="block text-xs font-semibold text-slate-600 mb-1.5">Beneficiario</label>
+                          <select
+                            value={gastoForm.payeeId}
+                            onChange={(e) => {
+                              const selected = vendors.find((v) => v.id === e.target.value);
+                              setGastoForm({ ...gastoForm, payeeId: e.target.value, payeeName: selected ? selected.name : "" });
+                            }}
+                            className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 bg-white text-slate-800 focus:outline-none focus:border-[#f6821f] focus:ring-1 focus:ring-[#f6821f]/20 font-medium cursor-pointer"
+                          >
+                            <option value="">¿A quién le pagaste?</option>
+                            {vendors.map((v) => (
+                              <option key={v.id} value={v.id}>{v.name}</option>
+                            ))}
+                          </select>
+                        </div>
+
+                        {/* Cuenta de pago (6 cols) */}
+                        <div className="sm:col-span-6">
+                          <label className="block text-xs font-semibold text-slate-600 mb-1.5">Cuenta de pago</label>
+                          <select
+                            value={gastoForm.paymentAccount}
+                            onChange={(e) => setGastoForm({ ...gastoForm, paymentAccount: e.target.value })}
+                            className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 bg-white text-slate-800 focus:outline-none focus:border-[#f6821f] focus:ring-1 focus:ring-[#f6821f]/20 font-medium cursor-pointer"
+                          >
+                            <option value="Accrued Liabilities">Accrued Liabilities</option>
+                            <option value="1000 - Cash and Cash Equivalents">1000 - Cash and Cash Equivalents</option>
+                            <option value="1005 - Caja Chica">1005 - Caja Chica</option>
+                            <option value="1010 - Banco FICOHSA HNL">1010 - Banco FICOHSA HNL</option>
+                            <option value="1020 - Banco BAC USD">1020 - Banco BAC USD</option>
+                          </select>
+                          <span className="text-[10px] text-slate-500 mt-1 block">Saldo $0.00</span>
+                        </div>
+                      </div>
+
+                      {/* SECOND ROW: Fecha de pago, Método de pago, N.º de referencia */}
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
+                        {/* Fecha de pago */}
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-600 mb-1.5">Fecha de pago</label>
+                          <input
+                            type="date"
+                            value={gastoForm.paymentDate}
+                            onChange={(e) => setGastoForm({ ...gastoForm, paymentDate: e.target.value })}
+                            className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 bg-white text-slate-800 focus:outline-none focus:border-[#f6821f]"
+                          />
+                        </div>
+
+                        {/* Método de pago */}
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-600 mb-1.5">Método de pago</label>
+                          <select
+                            value={gastoForm.paymentMethod}
+                            onChange={(e) => setGastoForm({ ...gastoForm, paymentMethod: e.target.value })}
+                            className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 bg-white text-slate-800 focus:outline-none focus:border-[#f6821f] cursor-pointer"
+                          >
+                            <option value="Efectivo">Efectivo</option>
+                            <option value="Transferencia Bancaria">Transferencia Bancaria</option>
+                            <option value="Cheque">Cheque</option>
+                            <option value="Tarjeta de Crédito">Tarjeta de Crédito</option>
+                          </select>
+                        </div>
+
+                        {/* N.º de referencia */}
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-600 mb-1.5">N.º de referencia</label>
+                          <input
+                            type="text"
+                            placeholder="Ej. REF-8849"
+                            value={gastoForm.refNumber}
+                            onChange={(e) => setGastoForm({ ...gastoForm, refNumber: e.target.value })}
+                            className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 bg-white text-slate-800 focus:outline-none focus:border-[#f6821f]"
+                          />
+                        </div>
+                      </div>
+
+                    </div>
+
+                    {/* Right Column: IMPORTE DEL GASTO big stat box (4 cols - matching Registrar Pago layout) */}
+                    <div className="lg:col-span-4 text-right space-y-1 bg-slate-50/70 p-6 rounded-2xl border border-slate-200/80">
+                      <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">
+                        IMPORTE DEL GASTO
+                      </span>
+                      <div className="text-4xl font-bold text-slate-900 font-sans tracking-tight">
+                        ${gastoTotal.toLocaleString("es-HN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </div>
+                      <div className="text-xs text-slate-500 pt-1">
+                        <span>Moneda oficial </span>
+                        <span className="font-semibold text-slate-700">USD ($)</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* LINE ITEMS TABLE CARD */}
+                  <div className="pt-4 space-y-3">
+                    <h3 className="text-sm font-bold text-slate-900">Categoría e importe del gasto</h3>
+                    <div className="overflow-x-auto border border-slate-200 rounded-2xl shadow-2xs">
+                      <table className="w-full text-left text-xs">
+                        <thead className="bg-slate-50 border-b border-slate-200 text-slate-700 font-bold uppercase tracking-wider text-[11px]">
+                          <tr>
+                            <th className="p-3 w-10 text-center">#</th>
+                            <th className="p-3 min-w-[220px]">CATEGORÍA</th>
+                            <th className="p-3 min-w-[320px]">DESCRIPCIÓN</th>
+                            <th className="p-3 w-36 text-right">IMPORTE (USD)</th>
+                            <th className="p-3 w-16 text-center"></th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 bg-white">
+                          {gastoForm.lines.map((line, idx) => (
+                            <tr key={line.id} className="hover:bg-slate-50/70 transition">
+                              <td className="p-3 text-center text-slate-400 font-mono">{idx + 1}</td>
+                              <td className="p-3">
+                                <select
+                                  value={line.category}
+                                  onChange={(e) => handleGastoLineChange(line.id, "category", e.target.value)}
+                                  className="w-full px-3 py-1.5 text-xs rounded-lg border border-slate-200 bg-white text-slate-900 focus:outline-none focus:border-[#f6821f] cursor-pointer"
+                                >
+                                  <option value="">-- Seleccionar categoría --</option>
+                                  <option value="Publicidad y Propaganda">Publicidad y Propaganda</option>
+                                  <option value="Servicios Públicos (Agua/Luz/Teléfono)">Servicios Públicos (Agua/Luz/Teléfono)</option>
+                                  <option value="Reparación y Mantenimiento">Reparación y Mantenimiento</option>
+                                  <option value="Materia Prima e Insumos Flexo">Materia Prima e Insumos Flexo</option>
+                                  <option value="Gastos de Transporte y Fletes">Gastos de Transporte y Fletes</option>
+                                  <option value="Seguros y Fianzas">Seguros y Fianzas</option>
+                                  <option value="Honorarios Profesionales">Honorarios Profesionales</option>
+                                  <option value="Gastos de Representación">Gastos de Representación</option>
+                                </select>
+                              </td>
+                              <td className="p-3">
+                                <input
+                                  type="text"
+                                  placeholder="Detalle o descripción del gasto..."
+                                  value={line.description}
+                                  onChange={(e) => handleGastoLineChange(line.id, "description", e.target.value)}
+                                  className="w-full px-3 py-1.5 text-xs rounded-lg border border-slate-200 bg-white text-slate-900 focus:outline-none focus:border-[#f6821f]"
+                                />
+                              </td>
+                              <td className="p-3 text-right">
+                                <input
+                                  type="number"
+                                  step="0.01"
+                                  placeholder="0.00"
+                                  value={line.amount || ""}
+                                  onChange={(e) => handleGastoLineChange(line.id, "amount", Number(e.target.value))}
+                                  className="w-full px-3 py-1.5 text-xs rounded-lg border border-slate-200 bg-white text-slate-900 text-right focus:outline-none focus:border-[#f6821f] font-bold"
+                                />
+                              </td>
+                              <td className="p-3 text-center">
+                                <div className="flex items-center justify-center gap-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDuplicateGastoLine(line.id)}
+                                    className="text-slate-400 hover:text-slate-700 transition cursor-pointer p-1"
+                                    title="Duplicar línea"
+                                  >
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                    </svg>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRemoveGastoLine(line.id)}
+                                    className="text-slate-400 hover:text-red-600 transition cursor-pointer p-1"
+                                    title="Eliminar línea"
+                                  >
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                    </svg>
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Under Table Action Buttons & Total */}
+                    <div className="p-4 bg-slate-50/50 rounded-2xl border border-slate-200/80 flex flex-wrap items-center justify-between gap-3">
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={handleAddGastoLine}
+                          className="px-3.5 py-1.5 rounded-xl bg-white border border-slate-300 text-slate-700 hover:bg-slate-100 text-xs font-semibold transition cursor-pointer shadow-2xs"
+                        >
+                          Agregar líneas
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleClearAllGastoLines}
+                          className="px-3.5 py-1.5 rounded-xl bg-white border border-slate-300 text-slate-700 hover:bg-slate-100 text-xs font-semibold transition cursor-pointer shadow-2xs"
+                        >
+                          Borrar todas las líneas
+                        </button>
+                      </div>
+
+                      <div className="text-right">
+                        <span className="text-xs font-bold text-slate-600 mr-4">Total</span>
+                        <span className="text-base font-bold text-slate-900">${gastoTotal.toLocaleString("es-HN", { minimumFractionDigits: 2 })}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* BOTTOM WORKSPACE: Nota & Archivos adjuntos (matching Registrar Pago) */}
+                  <div className="pt-6 border-t border-slate-100 space-y-6">
+                    {/* Nota */}
+                    <div className="max-w-md">
+                      <label className="block text-xs font-semibold text-slate-600 mb-1.5">Nota</label>
+                      <textarea
+                        rows={3}
+                        placeholder="Escribe comentarios o notas del gasto..."
+                        value={gastoForm.notes}
+                        onChange={(e) => setGastoForm({ ...gastoForm, notes: e.target.value })}
+                        className="w-full p-3 text-xs rounded-xl border border-slate-300 bg-white text-slate-800 focus:outline-none focus:border-[#f6821f] resize-none"
+                      />
+                    </div>
+
+                    {/* Archivos adjuntos */}
+                    <div className="max-w-md space-y-2">
+                      <label className="block text-xs font-semibold text-slate-600">Archivos adjuntos</label>
+                      <div className="border-2 border-dashed border-slate-200 hover:border-[#f6821f] rounded-xl p-6 text-center space-y-1 cursor-pointer transition bg-slate-50/50 hover:bg-slate-50">
+                        <svg className="w-8 h-8 text-slate-400 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                        </svg>
+                        <p className="text-xs font-semibold text-[#0066cc]">Añadir archivo adjunto</p>
+                        <p className="text-[11px] text-slate-400 mt-0.5">Tamaño máximo de archivo: 20 MB</p>
+                        <button type="button" className="text-[11px] text-[#0066cc] font-medium hover:underline pt-2">Mostrar existentes</button>
+                      </div>
+                    </div>
+                  </div>
+
+                </div>
+              </div>
+            </div>
+
+              {/* FIXED BOTTOM ACTION BAR - RIGHT ALIGNED WITH SITE ORANGE BUTTON */}
+              <footer className="bg-white border-t border-slate-200 px-6 py-3.5 flex items-center justify-end gap-3 z-30 shadow-lg shrink-0">
+                <button
+                  type="button"
+                  onClick={closeGastoView}
+                  className="px-4 py-2 rounded-xl border border-slate-300 text-slate-700 hover:bg-slate-100 text-xs font-semibold transition cursor-pointer"
+                >
+                  Cancelar
+                </button>
+
+                <div className="relative inline-flex rounded-lg shadow-sm">
+                  <button
+                    type="button"
+                    onClick={() => handleSaveGasto(false)}
+                    className="px-5 py-2 rounded-l-lg bg-[#f6821f] hover:bg-[#e07216] text-white font-bold text-xs transition cursor-pointer flex items-center gap-1"
+                  >
+                    Guardar y cerrar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowGastoSaveDropdown(!showGastoSaveDropdown)}
+                    className="px-2.5 py-2 rounded-r-lg bg-[#e07216] hover:bg-[#d06512] text-white border-l border-white/20 transition cursor-pointer flex items-center justify-center"
+                  >
+                    <svg
+                      className={`w-3.5 h-3.5 transition-transform ${showGastoSaveDropdown ? "rotate-180" : "rotate-0"}`}
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
+
+                  {showGastoSaveDropdown && (
+                    <div className="absolute bottom-full right-0 mb-2 w-52 bg-white rounded-xl shadow-2xl border border-slate-200 py-1 z-40 animate-in fade-in zoom-in-95 duration-150">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowGastoSaveDropdown(false);
+                          handleSaveGasto(false);
+                        }}
+                        className="w-full text-left px-4 py-2.5 text-xs text-slate-700 hover:bg-[#fff7ed] hover:text-[#f6821f] font-semibold transition cursor-pointer"
+                      >
+                        Guardar y cerrar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowGastoSaveDropdown(false);
+                          handleSaveGasto(true);
+                        }}
+                        className="w-full text-left px-4 py-2.5 text-xs text-slate-700 hover:bg-[#fff7ed] hover:text-[#f6821f] font-semibold transition cursor-pointer"
+                      >
+                        Guardar y crear nuevo
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </footer>
+            </div>
+          )}
+
+          {/* ================= VIEW: PAGAR FACTURAS DE PROVEEDORES ================= */}
+          {currentView === "pagar-proveedor" && (
+            <div className="fixed inset-0 z-40 flex flex-col bg-[#f8faf9] text-slate-800 animate-in fade-in duration-150 overflow-hidden">
+              
+              {/* TOP HEADER BAR */}
+              <header className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between sticky top-0 z-30 shadow-2xs">
+                <div className="flex items-center gap-3">
+                  <h1 className="text-xl font-bold text-slate-900 tracking-tight">Pagar facturas de proveedores</h1>
+                </div>
+                <button
+                  type="button"
+                  onClick={closePagarProveedorView}
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition cursor-pointer"
+                  title="Cerrar"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </header>
+
+              {/* MAIN SCROLLABLE CONTENT (Scrollbar flush against right edge of screen) */}
+              <div className="flex-1 overflow-y-auto w-full">
+                <div className="p-6 lg:p-8 space-y-6 max-w-7xl mx-auto w-full">
+                  
+                  {pagarProveedorSuccessMsg && (
+                    <div className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs rounded-xl flex items-center justify-between shadow-xs font-semibold">
+                      <span>✓ {pagarProveedorSuccessMsg}</span>
+                    </div>
+                  )}
+
+                  {/* FORM & FILTERS WORKSPACE */}
+                  <div className="space-y-6">
+                    
+                    {/* Top Row: Cuenta de pago & Fecha de pago */}
+                    <div className="flex flex-wrap items-center gap-6">
+                      {/* Cuenta de pago */}
+                      <div className="w-64">
+                        <label className="block text-xs text-slate-500 font-medium mb-1">Cuenta de pago</label>
+                        <select
+                          value={pagarProveedorForm.account}
+                          onChange={(e) => setPagarProveedorForm({ ...pagarProveedorForm, account: e.target.value })}
+                          className="w-full px-3.5 py-2 text-xs rounded-xl border border-slate-300 bg-white text-slate-800 focus:outline-none focus:border-[#f6821f] focus:ring-1 focus:ring-[#f6821f]/20 font-medium cursor-pointer shadow-2xs"
+                        >
+                          <option value="Seleccionar una cuenta">Seleccionar una cuenta</option>
+                          <option value="1000 - Cash and cash equivalents">1000 - Cash and cash equivalents</option>
+                          <option value="1005 - Caja Chica">1005 - Caja Chica</option>
+                          <option value="1010 - Banco FICOHSA HNL">1010 - Banco FICOHSA HNL</option>
+                          <option value="1020 - Banco BAC USD">1020 - Banco BAC USD</option>
+                        </select>
+                      </div>
+
+                      {/* Fecha de pago */}
+                      <div className="w-48">
+                        <label className="block text-xs text-slate-500 font-medium mb-1">Fecha de pago</label>
+                        <input
+                          type="date"
+                          value={pagarProveedorForm.paymentDate}
+                          onChange={(e) => setPagarProveedorForm({ ...pagarProveedorForm, paymentDate: e.target.value })}
+                          className="w-full px-3.5 py-2 text-xs rounded-xl border border-slate-300 bg-white text-slate-800 focus:outline-none focus:border-[#f6821f] focus:ring-1 focus:ring-[#f6821f]/20 shadow-2xs"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Second Row: Moneda, Método de pago, N.º de referencia */}
+                    <div className="flex flex-wrap items-center gap-6">
+                      <div className="w-64">
+                        <label className="block text-xs text-slate-500 font-medium mb-1">Moneda</label>
+                        <select
+                          value={pagarProveedorForm.currency}
+                          onChange={(e) => setPagarProveedorForm({ ...pagarProveedorForm, currency: e.target.value })}
+                          className="w-full px-3.5 py-2 text-xs rounded-xl border border-slate-300 bg-white text-slate-800 focus:outline-none focus:border-[#f6821f] focus:ring-1 focus:ring-[#f6821f]/20 font-medium cursor-pointer shadow-2xs"
+                        >
+                          <option value="USD - Dólar estadounidense">USD - Dólar estadou...</option>
+                          <option value="HNL - Lempira hondureño">HNL - Lempira hondureño</option>
+                        </select>
+                      </div>
+
+                      <div className="w-48">
+                        <label className="block text-xs text-slate-500 font-medium mb-1">Método de pago</label>
+                        <select
+                          value={pagarProveedorForm.paymentMethod}
+                          onChange={(e) => setPagarProveedorForm({ ...pagarProveedorForm, paymentMethod: e.target.value })}
+                          className="w-full px-3.5 py-2 text-xs rounded-xl border border-slate-300 bg-white text-slate-800 focus:outline-none focus:border-[#f6821f] focus:ring-1 focus:ring-[#f6821f]/20 font-medium cursor-pointer shadow-2xs"
+                        >
+                          <option value="Transferencia Bancaria">Transferencia Bancaria (ACH)</option>
+                          <option value="Cheque">Cheque</option>
+                          <option value="Efectivo">Efectivo</option>
+                          <option value="Tarjeta de Crédito">Tarjeta de Crédito</option>
+                        </select>
+                      </div>
+
+                      <div className="w-48">
+                        <label className="block text-xs text-slate-500 font-medium mb-1">N.º de referencia / Cheque</label>
+                        <input
+                          type="text"
+                          placeholder="Ej. CHQ-99401"
+                          value={pagarProveedorForm.refNumber}
+                          onChange={(e) => setPagarProveedorForm({ ...pagarProveedorForm, refNumber: e.target.value })}
+                          className="w-full px-3.5 py-2 text-xs rounded-xl border border-slate-300 bg-white text-slate-800 focus:outline-none focus:border-[#f6821f] focus:ring-1 focus:ring-[#f6821f]/20 shadow-2xs"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Filter Pills & Interactive Popover */}
+                    <div className="relative pt-2">
+                      <div className="flex items-center gap-3">
+                        <button
+                          type="button"
+                          onClick={() => setShowPagarProveedorFilterPopover(!showPagarProveedorFilterPopover)}
+                          className={`px-4 py-1.5 rounded-full border text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer ${
+                            showPagarProveedorFilterPopover
+                              ? "border-[#f6821f] text-[#f6821f] bg-[#fff7ed]"
+                              : "border-slate-300 text-slate-700 bg-white hover:bg-slate-50"
+                          }`}
+                        >
+                          <span>Filtros</span>
+                          <svg className={`w-3.5 h-3.5 transition-transform ${showPagarProveedorFilterPopover ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </button>
+
+                        <span className="px-3.5 py-1.5 rounded-full bg-slate-200/70 text-slate-700 text-xs font-medium">
+                          {pagarProveedorForm.dueDateFilter}
+                        </span>
+                      </div>
+
+                      {/* FLOATING FILTER POPOVER (Matches exact screenshot layout) */}
+                      {showPagarProveedorFilterPopover && (
+                        <div className="absolute left-0 top-11 z-40 w-full max-w-md bg-white rounded-2xl shadow-2xl border border-slate-200/90 p-5 space-y-4 animate-in fade-in zoom-in-95 duration-150">
+                          <div className="flex items-center justify-between pb-1">
+                            <span className="text-xs font-bold text-slate-800">Filtros</span>
+                            <button
+                              type="button"
+                              onClick={() => setShowPagarProveedorFilterPopover(false)}
+                              className="text-slate-400 hover:text-slate-600 transition cursor-pointer p-1"
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                              </svg>
+                            </button>
+                          </div>
+
+                          {/* Fecha de vencimiento, De, Para */}
+                          <div className="grid grid-cols-12 gap-3 items-end">
+                            <div className="col-span-6">
+                              <label className="block text-[11px] text-slate-500 font-medium mb-1">Fecha de vencimiento</label>
+                              <select
+                                value={pagarProveedorForm.dueDateFilter}
+                                onChange={(e) => setPagarProveedorForm({ ...pagarProveedorForm, dueDateFilter: e.target.value })}
+                                className="w-full px-3 py-1.5 text-xs rounded-xl border border-slate-300 bg-white text-slate-800 focus:outline-none focus:border-[#f6821f]"
+                              >
+                                <option value="Últimos 365 días">Últimos 365 días</option>
+                                <option value="Este mes">Este mes</option>
+                                <option value="Próximos 30 días">Próximos 30 días</option>
+                                <option value="Personalizado">Personalizado</option>
+                              </select>
+                            </div>
+                            <div className="col-span-3">
+                              <label className="block text-[11px] text-slate-500 font-medium mb-1">De</label>
+                              <input
+                                type="date"
+                                value={pagarProveedorForm.dateFrom}
+                                onChange={(e) => setPagarProveedorForm({ ...pagarProveedorForm, dateFrom: e.target.value })}
+                                className="w-full px-2 py-1.5 text-xs rounded-xl border border-slate-300 bg-white text-slate-800 focus:outline-none focus:border-[#f6821f]"
+                              />
+                            </div>
+                            <div className="col-span-3">
+                              <label className="block text-[11px] text-slate-500 font-medium mb-1">Para</label>
+                              <input
+                                type="date"
+                                value={pagarProveedorForm.dateTo}
+                                onChange={(e) => setPagarProveedorForm({ ...pagarProveedorForm, dateTo: e.target.value })}
+                                className="w-full px-2 py-1.5 text-xs rounded-xl border border-slate-300 bg-white text-slate-800 focus:outline-none focus:border-[#f6821f]"
+                              />
+                            </div>
+                          </div>
+
+                          {/* Beneficiario */}
+                          <div>
+                            <label className="block text-[11px] text-slate-500 font-medium mb-1">Beneficiario</label>
+                            <select
+                              value={pagarProveedorForm.payeeFilter}
+                              onChange={(e) => setPagarProveedorForm({ ...pagarProveedorForm, payeeFilter: e.target.value })}
+                              className="w-full px-3 py-1.5 text-xs rounded-xl border border-slate-300 bg-white text-slate-800 focus:outline-none focus:border-[#f6821f]"
+                            >
+                              <option value="Todo">Todo</option>
+                              {vendors.map((v) => (
+                                <option key={v.id} value={v.id}>{v.name}</option>
+                              ))}
+                            </select>
+                          </div>
+
+                          {/* Checkbox: Solo estado Vencida */}
+                          <div className="pt-1">
+                            <label className="flex items-center gap-2 text-xs text-slate-700 font-medium cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={pagarProveedorForm.onlyOverdue}
+                                onChange={(e) => setPagarProveedorForm({ ...pagarProveedorForm, onlyOverdue: e.target.checked })}
+                                className="rounded border-slate-300 text-[#f6821f] focus:ring-[#f6821f]"
+                              />
+                              <span>Solo estado Vencida</span>
+                            </label>
+                          </div>
+
+                          {/* Action Buttons: Restablecer & Aplicar */}
+                          <div className="flex items-center justify-between pt-3 border-t border-slate-100">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setPagarProveedorForm((prev) => ({
+                                  ...prev,
+                                  dueDateFilter: "Últimos 365 días",
+                                  dateFrom: "",
+                                  dateTo: "",
+                                  payeeFilter: "Todo",
+                                  onlyOverdue: false,
+                                }));
+                              }}
+                              className="px-4 py-2 rounded-xl border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 text-xs font-semibold transition cursor-pointer"
+                            >
+                              Restablecer
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setShowPagarProveedorFilterPopover(false)}
+                              className="px-5 py-2 rounded-xl bg-[#f6821f] hover:bg-[#e07216] text-white text-xs font-bold transition cursor-pointer shadow-2xs"
+                            >
+                              Aplicar
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* MAIN CONTENT AREA: Empty State matching screenshot vs Vendor Bills Table */}
+                    {vendorBills.length === 0 ? (
+                      <div className="py-20 text-center space-y-4 max-w-md mx-auto">
+                        <p className="text-base text-slate-700 font-medium">
+                          Parece que no tienes ninguna factura de proveedor para pagar.
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => openPurchaseOrderEditor()}
+                          className="text-xs text-slate-500 hover:underline cursor-pointer block mx-auto font-medium"
+                        >
+                          Ingresa una factura de proveedor para programar un pago.
+                        </button>
+                        <div className="pt-2">
+                          <button
+                            type="button"
+                            onClick={() => openPurchaseOrderEditor()}
+                            className="px-6 py-3 rounded-2xl bg-[#f6821f] hover:bg-[#e07216] text-white font-bold text-xs transition cursor-pointer shadow-md inline-flex items-center gap-2"
+                          >
+                            Ingresar nueva factura de proveedor
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      /* Vendor Bills Table when bills are loaded */
+                      <div className="bg-white border border-slate-200/90 rounded-2xl overflow-hidden shadow-2xs space-y-3">
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-left text-xs">
+                            <thead className="bg-slate-50 border-b border-slate-200 text-slate-700 font-bold uppercase tracking-wider text-[11px]">
+                              <tr>
+                                <th className="p-3 w-10 text-center">
+                                  <input
+                                    type="checkbox"
+                                    checked={selectedBillIds.length === vendorBills.length && vendorBills.length > 0}
+                                    onChange={handleToggleSelectAllBills}
+                                    className="rounded border-slate-300 text-[#f6821f] focus:ring-[#f6821f]"
+                                  />
+                                </th>
+                                <th className="p-3">BENEFICIARIO</th>
+                                <th className="p-3">N.º DE FACTURA</th>
+                                <th className="p-3">FECHA DE VENCIMIENTO</th>
+                                <th className="p-3 text-right">IMPORTE ORIGINAL</th>
+                                <th className="p-3 text-right">SALDO PENDIENTE</th>
+                                <th className="p-3 text-right w-40">IMPORTE A PAGAR</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100 bg-white">
+                              {vendorBills.map((bill) => {
+                                const isSelected = selectedBillIds.includes(bill.id);
+                                return (
+                                  <tr key={bill.id} className={`hover:bg-slate-50 transition ${isSelected ? "bg-[#fff7ed]/60" : ""}`}>
+                                    <td className="p-3 text-center">
+                                      <input
+                                        type="checkbox"
+                                        checked={isSelected}
+                                        onChange={() => handleToggleSelectBill(bill.id)}
+                                        className="rounded border-slate-300 text-[#f6821f] focus:ring-[#f6821f]"
+                                      />
+                                    </td>
+                                    <td className="p-3 font-semibold text-slate-800">{bill.vendorName}</td>
+                                    <td className="p-3 font-mono text-slate-600">{bill.billNumber}</td>
+                                    <td className="p-3 text-slate-600">{bill.dueDate}</td>
+                                    <td className="p-3 text-right font-mono">${bill.originalAmount.toFixed(2)}</td>
+                                    <td className="p-3 text-right font-mono font-bold text-slate-900">${bill.balanceDue.toFixed(2)}</td>
+                                    <td className="p-3 text-right">
+                                      <input
+                                        type="number"
+                                        step="0.01"
+                                        value={customBillAmounts[bill.id] ?? bill.balanceDue}
+                                        onChange={(e) => setCustomBillAmounts({ ...customBillAmounts, [bill.id]: Number(e.target.value) })}
+                                        className="w-full px-2.5 py-1 text-xs rounded-lg border border-slate-300 text-right font-bold focus:outline-none focus:border-[#f6821f]"
+                                      />
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )}
+
+                  </div>
+
+                </div>
+              </div>
+
+              {/* FIXED BOTTOM ACTION BAR */}
+              <footer className="bg-white border-t border-slate-200 px-6 py-3.5 flex items-center justify-between z-30 shadow-lg shrink-0">
+                <div className="flex items-center gap-6 text-xs">
+                  <div>
+                    <span className="text-slate-500 font-medium">Facturas seleccionadas: </span>
+                    <span className="font-bold text-slate-900">{selectedBillIds.length} de {vendorBills.length}</span>
+                  </div>
+                  <div className="border-l border-slate-200 pl-6">
+                    <span className="text-slate-500 font-medium uppercase text-[10px] tracking-wider block">TOTAL A PAGAR</span>
+                    <span className="text-lg font-bold text-[#f6821f] font-mono">${totalPagarSum.toLocaleString("es-HN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD</span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={closePagarProveedorView}
+                    className="px-4 py-2 rounded-xl border border-slate-300 text-slate-700 hover:bg-slate-100 text-xs font-semibold transition cursor-pointer"
+                  >
+                    Cancelar
+                  </button>
+
+                  <div className="relative inline-flex rounded-lg shadow-sm">
+                    <button
+                      type="button"
+                      disabled={selectedBillIds.length === 0}
+                      onClick={() => handleSavePagarProveedor(false)}
+                      className="px-5 py-2.5 rounded-l-lg bg-[#f6821f] hover:bg-[#e07216] disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-bold text-xs transition cursor-pointer flex items-center gap-1.5"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 00-2 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+                      </svg>
+                      <span>{selectedBillIds.length > 0 ? `Pagar $${totalPagarSum.toLocaleString("es-HN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD` : "Pagar facturas"}</span>
+                    </button>
+                    <button
+                      type="button"
+                      disabled={selectedBillIds.length === 0}
+                      onClick={() => setShowPagarProveedorSaveDropdown(!showPagarProveedorSaveDropdown)}
+                      className="px-2.5 py-2.5 rounded-r-lg bg-[#e07216] hover:bg-[#d06512] disabled:bg-slate-400 disabled:cursor-not-allowed text-white border-l border-white/20 transition cursor-pointer flex items-center justify-center"
+                    >
+                      <svg
+                        className={`w-3.5 h-3.5 transition-transform ${showPagarProveedorSaveDropdown ? "rotate-180" : "rotate-0"}`}
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
+
+                    {showPagarProveedorSaveDropdown && (
+                      <div className="absolute bottom-full right-0 mb-2 w-52 bg-white rounded-xl shadow-2xl border border-slate-200 py-1 z-40 animate-in fade-in zoom-in-95 duration-150">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowPagarProveedorSaveDropdown(false);
+                            handleSavePagarProveedor(false);
+                          }}
+                          className="w-full text-left px-4 py-2.5 text-xs text-slate-700 hover:bg-[#fff7ed] hover:text-[#f6821f] font-semibold transition cursor-pointer"
+                        >
+                          Pagar y cerrar
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowPagarProveedorSaveDropdown(false);
+                            handleSavePagarProveedor(true);
+                          }}
+                          className="w-full text-left px-4 py-2.5 text-xs text-slate-700 hover:bg-[#fff7ed] hover:text-[#f6821f] font-semibold transition cursor-pointer"
+                        >
+                          Programar pago
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </footer>
+            </div>
+          )}
+
+          {/* ================= VIEW: RECIBIR PAGO ================= */}
+          {currentView === "recibir-pago" && (
+            <div className="fixed inset-0 z-40 flex flex-col bg-[#f3f6f5] text-slate-800 animate-in fade-in duration-150 overflow-hidden">
+              
+              {/* TOP HEADER BAR */}
+              <header className="bg-white border-b border-slate-200 px-6 py-3.5 flex items-center justify-between sticky top-0 z-30 shadow-2xs">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-600">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                  <h1 className="text-lg font-bold text-slate-900 tracking-tight">Registrar Pago</h1>
+                </div>
+
+                {/* Top Right Header Controls - NO comentarios, NO question icon per directive */}
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={handleRequestCancelRecibirPago}
+                    className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition cursor-pointer"
+                    title="Cerrar"
+                  >
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              </header>
+
+              {/* MAIN SCROLLABLE CONTENT (Scrollbar flush against right edge of screen) */}
+              <div className="flex-1 overflow-y-auto w-full">
+                <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-7xl mx-auto w-full">
+                
+                {recibirPagoSuccessMsg && (
+                  <div className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs rounded-xl flex items-center justify-between shadow-xs font-semibold">
+                    <span>✓ {recibirPagoSuccessMsg}</span>
+                  </div>
+                )}
+                {recibirPagoErrorMsg && (
+                  <div className="p-4 bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl flex items-center justify-between shadow-xs font-semibold">
+                    <span>⚠ {recibirPagoErrorMsg}</span>
+                  </div>
+                )}
+
+                {/* FORM WORKSPACE CARD */}
+                <div className="bg-white border border-slate-200/90 rounded-2xl p-6 lg:p-8 shadow-xs space-y-6">
+                  
+                  {/* TOP ROW: Cliente, Correo electrónico, Buscar por n.º de factura & IMPORTE RECIBIDO */}
+                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                    
+                    {/* Left Column: Form Fields (8 cols) */}
+                    <div className="lg:col-span-8 space-y-5">
+                      <div className="grid grid-cols-1 sm:grid-cols-12 gap-4 items-start">
+                        
+                        {/* Cliente (5 cols) */}
+                        <div className="sm:col-span-5">
+                          <label className="block text-xs font-semibold text-slate-600 mb-1.5">Cliente</label>
+                          <select
+                            value={recibirPagoForm.customerId}
+                            onChange={(e) => handleRecibirPagoCustomerChange(e.target.value)}
+                            className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 bg-white text-slate-800 focus:outline-none focus:border-[#f6821f] focus:ring-1 focus:ring-[#f6821f]/20"
+                          >
+                            <option value="">Elige un cliente</option>
+                            {customers.map((c) => (
+                              <option key={c.id} value={c.id}>
+                                {c.name} {c.macolaCode ? `(${c.macolaCode})` : ""}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        {/* Correo electrónico (4 cols) */}
+                        <div className="sm:col-span-4 relative">
+                          <div className="flex justify-between items-center mb-1.5">
+                            <label className="block text-xs font-semibold text-slate-600">Correo electrónico</label>
+                            <button
+                              type="button"
+                              onClick={() => setShowCcCcoPopover(!showCcCcoPopover)}
+                              className="text-[11px] font-medium text-[#0066cc] hover:underline cursor-pointer"
+                            >
+                              CC / CCO
+                            </button>
+                          </div>
+
+                          {/* Popover CC / CCO */}
+                          {showCcCcoPopover && (
+                            <div className="absolute left-0 sm:-left-4 top-8 z-50 w-72 bg-white rounded-2xl shadow-2xl border border-slate-200 p-4 space-y-3 animate-in fade-in zoom-in-95 duration-150">
+                              {/* Popover Arrow tail */}
+                              <div className="absolute -top-2 right-4 sm:left-12 w-4 h-4 bg-white border-t border-l border-slate-200 rotate-45" />
+
+                              <div>
+                                <label className="block text-xs font-bold text-slate-700 mb-1">CC</label>
+                                <input
+                                  type="text"
+                                  placeholder=""
+                                  value={recibirPagoForm.emailCc}
+                                  onChange={(e) => setRecibirPagoForm({ ...recibirPagoForm, emailCc: e.target.value })}
+                                  className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 bg-white text-slate-800 focus:outline-none focus:border-[#f6821f]"
+                                />
+                              </div>
+
+                              <div>
+                                <label className="block text-xs font-bold text-slate-700 mb-1">CCO</label>
+                                <input
+                                  type="text"
+                                  placeholder=""
+                                  value={recibirPagoForm.emailCco}
+                                  onChange={(e) => setRecibirPagoForm({ ...recibirPagoForm, emailCco: e.target.value })}
+                                  className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 bg-white text-slate-800 focus:outline-none focus:border-[#f6821f]"
+                                />
+                              </div>
+
+                              <div className="flex justify-end pt-1">
+                                <button
+                                  type="button"
+                                  onClick={() => setShowCcCcoPopover(false)}
+                                  className="px-4 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-800 font-semibold text-xs rounded-xl cursor-pointer transition"
+                                >
+                                  Listo
+                                </button>
+                              </div>
+                            </div>
+                          )}
+
+                          <input
+                            type="email"
+                            placeholder="Correo electrónico (separa las direcciones con comas)"
+                            value={recibirPagoForm.customerEmail}
+                            onChange={(e) => setRecibirPagoForm({ ...recibirPagoForm, customerEmail: e.target.value })}
+                            className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 bg-white text-slate-800 focus:outline-none focus:border-[#f6821f] focus:ring-1 focus:ring-[#f6821f]/20"
+                          />
+                          <label className="mt-2 flex items-center gap-2 text-xs text-slate-600 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={recibirPagoForm.sendLater}
+                              onChange={(e) => setRecibirPagoForm({ ...recibirPagoForm, sendLater: e.target.checked })}
+                              className="rounded border-slate-300 text-[#f6821f] focus:ring-[#f6821f]"
+                            />
+                            <span>Enviar más adelante</span>
+                          </label>
+                        </div>
+
+                        {/* Buscar por n.º de factura button (3 cols) */}
+                        <div className="sm:col-span-3 pt-6 sm:pt-6">
+                          <button
+                            type="button"
+                            onClick={() => setShowInvoiceSearchModal(true)}
+                            className="w-full px-3 py-2 rounded-lg border border-[#f6821f] text-[#f6821f] hover:bg-[#fff7ed] font-semibold text-xs transition cursor-pointer text-center whitespace-nowrap"
+                          >
+                            Buscar por n.º de factura
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* SECOND ROW: Fecha de pago, Método de pago, N.º de referencia, Depositar en, Importe recibido */}
+                      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 pt-2">
+                        {/* Fecha de pago */}
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-600 mb-1.5">Fecha de pago</label>
+                          <input
+                            type="date"
+                            value={recibirPagoForm.paymentDate}
+                            onChange={(e) => setRecibirPagoForm({ ...recibirPagoForm, paymentDate: e.target.value })}
+                            className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 bg-white text-slate-800 focus:outline-none focus:border-[#f6821f]"
+                          />
+                        </div>
+
+                        {/* Método de pago */}
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-600 mb-1.5">Método de pago</label>
+                          <select
+                            value={recibirPagoForm.paymentMethod}
+                            onChange={(e) => setRecibirPagoForm({ ...recibirPagoForm, paymentMethod: e.target.value })}
+                            className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 bg-white text-slate-800 focus:outline-none focus:border-[#f6821f]"
+                          >
+                            <option value="Seleccionar método de pago">Seleccionar método de pago</option>
+                            <option value="Efectivo">Efectivo</option>
+                            <option value="Transferencia ACH">Transferencia ACH</option>
+                            <option value="Depósito bancario">Depósito bancario</option>
+                            <option value="Cheque">Cheque</option>
+                            <option value="Tarjeta de crédito">Tarjeta de crédito</option>
+                            <option value="Tarjeta de débito">Tarjeta de débito</option>
+                          </select>
+                        </div>
+
+                        {/* N.º de referencia */}
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-600 mb-1.5">N.º de referencia</label>
+                          <input
+                            type="text"
+                            placeholder=""
+                            value={recibirPagoForm.referenceNumber}
+                            onChange={(e) => setRecibirPagoForm({ ...recibirPagoForm, referenceNumber: e.target.value })}
+                            className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 bg-white text-slate-800 focus:outline-none focus:border-[#f6821f]"
+                          />
+                        </div>
+
+                        {/* Depositar en */}
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-600 mb-1.5">Depositar en</label>
+                          <select
+                            value={recibirPagoForm.depositAccount}
+                            onChange={(e) => setRecibirPagoForm({ ...recibirPagoForm, depositAccount: e.target.value })}
+                            className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 bg-white text-slate-800 focus:outline-none focus:border-[#f6821f]"
+                          >
+                            <option value="Cash and cash equivalents">Cash and cash equivalents</option>
+                            <option value="Caja General USD">Caja General (USD)</option>
+                            {connectedBanks.map((b) => (
+                              <option key={b.id} value={`${b.name} (${b.currency})`}>
+                                {b.name} - {b.accountNumber} ({b.currency})
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        {/* Importe recibido */}
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-600 mb-1.5">Importe recibido</label>
+                          <div className="relative">
+                            <input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              placeholder="0,00"
+                              value={recibirPagoForm.amount || ""}
+                              onChange={(e) => setRecibirPagoForm({ ...recibirPagoForm, amount: parseFloat(e.target.value) || 0 })}
+                              className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 bg-white text-slate-800 font-mono text-right focus:outline-none focus:border-[#f6821f]"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                    </div>
+
+                    {/* Right Column: IMPORTE RECIBIDO big stat box (4 cols) */}
+                    <div className="lg:col-span-4 text-right space-y-1">
+                      <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">
+                        IMPORTE RECIBIDO
+                      </span>
+                      <div className="text-4xl font-light text-slate-900 font-sans tracking-tight">
+                        ${(recibirPagoForm.amount || 0).toLocaleString("es-HN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </div>
+                      <div className="text-xs text-slate-500 pt-1">
+                        <span>Cliente saldo </span>
+                        <span className="font-semibold text-slate-700">$0,00</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* BOTTOM WORKSPACE: Nota & Archivos adjuntos */}
+                  <div className="pt-6 border-t border-slate-100 space-y-6">
+                    {/* Nota */}
+                    <div className="max-w-md">
+                      <label className="block text-xs font-semibold text-slate-600 mb-1.5">Nota</label>
+                      <textarea
+                        rows={3}
+                        placeholder="Nota"
+                        value={recibirPagoForm.note}
+                        onChange={(e) => setRecibirPagoForm({ ...recibirPagoForm, note: e.target.value })}
+                        className="w-full p-3 text-xs rounded-xl border border-slate-300 bg-white text-slate-800 focus:outline-none focus:border-[#f6821f] resize-none"
+                      />
+                    </div>
+
+                    {/* Archivos adjuntos */}
+                    <div className="max-w-md space-y-2">
+                      <label className="block text-xs font-semibold text-slate-600">Archivos adjuntos</label>
+                      <div
+                        onClick={() => paymentFileInputRef.current?.click()}
+                        className="border-2 border-dashed border-slate-200 hover:border-[#f6821f] rounded-xl p-6 text-center space-y-1 cursor-pointer transition bg-slate-50/50 hover:bg-slate-50"
+                      >
+                        <input
+                          ref={paymentFileInputRef}
+                          type="file"
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              setRecibirPagoForm((prev) => ({ ...prev, attachmentName: file.name }));
+                            }
+                          }}
+                        />
+                        <button type="button" className="text-xs font-medium text-[#0066cc] hover:underline cursor-pointer block mx-auto">
+                          Añadir archivo adjunto
+                        </button>
+                        <p className="text-[11px] text-slate-400">
+                          {recibirPagoForm.attachmentName ? `Adjunto: ${recibirPagoForm.attachmentName}` : "Tamaño máximo de archivo: 20 MB"}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                </div>
+              </div>
+            </div>
+
+              {/* FOOTER BAR */}
+              <footer className="bg-white border-t border-slate-200 px-6 py-3.5 flex items-center justify-end gap-3 sticky bottom-0 z-30 shadow-md">
+                {/* Cancelar */}
+                <button
+                  type="button"
+                  onClick={handleRequestCancelRecibirPago}
+                  className="px-4 py-2 rounded-lg border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 font-semibold text-xs transition cursor-pointer"
+                >
+                  Cancelar
+                </button>
+
+                {/* Imprimir */}
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  className="px-4 py-2 rounded-lg border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 font-semibold text-xs transition cursor-pointer"
+                >
+                  Imprimir
+                </button>
+
+                {/* Guardar */}
+                <button
+                  type="button"
+                  disabled={recibirPagoLoading}
+                  onClick={() => handleSaveRecibirPago(false)}
+                  className="px-4 py-2 rounded-lg border border-[#f6821f] bg-white text-[#f6821f] hover:bg-[#fff7ed] font-semibold text-xs transition cursor-pointer disabled:opacity-50"
+                >
+                  Guardar
+                </button>
+
+                {/* Guardar y cerrar split-button */}
+                <div className="relative inline-flex rounded-lg shadow-sm">
+                  <button
+                    type="button"
+                    disabled={recibirPagoLoading}
+                    onClick={() => handleSaveRecibirPago(true)}
+                    className="px-5 py-2 rounded-l-lg bg-[#f6821f] hover:bg-[#e07216] text-white font-bold text-xs transition cursor-pointer flex items-center gap-2 disabled:opacity-50 shadow-md shadow-[#f6821f]/20"
+                  >
+                    {recibirPagoLoading ? (
+                      <>
+                        <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        <span>Guardando...</span>
+                      </>
+                    ) : (
+                      <span>Guardar y cerrar</span>
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowRecibirPagoSaveDropdown(!showRecibirPagoSaveDropdown)}
+                    className="px-2.5 py-2 rounded-r-lg bg-[#e07216] hover:bg-[#d06512] text-white border-l border-white/20 transition cursor-pointer flex items-center justify-center"
+                  >
+                    <svg
+                      className={`w-3.5 h-3.5 transition-transform ${showRecibirPagoSaveDropdown ? "rotate-180" : "rotate-0"}`}
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
+
+                  {showRecibirPagoSaveDropdown && (
+                    <div className="absolute bottom-full right-0 mb-2 w-52 bg-white rounded-xl shadow-2xl border border-slate-200 py-1 z-40 animate-in fade-in zoom-in-95 duration-150">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowRecibirPagoSaveDropdown(false);
+                          handleSaveRecibirPago(true);
+                        }}
+                        className="w-full text-left px-4 py-2.5 text-xs text-slate-700 hover:bg-[#fff7ed] hover:text-[#f6821f] font-semibold transition cursor-pointer"
+                      >
+                        Guardar y cerrar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowRecibirPagoSaveDropdown(false);
+                          handleSaveRecibirPago(false);
+                        }}
+                        className="w-full text-left px-4 py-2.5 text-xs text-slate-700 hover:bg-[#fff7ed] hover:text-[#f6821f] font-semibold transition cursor-pointer"
+                      >
+                        Guardar y nuevo
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </footer>
+
+              {/* MODAL: BUSCAR POR N.º DE FACTURA */}
+              {showInvoiceSearchModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs">
+                  <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-lg p-6 shadow-2xl relative space-y-4 animate-in fade-in zoom-in-95 duration-150">
+                    <button
+                      type="button"
+                      onClick={() => setShowInvoiceSearchModal(false)}
+                      className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 transition cursor-pointer"
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+
+                    <div>
+                      <span className="text-[11px] font-bold text-[#f6821f] uppercase tracking-wider block">Búsqueda Rápida</span>
+                      <h3 className="font-bold text-lg text-slate-900">Buscar por N.º de Factura</h3>
+                      <p className="text-xs text-slate-500">Ingresa el número de factura o selecciona una de la lista para importar cliente e importe automáticamente.</p>
+                    </div>
+
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        placeholder="Ej. 1001 o nombre de cliente"
+                        value={searchInvoiceNumber}
+                        onChange={(e) => setSearchInvoiceNumber(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            handleImportInvoiceData(searchInvoiceNumber);
+                          }
+                        }}
+                        className="flex-1 px-3.5 py-2.5 text-xs rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:border-[#f6821f] text-slate-900"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleImportInvoiceData(searchInvoiceNumber)}
+                        className="px-5 py-2.5 rounded-xl bg-[#f6821f] hover:bg-[#e07216] text-white text-xs font-bold transition cursor-pointer shadow-md shadow-[#f6821f]/20"
+                      >
+                        Buscar
+                      </button>
+                    </div>
+
+                    {/* Quick Selection List */}
+                    <div className="pt-2">
+                      <span className="text-[11px] font-semibold text-slate-500 mb-2 block uppercase tracking-wider">Facturas Disponibles:</span>
+                      <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                        {[
+                          { num: "1001", date: "2026-09-03", customer: "Textiles Búfalo S.A.", due: "2026-10-03", total: 12500, status: "Pendiente" },
+                          { num: "1000", date: "2026-09-01", customer: "Empaques del Norte S. de R.L.", due: "2026-09-15", total: 4850, status: "Cobrada" },
+                          { num: "0999", date: "2026-08-28", customer: "Confecciones Gildan Búfalo", due: "2026-09-28", total: 8720, status: "Cobrada" },
+                        ]
+                          .filter((inv) =>
+                            !searchInvoiceNumber ||
+                            inv.num.includes(searchInvoiceNumber) ||
+                            inv.customer.toLowerCase().includes(searchInvoiceNumber.toLowerCase())
+                          )
+                          .map((inv) => (
+                            <div
+                              key={inv.num}
+                              onClick={() => handleImportInvoiceData(inv.num)}
+                              className="p-3 rounded-xl border border-slate-200 hover:border-[#f6821f] bg-slate-50/50 hover:bg-[#fff7ed] transition cursor-pointer flex items-center justify-between group"
+                            >
+                              <div>
+                                <div className="flex items-center gap-2">
+                                  <span className="font-bold text-xs text-slate-900 group-hover:text-[#f6821f]">Factura #{inv.num}</span>
+                                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                    inv.status === "Pendiente" ? "bg-amber-100 text-amber-800" : "bg-emerald-100 text-emerald-800"
+                                  }`}>
+                                    {inv.status}
+                                  </span>
+                                </div>
+                                <p className="text-xs text-slate-600 mt-0.5">{inv.customer}</p>
+                              </div>
+                              <div className="text-right">
+                                <span className="font-bold text-xs text-slate-900 block">${inv.total.toLocaleString("es-HN", { minimumFractionDigits: 2 })}</span>
+                                <span className="text-[10px] text-[#f6821f] font-semibold group-hover:underline">Seleccionar →</span>
+                              </div>
+                            </div>
+                          ))}
+                      </div>
+                    </div>
+
+                    <div className="flex justify-end pt-2 border-t border-slate-100">
+                      <button
+                        type="button"
+                        onClick={() => setShowInvoiceSearchModal(false)}
+                        className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold cursor-pointer"
+                      >
+                        Cerrar
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* MODAL: CONFIRMAR CANCELACIÓN Y BORRADO DE PAGO */}
+              {showCancelPaymentConfirmModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs">
+                  <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-md p-6 shadow-2xl relative space-y-4 animate-in fade-in zoom-in-95 duration-150 text-left">
+                    <div className="w-12 h-12 rounded-2xl bg-amber-100 border border-amber-200 text-amber-600 flex items-center justify-center mb-1">
+                      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                      </svg>
+                    </div>
+
+                    <div>
+                      <h3 className="font-bold text-lg text-slate-900">¿Salir sin guardar el pago?</h3>
+                      <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                        Si cancelas ahora, se borrarán todos los cambios e información ingresada en este registro de pago.
+                      </p>
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row justify-end gap-2.5 pt-3 border-t border-slate-100">
+                      <button
+                        type="button"
+                        onClick={() => setShowCancelPaymentConfirmModal(false)}
+                        className="px-4 py-2.5 rounded-xl border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 text-xs font-semibold cursor-pointer transition order-2 sm:order-1"
+                      >
+                        Seguir editando
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleConfirmDiscardPaymentChanges}
+                        className="px-4 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold transition cursor-pointer shadow-md shadow-red-600/20 order-1 sm:order-2"
+                      >
+                        Descartar cambios y salir
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+            </div>
+          )}
         </main>
       </div>
 
       {/* ================= MODAL OVERLAY ================= */}
-      {activeModal && (
+      {activeModal === "detalle-orden-compra" && selectedPurchaseOrder ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="bg-white border border-slate-200 rounded-3xl w-full max-w-3xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
+            {/* Header (Light theme) */}
+            <div className="bg-white border-b border-slate-200 p-6 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-[#fff7ed] text-[#f6821f] border border-[#fed7aa] flex items-center justify-center shadow-xs">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-lg font-bold text-slate-900">Orden de Compra {selectedPurchaseOrder.num}</h2>
+                    <select
+                      value={selectedPurchaseOrder.status}
+                      onChange={(e) => handleUpdatePOStatus(selectedPurchaseOrder.num, e.target.value)}
+                      className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold cursor-pointer outline-none border transition ${
+                        selectedPurchaseOrder.status === "Recibida"
+                          ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100"
+                          : selectedPurchaseOrder.status === "Aprobada"
+                          ? "bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100"
+                          : selectedPurchaseOrder.status === "Cancelada"
+                          ? "bg-red-50 text-red-700 border-red-200 hover:bg-red-100"
+                          : "bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100"
+                      }`}
+                    >
+                      <option value="Pendiente">Pendiente</option>
+                      <option value="Aprobada">Aprobada</option>
+                      <option value="Recibida">Recibida</option>
+                      <option value="Cancelada">Cancelada</option>
+                    </select>
+                  </div>
+                  <p className="text-xs text-slate-500">Emitida el {selectedPurchaseOrder.date} para {selectedPurchaseOrder.vendor}</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setActiveModal(null)}
+                className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-900 flex items-center justify-center transition cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Scrollable Body */}
+            <div className="p-6 overflow-y-auto space-y-6 text-xs text-slate-700">
+              {/* Information Cards Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Vendor Info */}
+                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-2">
+                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 block">Información del Proveedor</span>
+                  <p className="font-bold text-sm text-slate-900">{selectedPurchaseOrder.vendor}</p>
+                  <p className="text-slate-600">RTN: 08019998124091</p>
+                  <p className="text-slate-600">Contacto: ventas@{selectedPurchaseOrder.vendor.toLowerCase().replace(/[^a-z]/g, "")}.hn</p>
+                  <p className="text-slate-600">Tel: +504 2239-5000</p>
+                </div>
+
+                {/* Logistics Info */}
+                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-2">
+                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 block">Detalles de Almacén y Entrega</span>
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div>
+                      <span className="text-slate-500 block">Categoría:</span>
+                      <span className="font-semibold text-slate-800">{selectedPurchaseOrder.category}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-500 block">Almacén Destino:</span>
+                      <span className="font-semibold text-slate-800">Almacén Central #1</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-500 block">Condición Pago:</span>
+                      <span className="font-semibold text-slate-800">Crédito 30 días</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-500 block">Fecha Entrega:</span>
+                      <span className="font-semibold text-slate-800">2026-09-15</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Items Table */}
+              <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-2xs">
+                <div className="p-3.5 bg-slate-100/70 border-b border-slate-200 font-bold text-slate-800 flex items-center justify-between">
+                  <span>Ítems / Materiales Solicitados</span>
+                  <span className="text-[11px] font-normal text-slate-500">Multimoneda USD ($)</span>
+                </div>
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-50 text-slate-600 font-bold border-b border-slate-200">
+                    <tr>
+                      <th className="py-2.5 px-4">SKU</th>
+                      <th className="py-2.5 px-4">Descripción del Material</th>
+                      <th className="py-2.5 px-4 text-center">Cantidad</th>
+                      <th className="py-2.5 px-4 text-right">Precio Unitario</th>
+                      <th className="py-2.5 px-4 text-right">Importe Total</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 font-mono">
+                    {[
+                      { sku: "MAT-FLX-001", desc: `${selectedPurchaseOrder.category} - Lote Premium Grado A`, qty: 25, price: selectedPurchaseOrder.total * 0.028, total: selectedPurchaseOrder.total * 0.7 },
+                      { sku: "MAT-FLX-002", desc: `Complementos y Soluciones para ${selectedPurchaseOrder.category}`, qty: 10, price: selectedPurchaseOrder.total * 0.03, total: selectedPurchaseOrder.total * 0.3 },
+                    ].map((item, i) => (
+                      <tr key={i} className="hover:bg-slate-50/80">
+                        <td className="py-3 px-4 font-bold text-[#f6821f]">{item.sku}</td>
+                        <td className="py-3 px-4 font-sans text-slate-800 font-medium">{item.desc}</td>
+                        <td className="py-3 px-4 text-center font-bold">{item.qty}</td>
+                        <td className="py-3 px-4 text-right">${item.price.toLocaleString("en-US", { minimumFractionDigits: 2 })}</td>
+                        <td className="py-3 px-4 text-right font-bold text-slate-900">${item.total.toLocaleString("en-US", { minimumFractionDigits: 2 })}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Summary Totals */}
+              <div className="flex justify-end">
+                <div className="w-full sm:w-72 bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-2 text-right">
+                  <div className="flex justify-between text-slate-600 text-xs">
+                    <span>Subtotal:</span>
+                    <span className="font-mono font-medium">${(selectedPurchaseOrder.total * 0.85).toLocaleString("en-US", { minimumFractionDigits: 2 })}</span>
+                  </div>
+                  <div className="flex justify-between text-slate-600 text-xs">
+                    <span>Impuesto IVA (15%):</span>
+                    <span className="font-mono font-medium">${(selectedPurchaseOrder.total * 0.15).toLocaleString("en-US", { minimumFractionDigits: 2 })}</span>
+                  </div>
+                  <div className="pt-2 border-t border-slate-200 flex justify-between font-bold text-sm text-slate-900">
+                    <span>Total Orden (USD):</span>
+                    <span className="font-mono text-[#f6821f]">${selectedPurchaseOrder.total.toLocaleString("en-US", { minimumFractionDigits: 2 })}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer Action Bar */}
+            <div className="p-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between">
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveModal(null);
+                  openPurchaseOrderEditor(selectedPurchaseOrder);
+                }}
+                className="px-4 py-2 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-700 font-semibold text-xs transition cursor-pointer"
+              >
+                Editar orden
+              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  className="px-4 py-2 rounded-xl border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 font-semibold text-xs transition cursor-pointer"
+                >
+                  Imprimir PDF
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveModal(null)}
+                  className="px-5 py-2 rounded-xl bg-[#f6821f] hover:bg-[#e07216] text-white font-bold text-xs transition cursor-pointer shadow-md shadow-[#f6821f]/20"
+                >
+                  Cerrar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : activeModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs">
           <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-lg p-6 shadow-2xl relative animate-in fade-in zoom-in-95 duration-150">
             {/* Close button */}
@@ -5576,13 +12757,15 @@ export default function AdminDashboard() {
               </div>
             )}
 
-            {/* Modal: AGREGAR PROVEEDOR */}
-            {activeModal === "agregar-proveedor" && (
+
+
+            {/* Modal: EDITAR CLIENTE */}
+            {activeModal === "editar-cliente" && editingCustomer && (
               <div>
                 <div className="mb-4">
-                  <span className="text-[11px] font-semibold text-[#f6821f] uppercase tracking-wider">Acción Rápida</span>
-                  <h3 className="text-lg font-bold text-slate-900">Agregar Nuevo Proveedor</h3>
-                  <p className="text-xs text-slate-500">Registrar proveedor con código Macola opcional en la base de datos.</p>
+                  <span className="text-[11px] font-semibold text-[#f6821f] uppercase tracking-wider">Gestión de Clientes</span>
+                  <h3 className="text-lg font-bold text-slate-900">Editar Cliente</h3>
+                  <p className="text-xs text-slate-500">Actualizar información de la empresa o cliente registrado.</p>
                 </div>
 
                 {modalError && (
@@ -5596,7 +12779,131 @@ export default function AdminDashboard() {
                   </div>
                 )}
 
-                <form onSubmit={handleCreateVendor} className="space-y-3.5 text-xs">
+                <form onSubmit={handleUpdateCustomer} className="space-y-3.5 text-xs">
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">Nombre de la Empresa / Cliente *</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Ej. Distribuidora Textil S.A."
+                      value={customerForm.name}
+                      onChange={(e) => setCustomerForm({ ...customerForm, name: e.target.value })}
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:border-[#f6821f] text-slate-900"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block font-semibold text-slate-700 mb-1">Código Macola</label>
+                      <input
+                        type="text"
+                        placeholder="Ej. CUS-009"
+                        value={customerForm.macolaCode}
+                        onChange={(e) => setCustomerForm({ ...customerForm, macolaCode: e.target.value })}
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:border-[#f6821f] text-slate-900 font-mono"
+                      />
+                    </div>
+                    <div>
+                      <label className="block font-semibold text-slate-700 mb-1">Moneda</label>
+                      <select
+                        value={customerForm.currency}
+                        onChange={(e) => setCustomerForm({ ...customerForm, currency: e.target.value })}
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:border-[#f6821f] text-slate-900"
+                      >
+                        <option value="USD">USD ($)</option>
+                        <option value="HNL">HNL (L)</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block font-semibold text-slate-700 mb-1">Correo Electrónico</label>
+                      <input
+                        type="email"
+                        placeholder="contacto@cliente.com"
+                        value={customerForm.email}
+                        onChange={(e) => setCustomerForm({ ...customerForm, email: e.target.value })}
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:border-[#f6821f] text-slate-900"
+                      />
+                    </div>
+                    <div>
+                      <label className="block font-semibold text-slate-700 mb-1">Teléfono</label>
+                      <input
+                        type="text"
+                        placeholder="+504 2550-0000"
+                        value={customerForm.phone}
+                        onChange={(e) => setCustomerForm({ ...customerForm, phone: e.target.value })}
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:border-[#f6821f] text-slate-900"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">Dirección Física</label>
+                    <input
+                      type="text"
+                      placeholder="San Pedro Sula, Honduras"
+                      value={customerForm.address}
+                      onChange={(e) => setCustomerForm({ ...customerForm, address: e.target.value })}
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:border-[#f6821f] text-slate-900"
+                    />
+                  </div>
+
+                  <div className="pt-2 flex justify-between items-center">
+                    <button
+                      type="button"
+                      onClick={handleDeleteCustomer}
+                      disabled={modalLoading}
+                      className="px-3.5 py-2 rounded-xl bg-red-50 hover:bg-red-100 text-red-600 font-semibold cursor-pointer border border-red-200 transition"
+                    >
+                      Eliminar
+                    </button>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setActiveModal(null);
+                          setEditingCustomer(null);
+                        }}
+                        className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium cursor-pointer"
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={modalLoading}
+                        className="px-5 py-2 rounded-xl bg-[#f6821f] hover:bg-[#e07216] text-white font-semibold cursor-pointer shadow-md shadow-[#f6821f]/20 disabled:opacity-50"
+                      >
+                        {modalLoading ? "Guardando..." : "Guardar cambios"}
+                      </button>
+                    </div>
+                  </div>
+                </form>
+              </div>
+            )}
+
+            {/* Modal: EDITAR PROVEEDOR */}
+            {activeModal === "editar-proveedor" && editingVendor && (
+              <div>
+                <div className="mb-4">
+                  <span className="text-[11px] font-semibold text-[#f6821f] uppercase tracking-wider">Gestión de Proveedores</span>
+                  <h3 className="text-lg font-bold text-slate-900">Editar Proveedor</h3>
+                  <p className="text-xs text-slate-500">Actualizar información del proveedor registrado.</p>
+                </div>
+
+                {modalError && (
+                  <div className="mb-4 p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs">
+                    {modalError}
+                  </div>
+                )}
+                {modalSuccess && (
+                  <div className="mb-4 p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-semibold">
+                    {modalSuccess}
+                  </div>
+                )}
+
+                <form onSubmit={handleUpdateVendor} className="space-y-3.5 text-xs">
                   <div>
                     <label className="block font-semibold text-slate-700 mb-1">Nombre del Proveedor *</label>
                     <input
@@ -5667,6 +12974,146 @@ export default function AdminDashboard() {
                     />
                   </div>
 
+                  <div className="pt-2 flex justify-between items-center">
+                    <button
+                      type="button"
+                      onClick={handleDeleteVendor}
+                      disabled={modalLoading}
+                      className="px-3.5 py-2 rounded-xl bg-red-50 hover:bg-red-100 text-red-600 font-semibold cursor-pointer border border-red-200 transition"
+                    >
+                      Eliminar
+                    </button>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setActiveModal(null);
+                          setEditingVendor(null);
+                        }}
+                        className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium cursor-pointer"
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={modalLoading}
+                        className="px-5 py-2 rounded-xl bg-[#f6821f] hover:bg-[#e07216] text-white font-semibold cursor-pointer shadow-md shadow-[#f6821f]/20 disabled:opacity-50"
+                      >
+                        {modalLoading ? "Guardando..." : "Guardar cambios"}
+                      </button>
+                    </div>
+                  </div>
+                </form>
+              </div>
+            )}
+
+            {/* Modal: CREAR / EDITAR ORDEN DE COMPRA */}
+            {activeModal === "crear-orden-compra" && (
+              <div>
+                <h3 className="text-lg font-extrabold text-slate-900 mb-1">
+                  {selectedPurchaseOrder ? `Editar Orden de Compra ${selectedPurchaseOrder.num}` : "Crear Nueva Orden de Compra"}
+                </h3>
+                <p className="text-xs text-slate-500 mb-4">
+                  {selectedPurchaseOrder
+                    ? `Modifica los términos, materiales o importes de la orden emitida a ${selectedPurchaseOrder.vendor}.`
+                    : "Ingresa los datos para solicitar insumos o materia prima a un proveedor."}
+                </p>
+
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    setModalLoading(true);
+                    setTimeout(() => {
+                      setModalLoading(false);
+                      setModalSuccess(`¡Orden de compra ${selectedPurchaseOrder ? selectedPurchaseOrder.num : "OC-2026-085"} guardada con éxito!`);
+                      setTimeout(() => {
+                        setActiveModal(null);
+                        setModalSuccess("");
+                      }, 1000);
+                    }, 600);
+                  }}
+                  className="space-y-3.5 text-xs"
+                >
+                  {modalSuccess && (
+                    <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-semibold">
+                      {modalSuccess}
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">Proveedor *</label>
+                    <select
+                      defaultValue={selectedPurchaseOrder?.vendor || "Insumos Flexográficos S.A."}
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:border-[#f6821f] text-slate-900 font-medium"
+                    >
+                      <option value="Insumos Flexográficos S.A.">Insumos Flexográficos S.A.</option>
+                      <option value="Papelera Hondureña">Papelera Hondureña</option>
+                      <option value="Químicos Industriales S.A.">Químicos Industriales S.A.</option>
+                      <option value="Empaques Especializados Búfalo">Empaques Especializados Búfalo</option>
+                    </select>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block font-semibold text-slate-700 mb-1">Categoría de Insumos</label>
+                      <input
+                        type="text"
+                        required
+                        defaultValue={selectedPurchaseOrder?.category || "Tintas Flexo"}
+                        placeholder="Ej. Cartón, Tintas, Solventes"
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:border-[#f6821f] text-slate-900"
+                      />
+                    </div>
+                    <div>
+                      <label className="block font-semibold text-slate-700 mb-1">Monto Total (USD)</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        required
+                        defaultValue={selectedPurchaseOrder?.total || 6450}
+                        placeholder="0.00"
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:border-[#f6821f] text-slate-900 font-mono font-bold"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block font-semibold text-slate-700 mb-1">Almacén Destino</label>
+                      <select className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:border-[#f6821f] text-slate-900">
+                        <option value="Almacén Central #1">Almacén Central #1</option>
+                        <option value="Almacén Materia Prima #2">Almacén Materia Prima #2</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block font-semibold text-slate-700 mb-1">Condición de Pago</label>
+                      <select className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:border-[#f6821f] text-slate-900">
+                        <option value="Crédito 30 días">Crédito 30 días</option>
+                        <option value="Contado / Inmediato">Contado / Inmediato</option>
+                        <option value="Crédito 60 días">Crédito 60 días</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block font-semibold text-slate-700 mb-1">Fecha de Emisión</label>
+                      <input
+                        type="date"
+                        defaultValue={selectedPurchaseOrder?.date || new Date().toISOString().split("T")[0]}
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:border-[#f6821f] text-slate-900 font-mono"
+                      />
+                    </div>
+                    <div>
+                      <label className="block font-semibold text-slate-700 mb-1">Fecha Entrega Estimada</label>
+                      <input
+                        type="date"
+                        defaultValue="2026-09-15"
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:border-[#f6821f] text-slate-900 font-mono"
+                      />
+                    </div>
+                  </div>
+
                   <div className="pt-2 flex justify-end gap-2">
                     <button
                       type="button"
@@ -5680,7 +13127,110 @@ export default function AdminDashboard() {
                       disabled={modalLoading}
                       className="px-5 py-2 rounded-xl bg-[#f6821f] hover:bg-[#e07216] text-white font-semibold cursor-pointer shadow-md shadow-[#f6821f]/20 disabled:opacity-50"
                     >
-                      {modalLoading ? "Guardando..." : "Guardar Proveedor"}
+                      {modalLoading ? "Guardando..." : selectedPurchaseOrder ? "Guardar cambios" : "Emitir orden"}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            )}
+
+            {/* Modal: EDITAR PRODUCTO */}
+            {activeModal === "editar-producto" && editingProduct && (
+              <div>
+                <div className="mb-4">
+                  <span className="text-[11px] font-semibold text-[#f6821f] uppercase tracking-wider">Control de Inventario</span>
+                  <h3 className="text-lg font-bold text-slate-900">Editar Producto / Insumo</h3>
+                  <p className="text-xs text-slate-500">Modificar SKU, descripción, existencias o precios.</p>
+                </div>
+
+                {modalError && (
+                  <div className="mb-4 p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs">
+                    {modalError}
+                  </div>
+                )}
+                {modalSuccess && (
+                  <div className="mb-4 p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-semibold">
+                    {modalSuccess}
+                  </div>
+                )}
+
+                <form onSubmit={handleSaveEditProduct} className="space-y-3.5 text-xs">
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">Descripción del Artículo *</label>
+                    <input
+                      type="text"
+                      required
+                      value={productForm.description}
+                      onChange={(e) => setProductForm({ ...productForm, description: e.target.value })}
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:border-[#f6821f] text-slate-900"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block font-semibold text-slate-700 mb-1">SKU / Código Macola</label>
+                      <input
+                        type="text"
+                        required
+                        value={productForm.sku}
+                        onChange={(e) => setProductForm({ ...productForm, sku: e.target.value })}
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:border-[#f6821f] text-slate-900 font-mono"
+                      />
+                    </div>
+                    <div>
+                      <label className="block font-semibold text-slate-700 mb-1">Existencias (Stock)</label>
+                      <input
+                        type="number"
+                        required
+                        value={productForm.quantity}
+                        onChange={(e) => setProductForm({ ...productForm, quantity: Number(e.target.value) })}
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:border-[#f6821f] text-slate-900 font-mono font-bold"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block font-semibold text-slate-700 mb-1">Costo Unitario ($)</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        required
+                        value={productForm.cost}
+                        onChange={(e) => setProductForm({ ...productForm, cost: Number(e.target.value) })}
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:border-[#f6821f] text-slate-900 font-mono"
+                      />
+                    </div>
+                    <div>
+                      <label className="block font-semibold text-slate-700 mb-1">Precio de Venta ($)</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        required
+                        value={productForm.price}
+                        onChange={(e) => setProductForm({ ...productForm, price: Number(e.target.value) })}
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:border-[#f6821f] text-slate-900 font-mono font-bold"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="pt-2 flex justify-end gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActiveModal(null);
+                        setEditingProduct(null);
+                      }}
+                      className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium cursor-pointer"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={modalLoading}
+                      className="px-5 py-2 rounded-xl bg-[#f6821f] hover:bg-[#e07216] text-white font-semibold cursor-pointer shadow-md shadow-[#f6821f]/20 disabled:opacity-50"
+                    >
+                      {modalLoading ? "Guardando..." : "Guardar cambios"}
                     </button>
                   </div>
                 </form>
@@ -5688,7 +13238,12 @@ export default function AdminDashboard() {
             )}
 
             {/* Modal: OTRAS ACCIONES */}
-            {activeModal !== "agregar-cliente" && activeModal !== "agregar-proveedor" && (
+            {activeModal !== "agregar-cliente" &&
+              activeModal !== "agregar-proveedor" &&
+              activeModal !== "editar-cliente" &&
+              activeModal !== "editar-proveedor" &&
+              activeModal !== "crear-orden-compra" &&
+              activeModal !== "editar-producto" && (
               <div className="text-center py-4 space-y-4">
                 <div className="w-12 h-12 rounded-2xl bg-[#fff7ed] text-[#f6821f] border border-[#fed7aa] flex items-center justify-center mx-auto shadow-xs">
                   <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -6094,6 +13649,893 @@ export default function AdminDashboard() {
           </aside>
         </div>
       )}
+
+      {/* ================= SIDEBAR: AÑADIR NUEVO PRODUCTO O SERVICIO (Matching screenshot) ================= */}
+      {showNewProductDrawer && (
+        <div className="fixed inset-0 z-50 flex justify-end">
+          {/* Backdrop */}
+          <div
+            className="fixed inset-0 bg-slate-900/30 backdrop-blur-xs transition-opacity z-50"
+            onClick={() => setShowNewProductDrawer(false)}
+          />
+
+          {/* Drawer Panel */}
+          <aside className="relative z-50 w-full max-w-xl bg-slate-50 border-l border-slate-200 shadow-2xl flex flex-col h-full animate-in slide-in-from-right duration-200">
+            {/* Header */}
+            <div className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between sticky top-0 z-10 shadow-2xs">
+              <h2 className="text-base font-bold text-slate-800">Añadir un nuevo producto o servicio</h2>
+              <button
+                type="button"
+                onClick={() => setShowNewProductDrawer(false)}
+                className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg transition cursor-pointer"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Notification Banner if success */}
+            {productDrawerSuccess && (
+              <div className="m-4 p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs rounded-xl flex items-center justify-between shadow-xs">
+                <span className="font-semibold">{productDrawerSuccess}</span>
+              </div>
+            )}
+
+            {/* Scrollable Form Body */}
+            <form onSubmit={(e) => handleCreateProduct(e, false)} className="flex-1 overflow-y-auto p-6 space-y-4">
+              
+              {/* SECTION 1: INFORMACIÓN BÁSICA */}
+              <div className="bg-white border border-slate-200/90 rounded-2xl p-5 shadow-xs space-y-4">
+                <button
+                  type="button"
+                  onClick={() => setProductSectionsOpen(prev => ({ ...prev, basic: !prev.basic }))}
+                  className="w-full flex items-center justify-between text-left font-bold text-sm text-slate-900 cursor-pointer"
+                >
+                  <span>Información básica</span>
+                  <svg className={`w-4 h-4 text-slate-400 transition-transform ${productSectionsOpen.basic ? "rotate-0" : "-rotate-90"}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+
+                {productSectionsOpen.basic && (
+                  <div className="space-y-4 pt-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-start">
+                      <div className="sm:col-span-2 space-y-3">
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-700 mb-1">
+                            Nombre<span className="text-red-500">*</span>
+                          </label>
+                          <input
+                            type="text"
+                            required
+                            placeholder="ej. Impresión Flexográfica Cartón Búfalo"
+                            value={newProductForm.name}
+                            onChange={(e) => setNewProductForm({ ...newProductForm, name: e.target.value })}
+                            className="w-full px-3.5 py-2 text-xs rounded-xl bg-white border border-slate-300 text-slate-900 focus:outline-none focus:border-[#f6821f] focus:ring-1 focus:ring-[#f6821f]"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-700 mb-1">Tipo de artículo</label>
+                          <select
+                            value={newProductForm.type}
+                            onChange={(e) => setNewProductForm({ ...newProductForm, type: e.target.value })}
+                            className="w-full px-3.5 py-2 text-xs rounded-xl bg-white border border-slate-300 text-slate-900 focus:outline-none focus:border-[#f6821f] cursor-pointer"
+                          >
+                            <option value="Servicio">Servicio</option>
+                            <option value="Inventario">Inventario</option>
+                            <option value="No de inventario">No de inventario</option>
+                            <option value="Empaque">Empaque y Embalaje</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      {/* Image Upload Box */}
+                      <div className="sm:col-span-1 border-2 border-dashed border-slate-200 hover:border-[#f6821f]/50 rounded-2xl p-4 flex flex-col items-center justify-center text-center cursor-pointer bg-slate-50/50 hover:bg-slate-50 transition min-h-[110px]">
+                        <svg className="w-8 h-8 text-slate-400 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                        <span className="text-[11px] font-semibold text-[#0066cc]">Añadir una imagen</span>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 mb-1">
+                        Unidad de mantenimiento de existencias (SKU)
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="ej. SKU-104928"
+                        value={newProductForm.sku}
+                        onChange={(e) => setNewProductForm({ ...newProductForm, sku: e.target.value })}
+                        className="w-full px-3.5 py-2 text-xs rounded-xl bg-white border border-slate-300 text-slate-900 font-mono focus:outline-none focus:border-[#f6821f]"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 mb-1">Categoría</label>
+                      <select
+                        value={newProductForm.category}
+                        onChange={(e) => setNewProductForm({ ...newProductForm, category: e.target.value })}
+                        className="w-full px-3.5 py-2 text-xs rounded-xl bg-white border border-slate-300 text-slate-900 focus:outline-none focus:border-[#f6821f] cursor-pointer"
+                      >
+                        {productCategoriesList.map((cat) => (
+                          <option key={cat} value={cat}>
+                            {cat}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* SECTION 2: VENTAS */}
+              <div className="bg-white border border-slate-200/90 rounded-2xl p-5 shadow-xs space-y-4">
+                <button
+                  type="button"
+                  onClick={() => setProductSectionsOpen(prev => ({ ...prev, sales: !prev.sales }))}
+                  className="w-full flex items-center justify-between text-left font-bold text-sm text-slate-900 cursor-pointer"
+                >
+                  <span>Ventas</span>
+                  <svg className={`w-4 h-4 text-slate-400 transition-transform ${productSectionsOpen.sales ? "rotate-0" : "-rotate-90"}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+
+                {productSectionsOpen.sales && (
+                  <div className="space-y-4 pt-2">
+                    <label className="flex items-center gap-2.5 cursor-pointer select-none text-xs font-medium text-slate-800">
+                      <input
+                        type="checkbox"
+                        checked={newProductForm.isSold}
+                        onChange={(e) => setNewProductForm({ ...newProductForm, isSold: e.target.checked })}
+                        className="w-4 h-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer accent-[#0066cc]"
+                      />
+                      <span>Vendo este producto / servicio a mis clientes</span>
+                    </label>
+
+                    {newProductForm.isSold && (
+                      <div className="space-y-3 pt-1">
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-700 mb-1">Descripción de ventas</label>
+                          <textarea
+                            rows={2}
+                            placeholder="Descripción visible en facturas de venta..."
+                            value={newProductForm.salesDescription}
+                            onChange={(e) => setNewProductForm({ ...newProductForm, salesDescription: e.target.value })}
+                            className="w-full px-3.5 py-2 text-xs rounded-xl bg-white border border-slate-300 text-slate-900 focus:outline-none focus:border-[#f6821f]"
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-xs font-semibold text-slate-700 mb-1">Precio / Tarifa</label>
+                            <input
+                              type="number"
+                              step="0.01"
+                              placeholder="0.00"
+                              value={newProductForm.price}
+                              onChange={(e) => setNewProductForm({ ...newProductForm, price: parseFloat(e.target.value) || 0 })}
+                              className="w-full px-3.5 py-2 text-xs rounded-xl bg-white border border-slate-300 text-slate-900 font-mono focus:outline-none focus:border-[#f6821f]"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-semibold text-slate-700 mb-1">
+                              Cuenta de ingresos<span className="text-red-500">*</span>
+                            </label>
+                            <select
+                              value={newProductForm.incomeAccountId}
+                              onChange={(e) => setNewProductForm({ ...newProductForm, incomeAccountId: e.target.value })}
+                              className="w-full px-3.5 py-2 text-xs rounded-xl bg-white border border-slate-300 text-slate-900 focus:outline-none focus:border-[#f6821f] cursor-pointer"
+                            >
+                              <option value="7000">7000 - Ingresos por Ventas de Servicios</option>
+                              {accounts
+                                .filter((a) => a.type.toLowerCase().includes("ingreso") || a.type.toLowerCase().includes("income"))
+                                .map((a) => (
+                                  <option key={a.id} value={a.id}>
+                                    {a.code} - {a.name}
+                                  </option>
+                                ))}
+                            </select>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* SECTION 3: COMPRAS */}
+              <div className="bg-white border border-slate-200/90 rounded-2xl p-5 shadow-xs space-y-4">
+                <button
+                  type="button"
+                  onClick={() => setProductSectionsOpen(prev => ({ ...prev, purchases: !prev.purchases }))}
+                  className="w-full flex items-center justify-between text-left font-bold text-sm text-slate-900 cursor-pointer"
+                >
+                  <span>Compras</span>
+                  <svg className={`w-4 h-4 text-slate-400 transition-transform ${productSectionsOpen.purchases ? "rotate-0" : "-rotate-90"}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+
+                {productSectionsOpen.purchases && (
+                  <div className="space-y-4 pt-2">
+                    <label className="flex items-center gap-2.5 cursor-pointer select-none text-xs font-medium text-slate-800">
+                      <input
+                        type="checkbox"
+                        checked={newProductForm.isPurchased}
+                        onChange={(e) => setNewProductForm({ ...newProductForm, isPurchased: e.target.checked })}
+                        className="w-4 h-4 rounded border-slate-300 text-[#0066cc] focus:ring-[#0066cc] cursor-pointer accent-[#0066cc]"
+                      />
+                      <span>Compro este producto / servicio a un proveedor</span>
+                    </label>
+
+                    {newProductForm.isPurchased && (
+                      <div className="space-y-3 pt-1">
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-700 mb-1">Descripción de compras</label>
+                          <textarea
+                            rows={2}
+                            placeholder="Descripción visible en órdenes de compra..."
+                            value={newProductForm.purchaseDescription}
+                            onChange={(e) => setNewProductForm({ ...newProductForm, purchaseDescription: e.target.value })}
+                            className="w-full px-3.5 py-2 text-xs rounded-xl bg-white border border-slate-300 text-slate-900 focus:outline-none focus:border-[#f6821f]"
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-xs font-semibold text-slate-700 mb-1">Costo Unitario</label>
+                            <input
+                              type="number"
+                              step="0.01"
+                              placeholder="0.00"
+                              value={newProductForm.cost}
+                              onChange={(e) => setNewProductForm({ ...newProductForm, cost: parseFloat(e.target.value) || 0 })}
+                              className="w-full px-3.5 py-2 text-xs rounded-xl bg-white border border-slate-300 text-slate-900 font-mono focus:outline-none focus:border-[#f6821f]"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-semibold text-slate-700 mb-1">
+                              Cuenta de gastos / costo<span className="text-red-500">*</span>
+                            </label>
+                            <select
+                              value={newProductForm.expenseAccountId}
+                              onChange={(e) => setNewProductForm({ ...newProductForm, expenseAccountId: e.target.value })}
+                              className="w-full px-3.5 py-2 text-xs rounded-xl bg-white border border-slate-300 text-slate-900 focus:outline-none focus:border-[#f6821f] cursor-pointer"
+                            >
+                              <option value="5000">5000 - Costo de mercancía vendida / Suministros</option>
+                              {accounts
+                                .filter((a) => a.type.toLowerCase().includes("gasto") || a.type.toLowerCase().includes("expense") || a.type.toLowerCase().includes("costo"))
+                                .map((a) => (
+                                  <option key={a.id} value={a.id}>
+                                    {a.code} - {a.name}
+                                  </option>
+                                ))}
+                            </select>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </form>
+
+            {/* Sticky Footer matching user screenshot */}
+            <div className="border-t border-slate-200 px-6 py-3.5 bg-slate-50/50 flex items-center justify-end gap-2.5">
+              <button
+                type="button"
+                onClick={() => setShowNewProductDrawer(false)}
+                className="px-4 py-2 rounded-lg border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 font-semibold text-xs transition cursor-pointer"
+              >
+                Cancelar
+              </button>
+
+              <div className="relative inline-flex rounded-lg shadow-sm">
+                <button
+                  type="submit"
+                  disabled={productDrawerLoading}
+                  className="px-4 py-2 rounded-l-lg bg-[#f6821f] hover:bg-[#e07216] text-white font-semibold text-xs transition cursor-pointer disabled:opacity-50 flex items-center gap-1"
+                >
+                  {productDrawerLoading ? "Guardando..." : "Guardar"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowProductSaveDropdown(!showProductSaveDropdown)}
+                  className="px-2.5 py-2 rounded-r-lg bg-[#e07216] hover:bg-[#d06512] text-white border-l border-white/20 transition cursor-pointer flex items-center justify-center"
+                >
+                  <svg
+                    className={`w-3.5 h-3.5 transition-transform ${showProductSaveDropdown ? "rotate-180" : "rotate-0"}`}
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+
+                {/* Dropdown Options */}
+                {showProductSaveDropdown && (
+                  <div className="absolute bottom-full right-0 mb-2 w-52 bg-white rounded-xl shadow-2xl border border-slate-200 py-1 z-30 animate-in fade-in zoom-in-95 duration-150">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowProductSaveDropdown(false);
+                        handleCreateProduct(undefined, false);
+                      }}
+                      className="w-full text-left px-4 py-2.5 text-xs text-slate-700 hover:bg-[#fff7ed] hover:text-[#f6821f] font-semibold transition cursor-pointer flex items-center gap-2"
+                    >
+                      <span>Guardar y cerrar</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowProductSaveDropdown(false);
+                        handleCreateProduct(undefined, true);
+                      }}
+                      className="w-full text-left px-4 py-2.5 text-xs text-slate-700 hover:bg-[#fff7ed] hover:text-[#f6821f] font-semibold transition cursor-pointer flex items-center gap-2"
+                    >
+                      <svg className="w-4 h-4 text-[#f6821f]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
+                      </svg>
+                      <span>Guardar y crear nuevo</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </aside>
+        </div>
+      )}
+
+      {/* ================= SIDEBAR / DRAWER: CREAR NUEVO CLIENTE ================= */}
+      {showNewCustomerDrawer && (
+        <div className="fixed inset-0 z-50 flex justify-end">
+          {/* Backdrop */}
+          <div
+            className="fixed inset-0 bg-slate-900/30 backdrop-blur-xs transition-opacity z-50"
+            onClick={() => setShowNewCustomerDrawer(false)}
+          />
+
+          {/* Drawer Panel */}
+          <aside className="relative z-50 w-full max-w-xl bg-slate-50 border-l border-slate-200 shadow-2xl flex flex-col h-full animate-in slide-in-from-right duration-200">
+            {/* Header */}
+            <div className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between sticky top-0 z-10 shadow-2xs">
+              <div>
+                <h2 className="text-base font-bold text-slate-800">Añadir un nuevo cliente</h2>
+                <p className="text-xs text-slate-500">Registra un nuevo contacto o razón social comercial</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowNewCustomerDrawer(false)}
+                className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg transition cursor-pointer"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Notification Banner if success */}
+            {customerDrawerSuccess && (
+              <div className="m-4 p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs rounded-xl flex items-center justify-between shadow-xs">
+                <span className="font-semibold">{customerDrawerSuccess}</span>
+              </div>
+            )}
+
+            {/* Scrollable Form Body */}
+            <form onSubmit={(e) => handleCreateCustomerDrawer(e, false)} className="flex-1 overflow-y-auto p-6 space-y-4 text-xs">
+              
+              {/* SECTION 1: INFORMACIÓN BÁSICA DEL CLIENTE */}
+              <div className="bg-white border border-slate-200/90 rounded-2xl p-5 shadow-xs space-y-4">
+                <button
+                  type="button"
+                  onClick={() => setCustomerSectionsOpen(prev => ({ ...prev, basic: !prev.basic }))}
+                  className="w-full flex items-center justify-between text-left font-bold text-sm text-slate-900 cursor-pointer"
+                >
+                  <span>Información básica del cliente</span>
+                  <svg className={`w-4 h-4 text-slate-400 transition-transform ${customerSectionsOpen.basic ? "rotate-0" : "-rotate-90"}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+
+                {customerSectionsOpen.basic && (
+                  <div className="space-y-4 pt-2">
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 mb-1">
+                        Nombre de la Empresa / Razón Social <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="Ej. Distribuidora Textil S.A."
+                        value={newCustomerDrawerForm.name}
+                        onChange={(e) => setNewCustomerDrawerForm({ ...newCustomerDrawerForm, name: e.target.value })}
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:border-[#f6821f] text-slate-900"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700 mb-1">RTN / ID Fiscal</label>
+                        <input
+                          type="text"
+                          placeholder="Ej. 0801199912345"
+                          value={newCustomerDrawerForm.rtn}
+                          onChange={(e) => setNewCustomerDrawerForm({ ...newCustomerDrawerForm, rtn: e.target.value })}
+                          className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:border-[#f6821f] text-slate-900 font-mono"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700 mb-1">Código Macola</label>
+                        <input
+                          type="text"
+                          placeholder="Ej. CUS-009"
+                          value={newCustomerDrawerForm.macolaCode}
+                          onChange={(e) => setNewCustomerDrawerForm({ ...newCustomerDrawerForm, macolaCode: e.target.value })}
+                          className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:border-[#f6821f] text-slate-900 font-mono"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700 mb-1">Moneda Preferida</label>
+                        <select
+                          value={newCustomerDrawerForm.currency}
+                          onChange={(e) => setNewCustomerDrawerForm({ ...newCustomerDrawerForm, currency: e.target.value })}
+                          className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:border-[#f6821f] text-slate-900"
+                        >
+                          <option value="USD">USD ($)</option>
+                          <option value="HNL">HNL (L)</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* SECTION 2: DATOS DE CONTACTO Y UBICACIÓN */}
+              <div className="bg-white border border-slate-200/90 rounded-2xl p-5 shadow-xs space-y-4">
+                <button
+                  type="button"
+                  onClick={() => setCustomerSectionsOpen(prev => ({ ...prev, contact: !prev.contact }))}
+                  className="w-full flex items-center justify-between text-left font-bold text-sm text-slate-900 cursor-pointer"
+                >
+                  <span>Contacto y ubicación</span>
+                  <svg className={`w-4 h-4 text-slate-400 transition-transform ${customerSectionsOpen.contact ? "rotate-0" : "-rotate-90"}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+
+                {customerSectionsOpen.contact && (
+                  <div className="space-y-4 pt-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700 mb-1">Correo Electrónico</label>
+                        <input
+                          type="email"
+                          placeholder="contacto@cliente.com"
+                          value={newCustomerDrawerForm.email}
+                          onChange={(e) => setNewCustomerDrawerForm({ ...newCustomerDrawerForm, email: e.target.value })}
+                          className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:border-[#f6821f] text-slate-900"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700 mb-1">Teléfono Principal</label>
+                        <input
+                          type="text"
+                          placeholder="+504 2550-0000"
+                          value={newCustomerDrawerForm.phone}
+                          onChange={(e) => setNewCustomerDrawerForm({ ...newCustomerDrawerForm, phone: e.target.value })}
+                          className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:border-[#f6821f] text-slate-900"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 mb-1">Dirección Física</label>
+                      <input
+                        type="text"
+                        placeholder="Ej. Boulevard del Sur, San Pedro Sula, Honduras"
+                        value={newCustomerDrawerForm.address}
+                        onChange={(e) => setNewCustomerDrawerForm({ ...newCustomerDrawerForm, address: e.target.value })}
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:border-[#f6821f] text-slate-900"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* SECTION 3: CONDICIONES COMERCIALES */}
+              <div className="bg-white border border-slate-200/90 rounded-2xl p-5 shadow-xs space-y-4">
+                <button
+                  type="button"
+                  onClick={() => setCustomerSectionsOpen(prev => ({ ...prev, commercial: !prev.commercial }))}
+                  className="w-full flex items-center justify-between text-left font-bold text-sm text-slate-900 cursor-pointer"
+                >
+                  <span>Condiciones comerciales</span>
+                  <svg className={`w-4 h-4 text-slate-400 transition-transform ${customerSectionsOpen.commercial ? "rotate-0" : "-rotate-90"}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+
+                {customerSectionsOpen.commercial && (
+                  <div className="space-y-4 pt-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700 mb-1">Términos de Pago</label>
+                        <select
+                          value={newCustomerDrawerForm.paymentTerms}
+                          onChange={(e) => setNewCustomerDrawerForm({ ...newCustomerDrawerForm, paymentTerms: e.target.value })}
+                          className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:border-[#f6821f] text-slate-900"
+                        >
+                          <option value="Contado / Inmediato">Contado / Inmediato</option>
+                          <option value="Crédito 15 días">Crédito 15 días</option>
+                          <option value="Crédito 30 días">Crédito 30 días</option>
+                          <option value="Crédito 60 días">Crédito 60 días</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700 mb-1">Límite de Crédito ($)</label>
+                        <input
+                          type="number"
+                          placeholder="0.00"
+                          value={newCustomerDrawerForm.creditLimit}
+                          onChange={(e) => setNewCustomerDrawerForm({ ...newCustomerDrawerForm, creditLimit: Number(e.target.value) })}
+                          className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:border-[#f6821f] text-slate-900 font-mono font-bold"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+            </form>
+
+            {/* Sticky Footer matching product drawer style */}
+            <div className="border-t border-slate-200 px-6 py-3.5 bg-slate-50/50 flex items-center justify-end gap-2.5">
+              <button
+                type="button"
+                onClick={() => setShowNewCustomerDrawer(false)}
+                className="px-4 py-2 rounded-lg border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 font-semibold text-xs transition cursor-pointer"
+              >
+                Cancelar
+              </button>
+
+              <div className="relative inline-flex rounded-lg shadow-sm">
+                <button
+                  type="submit"
+                  disabled={customerDrawerLoading}
+                  onClick={(e) => handleCreateCustomerDrawer(e, false)}
+                  className="px-4 py-2 rounded-l-lg bg-[#f6821f] hover:bg-[#e07216] text-white font-semibold text-xs transition cursor-pointer disabled:opacity-50 flex items-center gap-1"
+                >
+                  {customerDrawerLoading ? "Guardando..." : "Guardar"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowCustomerSaveDropdown(!showCustomerSaveDropdown)}
+                  className="px-2.5 py-2 rounded-r-lg bg-[#e07216] hover:bg-[#d06512] text-white border-l border-white/20 transition cursor-pointer flex items-center justify-center"
+                >
+                  <svg
+                    className={`w-3.5 h-3.5 transition-transform ${showCustomerSaveDropdown ? "rotate-180" : "rotate-0"}`}
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+
+                {/* Dropdown Options */}
+                {showCustomerSaveDropdown && (
+                  <div className="absolute bottom-full right-0 mb-2 w-52 bg-white rounded-xl shadow-2xl border border-slate-200 py-1 z-30 animate-in fade-in zoom-in-95 duration-150">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        setShowCustomerSaveDropdown(false);
+                        handleCreateCustomerDrawer(e, false);
+                      }}
+                      className="w-full text-left px-4 py-2.5 text-xs text-slate-700 hover:bg-[#fff7ed] hover:text-[#f6821f] font-semibold transition cursor-pointer flex items-center gap-2"
+                    >
+                      <span>Guardar y cerrar</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        setShowCustomerSaveDropdown(false);
+                        handleCreateCustomerDrawer(e, true);
+                      }}
+                      className="w-full text-left px-4 py-2.5 text-xs text-slate-700 hover:bg-[#fff7ed] hover:text-[#f6821f] font-semibold transition cursor-pointer flex items-center gap-2"
+                    >
+                      <svg className="w-4 h-4 text-[#f6821f]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
+                      </svg>
+                      <span>Guardar y crear nuevo</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </aside>
+        </div>
+      )}
+
+      {/* ================= SIDEBAR MODAL DRAWER: AGREGAR PROVEEDOR (Matching Agregar Cliente) ================= */}
+      {showNewVendorDrawer && (
+        <div className="fixed inset-0 z-50 flex justify-end">
+          {/* Backdrop */}
+          <div
+            className="fixed inset-0 bg-slate-900/30 backdrop-blur-xs transition-opacity z-50"
+            onClick={() => setShowNewVendorDrawer(false)}
+          />
+
+          {/* Drawer Panel */}
+          <aside className="relative z-50 w-full max-w-xl bg-slate-50 border-l border-slate-200 shadow-2xl flex flex-col h-full animate-in slide-in-from-right duration-200">
+            {/* Header */}
+            <div className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between sticky top-0 z-10 shadow-2xs">
+              <div>
+                <h2 className="text-base font-bold text-slate-800">Añadir un nuevo proveedor</h2>
+                <p className="text-xs text-slate-500">Registra un proveedor de materias primas o insumos</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowNewVendorDrawer(false)}
+                className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg transition cursor-pointer"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Notification Banner if success */}
+            {vendorDrawerSuccess && (
+              <div className="m-4 p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs rounded-xl flex items-center justify-between shadow-xs">
+                <span className="font-semibold">{vendorDrawerSuccess}</span>
+              </div>
+            )}
+
+            {/* Scrollable Form Body */}
+            <form onSubmit={(e) => handleCreateVendorDrawer(e, false)} className="flex-1 overflow-y-auto p-6 space-y-4 text-xs">
+              
+              {/* SECTION 1: INFORMACIÓN BÁSICA DEL PROVEEDOR */}
+              <div className="bg-white border border-slate-200/90 rounded-2xl p-5 shadow-xs space-y-4">
+                <button
+                  type="button"
+                  onClick={() => setVendorSectionsOpen(prev => ({ ...prev, basic: !prev.basic }))}
+                  className="w-full flex items-center justify-between text-left font-bold text-sm text-slate-900 cursor-pointer"
+                >
+                  <span>Información básica del proveedor</span>
+                  <svg className={`w-4 h-4 text-slate-400 transition-transform ${vendorSectionsOpen.basic ? "rotate-0" : "-rotate-90"}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+
+                {vendorSectionsOpen.basic && (
+                  <div className="space-y-4 pt-2">
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 mb-1">
+                        Nombre de la Empresa / Razón Social <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="Ej. Insumos Flexográficos S.A."
+                        value={newVendorDrawerForm.name}
+                        onChange={(e) => setNewVendorDrawerForm({ ...newVendorDrawerForm, name: e.target.value })}
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:border-[#f6821f] text-slate-900"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700 mb-1">RTN / ID Fiscal</label>
+                        <input
+                          type="text"
+                          placeholder="Ej. 0801199912345"
+                          value={newVendorDrawerForm.rtn}
+                          onChange={(e) => setNewVendorDrawerForm({ ...newVendorDrawerForm, rtn: e.target.value })}
+                          className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:border-[#f6821f] text-slate-900 font-mono"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700 mb-1">Código Macola</label>
+                        <input
+                          type="text"
+                          placeholder="Ej. VEN-009"
+                          value={newVendorDrawerForm.macolaCode}
+                          onChange={(e) => setNewVendorDrawerForm({ ...newVendorDrawerForm, macolaCode: e.target.value })}
+                          className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:border-[#f6821f] text-slate-900 font-mono"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700 mb-1">Moneda Preferida</label>
+                        <select
+                          value={newVendorDrawerForm.currency}
+                          onChange={(e) => setNewVendorDrawerForm({ ...newVendorDrawerForm, currency: e.target.value })}
+                          className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:border-[#f6821f] text-slate-900"
+                        >
+                          <option value="USD">USD ($)</option>
+                          <option value="HNL">HNL (L)</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* SECTION 2: DATOS DE CONTACTO Y UBICACIÓN */}
+              <div className="bg-white border border-slate-200/90 rounded-2xl p-5 shadow-xs space-y-4">
+                <button
+                  type="button"
+                  onClick={() => setVendorSectionsOpen(prev => ({ ...prev, contact: !prev.contact }))}
+                  className="w-full flex items-center justify-between text-left font-bold text-sm text-slate-900 cursor-pointer"
+                >
+                  <span>Contacto y ubicación</span>
+                  <svg className={`w-4 h-4 text-slate-400 transition-transform ${vendorSectionsOpen.contact ? "rotate-0" : "-rotate-90"}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+
+                {vendorSectionsOpen.contact && (
+                  <div className="space-y-4 pt-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700 mb-1">Correo de Compras</label>
+                        <input
+                          type="email"
+                          placeholder="ventas@proveedor.com"
+                          value={newVendorDrawerForm.email}
+                          onChange={(e) => setNewVendorDrawerForm({ ...newVendorDrawerForm, email: e.target.value })}
+                          className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:border-[#f6821f] text-slate-900"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700 mb-1">Teléfono Principal</label>
+                        <input
+                          type="text"
+                          placeholder="+504 2550-0000"
+                          value={newVendorDrawerForm.phone}
+                          onChange={(e) => setNewVendorDrawerForm({ ...newVendorDrawerForm, phone: e.target.value })}
+                          className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:border-[#f6821f] text-slate-900"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 mb-1">Dirección / Planta</label>
+                      <input
+                        type="text"
+                        placeholder="Ej. Zona Industrial San José, San Pedro Sula, Honduras"
+                        value={newVendorDrawerForm.address}
+                        onChange={(e) => setNewVendorDrawerForm({ ...newVendorDrawerForm, address: e.target.value })}
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:border-[#f6821f] text-slate-900"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* SECTION 3: CONDICIONES Y CATEGORÍA */}
+              <div className="bg-white border border-slate-200/90 rounded-2xl p-5 shadow-xs space-y-4">
+                <button
+                  type="button"
+                  onClick={() => setVendorSectionsOpen(prev => ({ ...prev, commercial: !prev.commercial }))}
+                  className="w-full flex items-center justify-between text-left font-bold text-sm text-slate-900 cursor-pointer"
+                >
+                  <span>Categoría y Términos Comerciales</span>
+                  <svg className={`w-4 h-4 text-slate-400 transition-transform ${vendorSectionsOpen.commercial ? "rotate-0" : "-rotate-90"}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+
+                {vendorSectionsOpen.commercial && (
+                  <div className="space-y-4 pt-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700 mb-1">Categoría de Insumos</label>
+                        <select
+                          value={newVendorDrawerForm.category}
+                          onChange={(e) => setNewVendorDrawerForm({ ...newVendorDrawerForm, category: e.target.value })}
+                          className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:border-[#f6821f] text-slate-900"
+                        >
+                          <option value="Tintas Flexo">Tintas Flexográficas</option>
+                          <option value="Cartón y Papel">Cartón Corrugado y Papel</option>
+                          <option value="Solventes y Químicos">Solventes y Químicos</option>
+                          <option value="Planchas y Clichés">Planchas y Clichés</option>
+                          <option value="Empaques e Insumos">Empaques y Varios</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700 mb-1">Términos de Pago</label>
+                        <select
+                          value={newVendorDrawerForm.paymentTerms}
+                          onChange={(e) => setNewVendorDrawerForm({ ...newVendorDrawerForm, paymentTerms: e.target.value })}
+                          className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:border-[#f6821f] text-slate-900"
+                        >
+                          <option value="Contado">Contado</option>
+                          <option value="Crédito 15 días">Crédito 15 días</option>
+                          <option value="Crédito 30 días">Crédito 30 días</option>
+                          <option value="Crédito 60 días">Crédito 60 días</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+            </form>
+
+            {/* Sticky Drawer Footer with Split Save Button */}
+            <div className="border-t border-slate-200 px-6 py-3.5 bg-slate-50/50 flex items-center justify-end gap-2.5">
+              <button
+                type="button"
+                onClick={() => setShowNewVendorDrawer(false)}
+                className="px-4 py-2 rounded-lg border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 font-semibold text-xs transition cursor-pointer"
+              >
+                Cancelar
+              </button>
+
+              <div className="relative inline-flex rounded-lg shadow-sm">
+                <button
+                  type="button"
+                  disabled={vendorDrawerLoading}
+                  onClick={(e) => handleCreateVendorDrawer(e, false)}
+                  className="px-4 py-2 rounded-l-lg bg-[#f6821f] hover:bg-[#e07216] text-white font-semibold text-xs transition cursor-pointer disabled:opacity-50 flex items-center gap-1"
+                >
+                  {vendorDrawerLoading ? "Guardando..." : "Guardar"}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setShowVendorSaveDropdown(!showVendorSaveDropdown)}
+                  className="px-2.5 py-2 rounded-r-lg bg-[#e07216] hover:bg-[#d06512] text-white border-l border-white/20 transition cursor-pointer flex items-center justify-center"
+                >
+                  <svg
+                    className={`w-3.5 h-3.5 transition-transform ${showVendorSaveDropdown ? "rotate-180" : "rotate-0"}`}
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+
+                {showVendorSaveDropdown && (
+                  <div className="absolute bottom-full right-0 mb-2 w-52 bg-white rounded-xl shadow-2xl border border-slate-200 py-1 z-30 animate-in fade-in zoom-in-95 duration-150">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        setShowVendorSaveDropdown(false);
+                        handleCreateVendorDrawer(e, false);
+                      }}
+                      className="w-full text-left px-4 py-2.5 text-xs text-slate-700 hover:bg-[#fff7ed] hover:text-[#f6821f] font-semibold transition cursor-pointer flex items-center gap-2"
+                    >
+                      <span>Guardar y cerrar</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        setShowVendorSaveDropdown(false);
+                        handleCreateVendorDrawer(e, true);
+                      }}
+                      className="w-full text-left px-4 py-2.5 text-xs text-slate-700 hover:bg-[#fff7ed] hover:text-[#f6821f] font-semibold transition cursor-pointer flex items-center gap-2"
+                    >
+                      <svg className="w-4 h-4 text-[#f6821f]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
+                      </svg>
+                      <span>Guardar y crear nuevo</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </aside>
+        </div>
+      )}
       {/* ================= SIDEBAR: PERSONALIZAR (Matching screenshot) ================= */}
       {showConfigSidebar && (
         <>
@@ -6209,15 +14651,45 @@ export default function AdminDashboard() {
                     <p className="text-[11px] text-slate-500 pl-5">Drag to change the order of columns</p>
 
                     <div className="space-y-2 pl-5">
-                      {[
-                        { id: "code", label: "N.º" },
-                        { id: "type", label: "Tipo de cuenta" },
-                        { id: "detailType", label: "Tipo de detalles" },
-                        { id: "description", label: "Descripción" },
-                        { id: "currency", label: "Moneda" },
-                        { id: "bookBalance", label: "Saldo contable" },
-                        { id: "bankBalance", label: "Saldo bancario" },
-                      ].map((col, index) => (
+                      {(currentView === "clientes"
+                        ? [
+                            { id: "macolaCode", label: "Código Macola" },
+                            { id: "name", label: "Nombre de Empresa / Cliente" },
+                            { id: "email", label: "Correo Electrónico" },
+                            { id: "phone", label: "Teléfono" },
+                            { id: "address", label: "Dirección" },
+                            { id: "currency", label: "Moneda" },
+                            { id: "actions", label: "Acciones" },
+                          ]
+                        : currentView === "proveedores"
+                        ? [
+                            { id: "macolaCode", label: "Código Macola" },
+                            { id: "name", label: "Proveedor" },
+                            { id: "email", label: "Correo" },
+                            { id: "phone", label: "Teléfono" },
+                            { id: "address", label: "Dirección" },
+                            { id: "currency", label: "Moneda" },
+                            { id: "actions", label: "Acciones" },
+                          ]
+                        : currentView === "inventario"
+                        ? [
+                            { id: "sku", label: "SKU" },
+                            { id: "description", label: "Descripción del Artículo" },
+                            { id: "quantity", label: "Existencias" },
+                            { id: "cost", label: "Costo Unitario" },
+                            { id: "price", label: "Precio de Venta" },
+                            { id: "total", label: "Valoración Total" },
+                          ]
+                        : [
+                            { id: "code", label: "N.º" },
+                            { id: "type", label: "Tipo de cuenta" },
+                            { id: "detailType", label: "Tipo de detalles" },
+                            { id: "description", label: "Descripción" },
+                            { id: "currency", label: "Moneda" },
+                            { id: "bookBalance", label: "Saldo contable" },
+                            { id: "bankBalance", label: "Saldo bancario" },
+                          ]
+                      ).map((col, index) => (
                         <div key={col.id} className="flex items-center justify-between group py-0.5">
                           <div className="flex items-center gap-2.5">
                             {/* Drag grip icon */}
@@ -6355,8 +14827,8 @@ export default function AdminDashboard() {
           <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 space-y-4">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div>
-                <h3 className="text-base font-bold text-slate-900">Conectar Cuenta Bancaria Institucional</h3>
-                <p className="text-xs text-slate-500">Sincroniza movimientos y extractos automáticamente</p>
+                <h3 className="text-base font-bold text-slate-900">Registrar Cuenta Bancaria Institucional</h3>
+                <p className="text-xs text-slate-500">Crea la cuenta operativa para registro y conciliación de extractos</p>
               </div>
               <button
                 onClick={() => setShowConnectBankModal(false)}
@@ -6386,13 +14858,13 @@ export default function AdminDashboard() {
                   const json = await res.json();
                   if (json.success && json.data) {
                     setConnectedBanks((prev) => [...prev, json.data]);
-                    setBankToastNotification(`Cuenta de ${connectBankForm.institution} conectada y registrada en la base de datos.`);
+                    setBankToastNotification(`Cuenta de ${connectBankForm.institution} registrada en la base de datos.`);
                     setTimeout(() => setBankToastNotification(""), 4000);
                   }
                   setShowConnectBankModal(false);
                   loadBankingData();
                 } catch (err) {
-                  console.error("Error connecting bank:", err);
+                  console.error("Error registering bank:", err);
                 } finally {
                   setConnectBankLoading(false);
                 }
@@ -6412,8 +14884,8 @@ export default function AdminDashboard() {
                   <option value="Banpaís">Banpaís (Banco del País)</option>
                   <option value="Banco de Occidente">Banco de Occidente</option>
                   <option value="Banco Promerica">Banco Promerica</option>
-                  <option value="Chase Bank USA">Chase Bank (ACH Internacional / USD)</option>
-                  <option value="Wells Fargo USA">Wells Fargo (ACH Internacional / USD)</option>
+                  <option value="Chase Bank USA">Chase Bank (USD)</option>
+                  <option value="Wells Fargo USA">Wells Fargo (USD)</option>
                 </select>
               </div>
 
@@ -6457,19 +14929,6 @@ export default function AdminDashboard() {
                 />
               </div>
 
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">Frecuencia de Sincronización Automática</label>
-                <select
-                  value={connectBankForm.syncFrequency}
-                  onChange={(e) => setConnectBankForm({ ...connectBankForm, syncFrequency: e.target.value })}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:border-[#f6821f] text-slate-900 cursor-pointer"
-                >
-                  <option value="Automática cada hora">Automática cada hora (Recomendado)</option>
-                  <option value="Diaria a medianoche">Diaria a medianoche</option>
-                  <option value="Manual a petición">Manual a petición</option>
-                </select>
-              </div>
-
               <div className="pt-3 flex justify-end gap-2 border-t border-slate-100">
                 <button
                   type="button"
@@ -6488,7 +14947,7 @@ export default function AdminDashboard() {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                     </svg>
                   )}
-                  <span>{connectBankLoading ? "Conectando con banco..." : "Conectar y sincronizar"}</span>
+                  <span>{connectBankLoading ? "Guardando cuenta..." : "Registrar cuenta"}</span>
                 </button>
               </div>
             </form>

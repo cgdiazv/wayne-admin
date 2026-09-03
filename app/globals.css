@@ -26,3 +26,59 @@ body {
   font-family: Arial, Helvetica, sans-serif;
   min-height: 100vh;
 }
+
+/* Prevent auto-zoom on iPhone / iOS Safari when focusing form inputs */
+@media screen and (max-width: 768px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
+
+/* ================= PRINT STYLES FOR OFFICIAL INVOICE DOCUMENT ================= */
+@media print {
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+
+  /* Hide UI elements, sidebars, headers, footers, action bars */
+  header,
+  footer,
+  aside,
+  nav,
+  .no-print {
+    display: none !important;
+  }
+
+  /* Hide everything outside printable container */
+  body * {
+    visibility: hidden;
+  }
+
+  /* Only show the official printable invoice document */
+  #printable-invoice-document,
+  #printable-invoice-document * {
+    visibility: visible;
+  }
+
+  #printable-invoice-document {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 10px !important;
+    box-shadow: none !important;
+    border: none !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+
+  @page {
+    margin: 1cm;
+    size: portrait;
+  }
+}

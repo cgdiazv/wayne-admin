@@ -9,15 +9,16 @@ generator client {
 }
 
 model Account {
-  id        String   @id @default(cuid())
-  code      String   @unique // e.g., 1000-6000 standard numbering
-  name      String
-  type      String   // Asset, Liability, Equity, Income, Expense
-  currency  String   @default("USD")
-  balance   Float    @default(0)
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id          String       @id @default(cuid())
+  code        String       @unique // e.g., 1000-6000 standard numbering
+  name        String
+  type        String       // Asset, Liability, Equity, Income, Expense
+  currency    String       @default("USD")
+  balance     Float        @default(0)
+  isActive    Boolean      @default(true)
+  bankAccount BankAccount?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
 }
 
 model Customer {
@@ -75,6 +76,7 @@ model CompanySettings {
 
 model BankAccount {
   id            String            @id @default(cuid())
+  tenantId      String?
   name          String            // e.g. "Banco Ficohsa"
   accountNumber String            // e.g. "•••• 2266"
   type          String            // e.g. "Cuenta de cheques empresarial USD"
@@ -84,6 +86,8 @@ model BankAccount {
   lastUpdated   String            @default("Hoy, 10:15 PM")
   status        String            @default("Conectado")
   color         String            @default("#0284c7")
+  accountId     String?           @unique
+  account       Account?          @relation(fields: [accountId], references: [id], onDelete: SetNull)
   createdAt     DateTime          @default(now())
   updatedAt     DateTime          @updatedAt
   transactions  BankTransaction[]
@@ -114,4 +118,20 @@ model BankRule {
   active        Boolean  @default(true)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
+}
+
+model Payment {
+  id              String   @id @default(cuid())
+  customerId      String?
+  customerName    String
+  customerEmail   String?
+  sendLater       Boolean  @default(false)
+  paymentDate     String
+  paymentMethod   String
+  referenceNumber String?
+  depositAccount  String   @default("Cash and cash equivalents")
+  amount          Float
+  note            String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 }
