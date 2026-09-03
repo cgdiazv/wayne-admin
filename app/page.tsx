@@ -77,6 +77,33 @@ export default function AdminDashboard() {
   const [accountModalError, setAccountModalError] = useState("");
   const [accountModalSuccess, setAccountModalSuccess] = useState("");
 
+  // Plan de cuentas personalization sidebar states (Matching screenshot)
+  const [showConfigSidebar, setShowConfigSidebar] = useState(false);
+  const [pageSize, setPageSize] = useState<number>(75);
+  const [rowDensity, setRowDensity] = useState<"acogedor" | "compacto">("acogedor");
+  const [visibleColumns, setVisibleColumns] = useState<{ [key: string]: boolean }>({
+    code: true, // N.º
+    type: true, // Tipo de cuenta
+    detailType: true, // Tipo de detalles
+    description: true, // Descripción
+    currency: true, // Moneda
+    bookBalance: true, // Saldo en libros
+    bankBalance: true, // Saldo bancario
+  });
+  const [columnOrder, setColumnOrder] = useState<string[]>([
+    "code",
+    "type",
+    "detailType",
+    "description",
+    "currency",
+    "bookBalance",
+    "bankBalance",
+  ]);
+  const [activateAccountNumbers, setActivateAccountNumbers] = useState(true);
+  const [alternateRowColor, setAlternateRowColor] = useState(false);
+  const [showInactiveAccounts, setShowInactiveAccounts] = useState(true);
+  const [showReportBadges, setShowReportBadges] = useState(false);
+
   // Quick Actions Bar State & Config
   const quickActions = [
     { id: "crear-factura", label: "Crear factura" },
@@ -225,11 +252,29 @@ export default function AdminDashboard() {
 
   // Filters
   const filteredAccounts = accounts.filter((a) => {
+    if (!showInactiveAccounts && !a.isActive) return false;
     const term = accountsSearch ? accountsSearch.toLowerCase() : search.toLowerCase();
     const matchesSearch = !term || a.code.toLowerCase().includes(term) || a.name.toLowerCase().includes(term);
     const matchesType = accountsTypeFilter === "Todo" || a.type.toUpperCase() === accountsTypeFilter.toUpperCase();
     return matchesSearch && matchesType;
   });
+
+  const displayedAccounts = filteredAccounts.slice(0, pageSize);
+
+  const getDetailType = (type: string, name: string) => {
+    const n = name.toLowerCase();
+    if (n.includes("banco") || n.includes("caja")) return "Efectivo y equivalentes";
+    if (n.includes("inventario") || n.includes("mercader")) return "Inventario";
+    if (n.includes("cobrar") || n.includes("cliente")) return "Cuentas por cobrar";
+    if (n.includes("pagar") || n.includes("proveedor")) return "Cuentas por pagar";
+    if (n.includes("capital") || n.includes("patrimonio")) return "Capital contable";
+    if (type === "ACTIVO") return "Activo corriente";
+    if (type === "PASIVO") return "Pasivo corriente";
+    if (type === "CAPITAL") return "Patrimonio neto";
+    if (type === "INGRESO") return "Ingresos por ventas";
+    if (type === "GASTO") return "Gastos operativos";
+    return "Detalle general";
+  };
 
   const handleExportAccounts = () => {
     const headers = ["Codigo,Nombre,Tipo,Moneda,Estado"];
@@ -1058,9 +1103,11 @@ export default function AdminDashboard() {
                   </button>
 
                   <button
-                    onClick={() => alert("Opciones de columnas visibles del Plan de Cuentas")}
-                    title="Configuración"
-                    className="p-1.5 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition cursor-pointer"
+                    onClick={() => setShowConfigSidebar(true)}
+                    title="Personalizar tabla"
+                    className={`p-1.5 rounded-lg transition cursor-pointer ${
+                      showConfigSidebar ? "text-[#f6821f] bg-[#fff7ed]" : "text-slate-500 hover:text-slate-900 hover:bg-slate-100"
+                    }`}
                   >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
@@ -1074,42 +1121,141 @@ export default function AdminDashboard() {
               <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xs">
                 <div className="p-4 border-b border-slate-100 flex items-center justify-between">
                   <div>
-                    <h2 className="font-semibold text-sm text-slate-900">Catálogo Contable ({filteredAccounts.length})</h2>
+                    <h2 className="font-semibold text-sm text-slate-900">
+                      Catálogo Contable ({displayedAccounts.length} de {filteredAccounts.length})
+                    </h2>
                     <p className="text-xs text-slate-500">Plan estándar con cuentas activas en Wayne Trademark Honduras</p>
                   </div>
+                  {filteredAccounts.length > pageSize && (
+                    <span className="text-[11px] text-slate-500 font-medium">
+                      Página de {pageSize} registros
+                    </span>
+                  )}
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-xs text-slate-600">
                     <thead className="bg-slate-50 text-slate-700 font-semibold border-b border-slate-200">
                       <tr>
-                        <th className="p-3.5">Código</th>
-                        <th className="p-3.5">Nombre de la Cuenta</th>
-                        <th className="p-3.5">Tipo</th>
-                        <th className="p-3.5">Moneda</th>
-                        <th className="p-3.5">Estado</th>
+                        {columnOrder.map((colKey) => {
+                          if (!visibleColumns[colKey]) return null;
+                          const cellPadding = rowDensity === "compacto" ? "py-2 px-3" : "p-3.5";
+                          switch (colKey) {
+                            case "code":
+                              return <th key="code" className={cellPadding}>N.º</th>;
+                            case "type":
+                              return <th key="type" className={cellPadding}>Tipo de cuenta</th>;
+                            case "detailType":
+                              return <th key="detailType" className={cellPadding}>Tipo de detalles</th>;
+                            case "description":
+                              return <th key="description" className={cellPadding}>Descripción</th>;
+                            case "currency":
+                              return <th key="currency" className={cellPadding}>Moneda</th>;
+                            case "bookBalance":
+                              return <th key="bookBalance" className={cellPadding}>Saldo contable</th>;
+                            case "bankBalance":
+                              return <th key="bankBalance" className={cellPadding}>Saldo bancario</th>;
+                            default:
+                              return null;
+                          }
+                        })}
+                        <th className={rowDensity === "compacto" ? "py-2 px-3" : "p-3.5"}>Estado</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                      {filteredAccounts.map((acc) => (
-                        <tr key={acc.id} className="hover:bg-slate-50/80 transition">
-                          <td className="p-3.5 font-mono text-[#f6821f] font-semibold">{acc.code}</td>
-                          <td className="p-3.5 font-medium text-slate-900">{acc.name}</td>
-                          <td className="p-3.5">
-                            <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-slate-100 border border-slate-200 text-slate-700">
-                              {acc.type}
-                            </span>
-                          </td>
-                          <td className="p-3.5 font-medium">{acc.currency}</td>
-                          <td className="p-3.5">
-                            <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-semibold ${acc.isActive ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-slate-100 text-slate-500"}`}>
-                              {acc.isActive ? "Activa" : "Inactiva"}
-                            </span>
-                          </td>
-                        </tr>
-                      ))}
-                      {filteredAccounts.length === 0 && (
+                      {displayedAccounts.map((acc, idx) => {
+                        const cellPadding = rowDensity === "compacto" ? "py-1.5 px-3" : "p-3.5";
+                        const rowBg = alternateRowColor && idx % 2 === 1 ? "bg-slate-50/70" : "bg-white";
+                        return (
+                          <tr key={acc.id} className={`${rowBg} hover:bg-[#fff7ed]/50 transition`}>
+                            {columnOrder.map((colKey) => {
+                              if (!visibleColumns[colKey]) return null;
+                              switch (colKey) {
+                                case "code":
+                                  return (
+                                    <td key="code" className={`${cellPadding} font-mono font-semibold text-[#f6821f]`}>
+                                      {activateAccountNumbers ? acc.code : "—"}
+                                    </td>
+                                  );
+                                case "type":
+                                  return (
+                                    <td key="type" className={cellPadding}>
+                                      <div className="flex items-center gap-1.5">
+                                        <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-slate-100 border border-slate-200 text-slate-700">
+                                          {acc.type}
+                                        </span>
+                                        {showReportBadges && (
+                                          <span className="px-1.5 py-0.5 text-[9px] rounded font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                                            {acc.type === "INGRESO" || acc.type === "GASTO" ? "ER" : "BG"}
+                                          </span>
+                                        )}
+                                      </div>
+                                    </td>
+                                  );
+                                case "detailType":
+                                  return (
+                                    <td key="detailType" className={`${cellPadding} text-slate-600 font-medium`}>
+                                      {getDetailType(acc.type, acc.name)}
+                                    </td>
+                                  );
+                                case "description":
+                                  return (
+                                    <td key="description" className={`${cellPadding} font-medium text-slate-900`}>
+                                      {acc.name}
+                                    </td>
+                                  );
+                                case "currency":
+                                  return (
+                                    <td key="currency" className={`${cellPadding} font-medium text-slate-700`}>
+                                      {acc.currency}
+                                    </td>
+                                  );
+                                case "bookBalance":
+                                  return (
+                                    <td key="bookBalance" className={`${cellPadding} font-mono font-medium text-slate-800`}>
+                                      {formatCurrency(
+                                        acc.type === "ACTIVO"
+                                          ? 14250
+                                          : acc.type === "PASIVO"
+                                          ? 3420
+                                          : acc.type === "INGRESO"
+                                          ? 9611
+                                          : acc.type === "GASTO"
+                                          ? 6611
+                                          : 25000
+                                      )}
+                                    </td>
+                                  );
+                                case "bankBalance":
+                                  return (
+                                    <td key="bankBalance" className={`${cellPadding} font-mono font-medium text-slate-500`}>
+                                      {acc.name.toLowerCase().includes("banco") || acc.name.toLowerCase().includes("caja")
+                                        ? formatCurrency(14250)
+                                        : "—"}
+                                    </td>
+                                  );
+                                default:
+                                  return null;
+                              }
+                            })}
+                            <td className={cellPadding}>
+                              <span
+                                className={`px-2.5 py-0.5 rounded-full text-[10px] font-semibold ${
+                                  acc.isActive
+                                    ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                    : "bg-slate-100 text-slate-500"
+                                }`}
+                              >
+                                {acc.isActive ? "Activa" : "Inactiva"}
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                      {displayedAccounts.length === 0 && (
                         <tr>
-                          <td colSpan={5} className="p-8 text-center text-slate-400">No se encontraron cuentas contables</td>
+                          <td colSpan={columnOrder.filter((k) => visibleColumns[k]).length + 1} className="p-8 text-center text-slate-400">
+                            No se encontraron cuentas contables
+                          </td>
                         </tr>
                       )}
                     </tbody>
@@ -1912,6 +2058,242 @@ export default function AdminDashboard() {
             </form>
           </div>
         </div>
+      )}
+      {/* ================= SIDEBAR: PERSONALIZAR (Matching screenshot) ================= */}
+      {showConfigSidebar && (
+        <>
+          <div
+            className="fixed inset-0 bg-slate-900/30 backdrop-blur-xs z-50 transition-opacity"
+            onClick={() => setShowConfigSidebar(false)}
+          />
+          <aside className="fixed inset-y-0 right-0 w-80 sm:w-88 bg-white border-l border-slate-200 shadow-2xl z-50 overflow-y-auto flex flex-col animate-in slide-in-from-right duration-200">
+            {/* Header */}
+            <div className="p-5 border-b border-slate-200 flex items-center justify-between sticky top-0 bg-white/95 backdrop-blur-xs z-10">
+              <div className="w-5"></div>
+              <h3 className="text-sm font-bold text-slate-800 text-center">Personalizar</h3>
+              <button
+                onClick={() => setShowConfigSidebar(false)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition cursor-pointer"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="divide-y divide-slate-100 text-xs">
+              {/* Section: Rows */}
+              <div className="p-5 space-y-4">
+                <div className="flex items-center gap-1.5 font-bold text-slate-800">
+                  <svg className="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                  </svg>
+                  <span>Rows</span>
+                </div>
+
+                <div className="space-y-1.5 pl-5">
+                  <label className="text-slate-600 block text-xs">Tamaño de página</label>
+                  <div className="relative">
+                    <select
+                      value={pageSize}
+                      onChange={(e) => setPageSize(Number(e.target.value))}
+                      className="w-full pl-3.5 pr-8 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-medium appearance-none focus:outline-none focus:border-[#f6821f] cursor-pointer"
+                    >
+                      <option value={25}>25</option>
+                      <option value={50}>50</option>
+                      <option value={75}>75</option>
+                      <option value={100}>100</option>
+                      <option value={300}>300</option>
+                    </select>
+                    <svg className="w-4 h-4 text-slate-400 absolute right-2.5 top-2.5 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </div>
+                </div>
+
+                <div className="space-y-1.5 pl-5">
+                  <label className="text-slate-600 block text-xs">Densidad de filas</label>
+                  <div className="relative">
+                    <select
+                      value={rowDensity}
+                      onChange={(e) => setRowDensity(e.target.value as "acogedor" | "compacto")}
+                      className="w-full pl-3.5 pr-8 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-medium appearance-none focus:outline-none focus:border-[#f6821f] cursor-pointer"
+                    >
+                      <option value="acogedor">Acogedor</option>
+                      <option value="compacto">Compacto</option>
+                    </select>
+                    <svg className="w-4 h-4 text-slate-400 absolute right-2.5 top-2.5 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </div>
+                </div>
+              </div>
+
+              {/* Section: Columnas */}
+              <div className="p-5 space-y-3">
+                <div className="flex items-center gap-1.5 font-bold text-slate-800">
+                  <svg className="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                  </svg>
+                  <span>Columnas</span>
+                </div>
+
+                <p className="text-[11px] text-slate-500 pl-5">Drag to change the order of columns</p>
+
+                <div className="space-y-2 pl-5 pt-1">
+                  {[
+                    { id: "code", label: "N.º" },
+                    { id: "type", label: "Tipo de cuenta" },
+                    { id: "detailType", label: "Tipo de detalles" },
+                    { id: "description", label: "Descripción" },
+                    { id: "currency", label: "Moneda" },
+                    { id: "bookBalance", label: "Saldo contable" },
+                    { id: "bankBalance", label: "Saldo bancario" },
+                  ].map((col, index) => (
+                    <div key={col.id} className="flex items-center justify-between group py-0.5">
+                      <div className="flex items-center gap-2.5">
+                        {/* Drag grip icon */}
+                        <div className="flex items-center text-slate-400">
+                          <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+                            <circle cx="8.5" cy="6.5" r="1.5" />
+                            <circle cx="15.5" cy="6.5" r="1.5" />
+                            <circle cx="8.5" cy="12" r="1.5" />
+                            <circle cx="15.5" cy="12" r="1.5" />
+                            <circle cx="8.5" cy="17.5" r="1.5" />
+                            <circle cx="15.5" cy="17.5" r="1.5" />
+                          </svg>
+                        </div>
+                        <label className="flex items-center gap-2.5 cursor-pointer select-none text-slate-700">
+                          <input
+                            type="checkbox"
+                            checked={Boolean(visibleColumns[col.id])}
+                            onChange={() =>
+                              setVisibleColumns((prev) => ({
+                                ...prev,
+                                [col.id]: !prev[col.id],
+                              }))
+                            }
+                            className="w-4 h-4 rounded border-slate-300 text-[#f6821f] focus:ring-[#f6821f] cursor-pointer accent-[#f6821f]"
+                          />
+                          <span className="font-medium text-xs text-slate-800">{col.label}</span>
+                        </label>
+                      </div>
+
+                      {/* Quick re-order arrows */}
+                      <div className="opacity-0 group-hover:opacity-100 flex items-center gap-0.5 transition">
+                        {index > 0 && (
+                          <button
+                            type="button"
+                            title="Mover arriba"
+                            onClick={() => {
+                              const nextOrder = [...columnOrder];
+                              const temp = nextOrder[index - 1];
+                              nextOrder[index - 1] = nextOrder[index];
+                              nextOrder[index] = temp;
+                              setColumnOrder(nextOrder);
+                            }}
+                            className="p-1 hover:bg-slate-100 rounded text-slate-400 hover:text-slate-700 cursor-pointer"
+                          >
+                            ▲
+                          </button>
+                        )}
+                        {index < columnOrder.length - 1 && (
+                          <button
+                            type="button"
+                            title="Mover abajo"
+                            onClick={() => {
+                              const nextOrder = [...columnOrder];
+                              const temp = nextOrder[index + 1];
+                              nextOrder[index + 1] = nextOrder[index];
+                              nextOrder[index] = temp;
+                              setColumnOrder(nextOrder);
+                            }}
+                            className="p-1 hover:bg-slate-100 rounded text-slate-400 hover:text-slate-700 cursor-pointer"
+                          >
+                            ▼
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Section: Características */}
+              <div className="p-5 space-y-3">
+                <div className="flex items-center gap-1.5 font-bold text-slate-800">
+                  <svg className="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                  </svg>
+                  <span>Características</span>
+                </div>
+
+                <div className="pl-5 pt-1">
+                  <label className="flex items-center gap-3 cursor-pointer select-none">
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={activateAccountNumbers}
+                      onClick={() => setActivateAccountNumbers(!activateAccountNumbers)}
+                      className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                        activateAccountNumbers ? "bg-[#f6821f]" : "bg-slate-300"
+                      }`}
+                    >
+                      <span
+                        className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                          activateAccountNumbers ? "translate-x-4" : "translate-x-0"
+                        }`}
+                      />
+                    </button>
+                    <span className="text-slate-700 font-medium text-xs">Activar números de cuenta</span>
+                  </label>
+                </div>
+              </div>
+
+              {/* Section: Preferencias */}
+              <div className="p-5 space-y-3">
+                <div className="flex items-center gap-1.5 font-bold text-slate-800">
+                  <svg className="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                  </svg>
+                  <span>Preferencias</span>
+                </div>
+
+                <div className="space-y-3 pl-5 pt-1 text-slate-700">
+                  <label className="flex items-center gap-2.5 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={alternateRowColor}
+                      onChange={(e) => setAlternateRowColor(e.target.checked)}
+                      className="w-4 h-4 rounded border-slate-300 text-[#f6821f] focus:ring-[#f6821f] cursor-pointer accent-[#f6821f]"
+                    />
+                    <span className="font-medium text-xs">Alternar color de fila</span>
+                  </label>
+
+                  <label className="flex items-center gap-2.5 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={showInactiveAccounts}
+                      onChange={(e) => setShowInactiveAccounts(e.target.checked)}
+                      className="w-4 h-4 rounded border-slate-300 text-[#f6821f] focus:ring-[#f6821f] cursor-pointer accent-[#f6821f]"
+                    />
+                    <span className="font-medium text-xs">Mostrar cuentas inactivas</span>
+                  </label>
+
+                  <label className="flex items-center gap-2.5 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={showReportBadges}
+                      onChange={(e) => setShowReportBadges(e.target.checked)}
+                      className="w-4 h-4 rounded border-slate-300 text-[#f6821f] focus:ring-[#f6821f] cursor-pointer accent-[#f6821f]"
+                    />
+                    <span className="font-medium text-xs">Mostrar distintivos de tipo de informe</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+          </aside>
+        </>
       )}
     </div>
   );
