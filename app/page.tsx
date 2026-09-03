@@ -51,6 +51,7 @@ export default function AdminDashboard() {
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [showPnL, setShowPnL] = useState(true);
+  const [showGastos, setShowGastos] = useState(true);
 
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -651,52 +652,116 @@ export default function AdminDashboard() {
                   {/* Card 2: Gastos */}
                   <div className="bg-white border border-slate-200/90 rounded-2xl p-6 shadow-xs flex flex-col justify-between">
                     <div>
-                      <div className="mb-2">
+                      <div className="flex items-center justify-between mb-2">
                         <span className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">GASTOS</span>
+                        <button
+                          onClick={() => setShowGastos(!showGastos)}
+                          className="text-xs font-medium text-emerald-800 hover:text-emerald-950 transition cursor-pointer"
+                        >
+                          {showGastos ? "Ocultar" : "Mostrar"}
+                        </button>
                       </div>
                       <h3 className="text-lg font-medium text-slate-900 leading-snug mb-8">
                         Ve a dónde va tu dinero
                       </h3>
 
-                      <div className="flex items-center justify-center gap-8 my-6">
-                        {/* Donut Chart */}
-                        <div className="relative w-36 h-36 flex items-center justify-center">
-                          <svg className="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
-                            <circle
-                              cx="18"
-                              cy="18"
-                              r="13"
-                              fill="none"
-                              stroke="#e2e8f0"
-                              strokeWidth="5"
-                            />
-                          </svg>
-                        </div>
+                      {showGastos && (
+                        <div className="flex items-center justify-center gap-8 my-6">
+                          {/* Donut Chart with 5 segments */}
+                          <div className="relative w-36 h-36 flex items-center justify-center shrink-0">
+                            <svg className="w-full h-full transform -rotate-90" viewBox="0 0 42 42">
+                              {/* Background / Base Track */}
+                              <circle
+                                cx="21"
+                                cy="21"
+                                r="15.9155"
+                                fill="none"
+                                stroke="#f1f5f9"
+                                strokeWidth="7"
+                              />
+                              {/* 1. Blue Segment (25%) */}
+                              <circle
+                                cx="21"
+                                cy="21"
+                                r="15.9155"
+                                fill="none"
+                                stroke="#2563eb"
+                                strokeWidth="7"
+                                strokeDasharray="23.5 76.5"
+                                strokeDashoffset="0"
+                              />
+                              {/* 2. Teal Segment (20%) */}
+                              <circle
+                                cx="21"
+                                cy="21"
+                                r="15.9155"
+                                fill="none"
+                                stroke="#0097a7"
+                                strokeWidth="7"
+                                strokeDasharray="18.5 81.5"
+                                strokeDashoffset="-25"
+                              />
+                              {/* 3. Purple Segment (15%) */}
+                              <circle
+                                cx="21"
+                                cy="21"
+                                r="15.9155"
+                                fill="none"
+                                stroke="#6b21a8"
+                                strokeWidth="7"
+                                strokeDasharray="13.5 86.5"
+                                strokeDashoffset="-45"
+                              />
+                              {/* 4. Red Segment (25%) */}
+                              <circle
+                                cx="21"
+                                cy="21"
+                                r="15.9155"
+                                fill="none"
+                                stroke="#b91c1c"
+                                strokeWidth="7"
+                                strokeDasharray="23.5 76.5"
+                                strokeDashoffset="-60"
+                              />
+                              {/* 5. Orange Segment (15%) */}
+                              <circle
+                                cx="21"
+                                cy="21"
+                                r="15.9155"
+                                fill="none"
+                                stroke="#ea580c"
+                                strokeWidth="7"
+                                strokeDasharray="13.5 86.5"
+                                strokeDashoffset="-85"
+                              />
+                            </svg>
+                          </div>
 
-                        {/* Legend */}
-                        <div className="space-y-2 text-xs text-slate-400 font-medium">
-                          <div className="flex items-center gap-2">
-                            <span className="w-2 h-2 rounded-full bg-slate-300"></span>
-                            <span>--</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <span className="w-2 h-2 rounded-full bg-slate-300"></span>
-                            <span>--</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <span className="w-2 h-2 rounded-full bg-slate-300"></span>
-                            <span>--</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <span className="w-2 h-2 rounded-full bg-slate-300"></span>
-                            <span>--</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <span className="w-2 h-2 rounded-full bg-slate-300"></span>
-                            <span>--</span>
+                          {/* Legend with matching colors */}
+                          <div className="space-y-2.5 text-xs text-slate-700 font-medium">
+                            <div className="flex items-center gap-2.5">
+                              <span className="w-2.5 h-2.5 rounded-full bg-[#2563eb] shrink-0"></span>
+                              <span>Nombre de la categoría</span>
+                            </div>
+                            <div className="flex items-center gap-2.5">
+                              <span className="w-2.5 h-2.5 rounded-full bg-[#0097a7] shrink-0"></span>
+                              <span>Nombre de la categoría</span>
+                            </div>
+                            <div className="flex items-center gap-2.5">
+                              <span className="w-2.5 h-2.5 rounded-full bg-[#6b21a8] shrink-0"></span>
+                              <span>Nombre de la categoría</span>
+                            </div>
+                            <div className="flex items-center gap-2.5">
+                              <span className="w-2.5 h-2.5 rounded-full bg-[#b91c1c] shrink-0"></span>
+                              <span>Nombre de la categoría</span>
+                            </div>
+                            <div className="flex items-center gap-2.5">
+                              <span className="w-2.5 h-2.5 rounded-full bg-[#ea580c] shrink-0"></span>
+                              <span>Nombre de la categoría</span>
+                            </div>
                           </div>
                         </div>
-                      </div>
+                      )}
                     </div>
 
                     <div className="pt-6">
