@@ -963,7 +963,7 @@ export default function AdminDashboard() {
                   <svg className="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
                   </svg>
-                  <span>Todas las listas</span>
+                  <span>Regresar a Dashboard</span>
                 </button>
 
                 <div className="flex items-center gap-3 self-end sm:self-auto">
