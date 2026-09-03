@@ -188,6 +188,16 @@ export default function AdminDashboard() {
     router.refresh();
   };
 
+  // Currency Formatter: $0,000.00
+  const formatCurrency = (amount: number): string => {
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: "USD",
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(amount || 0);
+  };
+
   // Calculations
   const totalInventoryUnits = inventory.reduce((sum, item) => sum + (item.quantity || 0), 0);
   const totalInventoryValuation = inventory.reduce((sum, item) => sum + (item.quantity || 0) * (item.cost || 0), 0);
@@ -580,7 +590,7 @@ export default function AdminDashboard() {
                     </span>
                   </div>
                   <div className="text-3xl font-bold text-[#f6821f]">
-                    ${totalInventoryValuation.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    {formatCurrency(totalInventoryValuation)}
                   </div>
                   <p className="text-xs text-slate-500 mt-1">{totalInventoryUnits} unidades en stock</p>
                 </div>
@@ -609,7 +619,7 @@ export default function AdminDashboard() {
                       {showPnL && (
                         <div className="space-y-6 my-4">
                           <div>
-                            <div className="text-xl font-bold text-slate-900 mb-1">$9.611</div>
+                            <div className="text-xl font-bold text-slate-900 mb-1">{formatCurrency(9611)}</div>
                             <div className="flex items-center gap-3">
                               <span className="text-xs text-slate-600 font-medium w-16">Ingreso</span>
                               <div className="flex-1">
@@ -619,7 +629,7 @@ export default function AdminDashboard() {
                           </div>
 
                           <div>
-                            <div className="text-xl font-bold text-slate-900 mb-1">$6.611</div>
+                            <div className="text-xl font-bold text-slate-900 mb-1">{formatCurrency(6611)}</div>
                             <div className="flex items-center gap-3">
                               <span className="text-xs text-slate-600 font-medium w-16">Gastos</span>
                               <div className="flex-1">
@@ -984,10 +994,10 @@ export default function AdminDashboard() {
                         <td className="p-3.5 font-mono text-[#f6821f] font-semibold">{item.sku}</td>
                         <td className="p-3.5 font-medium text-slate-900">{item.description}</td>
                         <td className="p-3.5 text-right font-mono font-medium">{item.quantity}</td>
-                        <td className="p-3.5 text-right font-mono font-medium">${item.cost.toFixed(2)}</td>
-                        <td className="p-3.5 text-right font-mono font-medium">${item.price.toFixed(2)}</td>
+                        <td className="p-3.5 text-right font-mono font-medium">{formatCurrency(item.cost)}</td>
+                        <td className="p-3.5 text-right font-mono font-medium">{formatCurrency(item.price)}</td>
                         <td className="p-3.5 text-right font-mono text-slate-900 font-bold">
-                          ${(item.quantity * item.cost).toFixed(2)}
+                          {formatCurrency(item.quantity * item.cost)}
                         </td>
                       </tr>
                     ))}
