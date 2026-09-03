@@ -226,7 +226,7 @@ export default function AdminDashboard() {
   ];
 
   const [configSubTab, setConfigSubTab] = useState<
-    "empresa" | "uso" | "informes" | "contabilidad" | "ventas" | "gastos" | "horas" | "monedero" | "avanzadas"
+    "empresa" | "reportes" | "contabilidad" | "ventas" | "gastos" | "horas" | "monedero" | "avanzadas"
   >("empresa");
 
   const [companySettings, setCompanySettings] = useState({
@@ -2066,8 +2066,7 @@ export default function AdminDashboard() {
                   <div className="space-y-0.5">
                     {[
                       { id: "empresa", label: "Empresa" },
-                      { id: "uso", label: "Uso" },
-                      { id: "informes", label: "Informes" },
+                      { id: "reportes", label: "Reportes" },
                       { id: "contabilidad", label: "Contabilidad" },
                       { id: "ventas", label: "Ventas" },
                       { id: "gastos", label: "Gastos" },
@@ -2422,74 +2421,12 @@ export default function AdminDashboard() {
                     </div>
                   )}
 
-                  {/* SUBTAB 2: USO */}
-                  {configSubTab === "uso" && (
+                  {/* SUBTAB 2: REPORTES */}
+                  {configSubTab === "reportes" && (
                     <div className="max-w-3xl space-y-6">
                       <div className="border border-slate-200 rounded-xl p-5 bg-white shadow-xs">
-                        <div className="mb-4">
-                          <h2 className="font-bold text-sm text-slate-900">Límites de uso del sistema</h2>
-                          <p className="text-xs text-slate-500 mt-0.5">Consumo de recursos bajo el plan Wayne Enterprise Cloud.</p>
-                        </div>
-
-                        <div className="space-y-4 text-xs pt-1">
-                          <div>
-                            <div className="flex justify-between font-medium text-slate-700 mb-1.5">
-                              <span>Usuarios con acceso</span>
-                              <span className="font-semibold text-slate-900">3 de 5 usuarios</span>
-                            </div>
-                            <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
-                              <div className="h-full bg-[#f6821f] rounded-full" style={{ width: "60%" }} />
-                            </div>
-                          </div>
-
-                          <div>
-                            <div className="flex justify-between font-medium text-slate-700 mb-1.5">
-                              <span>Cuentas contables en catálogo</span>
-                              <span className="font-semibold text-slate-900">{accounts.length} de 250 cuentas</span>
-                            </div>
-                            <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
-                              <div className="h-full bg-[#f6821f] rounded-full" style={{ width: `${Math.min(100, (accounts.length / 250) * 100)}%` }} />
-                            </div>
-                          </div>
-
-                          <div>
-                            <div className="flex justify-between font-medium text-slate-700 mb-1.5">
-                              <span>Almacenamiento de comprobantes</span>
-                              <span className="font-semibold text-slate-900">4.2 MB de 10 GB</span>
-                            </div>
-                            <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
-                              <div className="h-full bg-[#f6821f] rounded-full" style={{ width: "2%" }} />
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="border border-slate-200 rounded-xl p-5 bg-white shadow-xs">
-                        <h2 className="font-bold text-sm text-slate-900 mb-1">Detalles de la Suscripción</h2>
-                        <div className="divide-y divide-slate-100 text-xs">
-                          <div className="py-2.5 flex justify-between">
-                            <span className="text-slate-600">Plan actual</span>
-                            <span className="font-semibold text-slate-900">Wayne Enterprise Pro (Honduras)</span>
-                          </div>
-                          <div className="py-2.5 flex justify-between">
-                            <span className="text-slate-600">Periodo de facturación</span>
-                            <span className="font-semibold text-slate-900">Anual (Renovación Octubre 2026)</span>
-                          </div>
-                          <div className="py-2.5 flex justify-between">
-                            <span className="text-slate-600">Estado</span>
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">Activo</span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* SUBTAB 3: INFORMES */}
-                  {configSubTab === "informes" && (
-                    <div className="max-w-3xl space-y-6">
-                      <div className="border border-slate-200 rounded-xl p-5 bg-white shadow-xs">
-                        <h2 className="font-bold text-sm text-slate-900 mb-1">Formatos de Informes Contables</h2>
-                        <p className="text-xs text-slate-500 mb-4">Personaliza los encabezados y la apariencia de los estados financieros.</p>
+                        <h2 className="font-bold text-sm text-slate-900 mb-1">Formatos de Reportes Contables</h2>
+                        <p className="text-xs text-slate-500 mb-4">Personaliza los encabezados y la apariencia de los reportes y estados financieros.</p>
 
                         <div className="divide-y divide-slate-100 text-xs">
                           <div className="py-3 flex items-center justify-between">
