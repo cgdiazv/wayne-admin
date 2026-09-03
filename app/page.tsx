@@ -491,7 +491,7 @@ export default function AdminDashboard() {
           {currentView === "dashboard" && (
             <>
               {/* Quick Actions Bar (Crear acciones) */}
-              <div className="bg-white border border-slate-200/90 rounded-2xl p-3.5 shadow-xs max-w-6xl">
+              <div className="bg-white border border-slate-200/90 rounded-2xl p-3.5 shadow-xs w-full">
                 <div className="flex items-center gap-3 overflow-x-auto no-scrollbar py-0.5">
                   <span className="font-bold text-slate-800 text-xs shrink-0 tracking-tight flex items-center gap-1.5">
                     <span className="w-2 h-2 rounded-full bg-[#f6821f]"></span>
