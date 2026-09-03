@@ -968,20 +968,10 @@ export default function AdminDashboard() {
 
                 <div className="flex items-center gap-3 self-end sm:self-auto">
                   <button
-                    onClick={() => alert("Comentarios enviados al equipo de soporte.")}
-                    className="text-xs text-slate-600 hover:text-slate-900 font-medium flex items-center gap-1.5 transition cursor-pointer"
-                  >
-                    <svg className="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
-                    </svg>
-                    <span>Enviar comentarios</span>
-                  </button>
-
-                  <button
                     onClick={handleExportAccounts}
                     className="px-4 py-2 rounded-xl border border-[#f6821f] text-[#f6821f] hover:bg-[#fff7ed] text-xs font-semibold transition cursor-pointer shadow-xs"
                   >
-                    Generar informe
+                    Generar reporte
                   </button>
 
                   <button
@@ -1045,18 +1035,7 @@ export default function AdminDashboard() {
                   )}
                 </div>
 
-                <div className="flex items-center gap-4 text-xs text-slate-600">
-                  <button
-                    onClick={() => alert("Modo de edición por lotes activado")}
-                    className="flex items-center gap-1.5 hover:text-slate-900 font-medium transition cursor-pointer"
-                  >
-                    <svg className="w-3.5 h-3.5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                    </svg>
-                    <span>Edición por lotes</span>
-                  </button>
-
-                  <div className="h-4 w-px bg-slate-200"></div>
+                <div className="flex items-center gap-3 text-xs text-slate-600">
 
                   <button
                     onClick={handleExportAccounts}
