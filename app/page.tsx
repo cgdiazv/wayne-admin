@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Users, Factory, Package, Tag, Boxes, AlertCircle, Clock, CheckCircle2, ShieldAlert, Layers, Hash, BookOpen, Download, Upload, FileSpreadsheet, ArrowRight, X, FileText } from "lucide-react";
+import CajaChicaModule from "@/components/CajaChicaModule";
 
 
 
@@ -188,7 +189,7 @@ type PurchaseInvoice = {
   createdAt?: string;
 };
 
-type NavItem = "dashboard" | "plan-cuentas" | "transacciones" | "macola-sync" | "clientes" | "proveedores" | "vendedores" | "comisiones" | "inventario" | "lotes" | "series" | "notas-credito-debito" | "reportes" | "configuracion" | "factura-editor" | "lista-facturas" | "lista-ordenes-compra" | "orden-compra-editor" | "factura-compra-lista" | "factura-compra-editor" | "deposito-bancario" | "recibir-pago" | "agregar-gasto" | "pagar-proveedor" | "devoluciones-proveedor";
+type NavItem = "dashboard" | "plan-cuentas" | "transacciones" | "macola-sync" | "caja-chica" | "clientes" | "proveedores" | "vendedores" | "comisiones" | "inventario" | "lotes" | "series" | "notas-credito-debito" | "reportes" | "configuracion" | "factura-editor" | "lista-facturas" | "lista-ordenes-compra" | "orden-compra-editor" | "factura-compra-lista" | "factura-compra-editor" | "deposito-bancario" | "recibir-pago" | "agregar-gasto" | "pagar-proveedor" | "devoluciones-proveedor";
 
 
 
@@ -718,6 +719,8 @@ export default function AdminDashboard() {
     }
   };
   const [contabilidadOpen, setContabilidadOpen] = useState(false);
+  const [ventasOpen, setVentasOpen] = useState(false);
+  const [comprasOpen, setComprasOpen] = useState(false);
   const [inventarioOpen, setInventarioOpen] = useState(false);
 
   const [lotesFilter, setLotesFilter] = useState<"todos" | "vencidos" | "por-vencer" | "vigentes">("todos");
@@ -1059,6 +1062,7 @@ export default function AdminDashboard() {
   const [accountsSearch, setAccountsSearch] = useState("");
   const [accountsTypeFilter, setAccountsTypeFilter] = useState("Todo");
   const [showNewAccountModal, setShowNewAccountModal] = useState(false);
+  const [editingAccountId, setEditingAccountId] = useState<string | null>(null);
   const [newAccountForm, setNewAccountForm] = useState({
     code: "",
     name: "",
@@ -1174,6 +1178,9 @@ export default function AdminDashboard() {
             sector: res.data.sector || "Manufactura y Producción Industrial (Manufacturing)",
             nombreLegal: res.data.nombreLegal || "WAYNE TRADEMARK PRINTING AND PACKAGING DE HONDURAS S DE RL",
             taxId: res.data.taxId || "05019008183490",
+            cai: res.data.cai || "Ninguno indicado",
+            rangoAutorizado: res.data.rangoAutorizado || "Ninguno indicado",
+            fechaLimiteEmision: res.data.fechaLimiteEmision || "Ninguno indicado",
             tipoEmpresa: res.data.tipoEmpresa || "Sociedad anónima (pequeña empresa) con dos o más propietarios",
             domicilioLegal: res.data.domicilioLegal || "Zip Búfalo Edificio 1B, Villanueva, Cortés 21101",
             emailCliente: res.data.emailCliente || "R.mondragon@waynetrademarkhn.com",
@@ -1352,6 +1359,9 @@ export default function AdminDashboard() {
     // Legal
     nombreLegal: "WAYNE TRADEMARK PRINTING AND PACKAGING DE HONDURAS S DE RL",
     taxId: "05019008183490",
+    cai: "Ninguno indicado",
+    rangoAutorizado: "Ninguno indicado",
+    fechaLimiteEmision: "Ninguno indicado",
     tipoEmpresa: "Sociedad anónima (pequeña empresa) con dos o más propietarios",
     domicilioLegal: "Zip Búfalo Edificio 1B, Villanueva, Cortés 21101",
     // Contacto del cliente
@@ -1456,48 +1466,87 @@ export default function AdminDashboard() {
   };
 
   // Configuración de Ventas states matching screenshot
-  const [salesSettings, setSalesSettings] = useState({
-    // Contenido del formulario de ventas
-    preferidofacturaCondiciones: "Net 30",
-    metodoEntregaPreferido: "Ninguno",
-    envio: false,
-    numerosTransaccionesPersonalizados: true,
-    fechaServicio: true,
-    descuento: false,
-    deposito: false,
-    etiquetas: true,
+  interface SalesSettingsState {
+    preferidofacturaCondiciones: string;
+    metodoEntregaPreferido: string;
+    envio: boolean;
+    numerosTransaccionesPersonalizados: boolean;
+    fechaServicio: boolean;
+    descuento: boolean;
+    deposito: boolean;
+    etiquetas: boolean;
+    mostrarColumnaProductoServicio: boolean;
+    mostrarColumnaSku: boolean;
+    activarReglasPrecios: boolean;
+    seguimientoCantidadPrecio: boolean;
+    seguimientoExistenciasInventario: boolean;
+    metodoValoracionInventario: string;
+    metodoRecepcionInventario: string;
+    reconocimientoIngresos: boolean;
+    facturacionProgresiva: boolean;
+    mensajePredeterminado: string;
+    recordatoriosConfig: string;
+    solicitarSolicitudTrabajo: boolean;
+    solicitarResenas: boolean;
+    solicitarReferencia: boolean;
+    frecuenciaEncuesta: string;
+    entregaEnLineaOpciones: string;
+    mostrarTablaAntiguedad: boolean;
+    // Impuesto Sobre Ventas (ISV SAR)
+    isvPredeterminado: boolean;
+    tasaIsvGeneral: number;
+    permitirIsv18: boolean;
+    preciosIncluyenIsv: boolean;
+  }
 
-    // Productos y servicios
-    mostrarColumnaProductoServicio: true,
-    mostrarColumnaSku: false,
-    activarReglasPrecios: false,
-    seguimientoCantidadPrecio: true,
-    seguimientoExistenciasInventario: true,
-    metodoValoracionInventario: "Seleccionar método",
-    metodoRecepcionInventario: "Facturas de proveedores y gastos",
-    reconocimientoIngresos: true,
+  const [salesSettings, setSalesSettings] = useState<SalesSettingsState>(() => {
+    const defaultSales: SalesSettingsState = {
+      preferidofacturaCondiciones: "Net 30",
+      metodoEntregaPreferido: "Ninguno",
+      envio: false,
+      numerosTransaccionesPersonalizados: true,
+      fechaServicio: true,
+      descuento: false,
+      deposito: false,
+      etiquetas: true,
+      mostrarColumnaProductoServicio: true,
+      mostrarColumnaSku: false,
+      activarReglasPrecios: false,
+      seguimientoCantidadPrecio: true,
+      seguimientoExistenciasInventario: true,
+      metodoValoracionInventario: "Seleccionar método",
+      metodoRecepcionInventario: "Facturas de proveedores y gastos",
+      reconocimientoIngresos: true,
+      facturacionProgresiva: false,
+      mensajePredeterminado: "Mensaje de correo electrónico predeterminado que se envía con los formularios de ventas",
+      recordatoriosConfig: "Configurar mensajes de correo electrónico de recordatorios",
+      solicitarSolicitudTrabajo: false,
+      solicitarResenas: false,
+      solicitarReferencia: false,
+      frecuenciaEncuesta: "90 días",
+      entregaEnLineaOpciones: "Opciones de envío por correo electrónico de los formularios de ventas",
+      mostrarTablaAntiguedad: true,
+      // Impuestos SAR
+      isvPredeterminado: true,
+      tasaIsvGeneral: 15,
+      permitirIsv18: true,
+      preciosIncluyenIsv: false,
+    };
 
-    // Facturación progresiva
-    facturacionProgresiva: false,
-
-    // Mensajes
-    mensajePredeterminado: "Mensaje de correo electrónico predeterminado que se envía con los formularios de ventas",
-
-    // Recordatorios
-    recordatoriosConfig: "Configurar mensajes de correo electrónico de recordatorios",
-
-    // Encuesta posterior a la factura/comentarios
-    solicitarSolicitudTrabajo: false,
-    solicitarResenas: false,
-    solicitarReferencia: false,
-    frecuenciaEncuesta: "90 días",
-
-    // Entrega en línea
-    entregaEnLineaOpciones: "Opciones de envío por correo electrónico de los formularios de ventas",
-
-    // Resúmenes
-    mostrarTablaAntiguedad: true,
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem("wayne_sales_settings");
+        if (saved) return { ...defaultSales, ...JSON.parse(saved) };
+      } catch {}
+    }
+    return defaultSales;
   });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("wayne_sales_settings", JSON.stringify(salesSettings));
+    } catch {}
+  }, [salesSettings]);
 
   const [editingSalesSection, setEditingSalesSection] = useState<string | null>(null);
   const [salesSavedNotification, setSalesSavedNotification] = useState(false);
@@ -1536,12 +1585,41 @@ export default function AdminDashboard() {
     aprobacionHorasExtra: "Requiere visto bueno de supervisión",
   });
 
-  const [monedasSettings, setMonedasSettings] = useState({
-    monedaPrincipal: "USD ($) Dólar estadounidense",
-    multidivisa: "Activado (USD, HNL)",
-    bancoPrincipal: "Banco Ficohsa (Cuenta de cheques empresarial USD)",
-    transferenciasAch: "Habilitadas",
+  interface MonedasSettingsState {
+    monedaPrincipal: string;
+    multidivisa: string;
+    bancoPrincipal: string;
+    transferenciasAch: string;
+  }
+
+  const [monedasSettings, setMonedasSettings] = useState<MonedasSettingsState>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem("wayne_monedas_settings");
+        if (saved) return JSON.parse(saved) as MonedasSettingsState;
+      } catch {}
+    }
+    return {
+      monedaPrincipal: "USD ($) Dólar estadounidense",
+      multidivisa: "Activado (USD, HNL)",
+      bancoPrincipal: "Banco Ficohsa (Cuenta de cheques empresarial USD)",
+      transferenciasAch: "Habilitadas",
+    };
   });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("wayne_monedas_settings", JSON.stringify(monedasSettings));
+    } catch {}
+  }, [monedasSettings]);
+
+  const defaultCurrencySymbol = useMemo(() => {
+    const main = monedasSettings?.monedaPrincipal || "";
+    if (main.includes("HNL") || main.includes("(L)") || main.includes("Lempira")) return "L";
+    if (main.includes("EUR") || main.includes("(€)") || main.includes("Euro")) return "€";
+    if (main.includes("USD") || main.includes("($)") || main.includes("Dólar")) return "$";
+    return "$";
+  }, [monedasSettings?.monedaPrincipal]);
 
   const [avanzadasSettings, setAvanzadasSettings] = useState({
     zonaHoraria: "(GMT-06:00) Hora estándar central (Honduras)",
@@ -1610,17 +1688,77 @@ export default function AdminDashboard() {
   const [editingConfigKey, setEditingConfigKey] = useState<string | null>(null);
   const [editingConfigLabel, setEditingConfigLabel] = useState<string>("");
   const [editingConfigValue, setEditingConfigValue] = useState<string>("");
+  const [rangoPrefijo, setRangoPrefijo] = useState<string>("000-001-01-");
+  const [rangoDesde, setRangoDesde] = useState<string>("00000661");
+  const [rangoHasta, setRangoHasta] = useState<string>("00000760");
 
   const startEditConfig = (key: keyof typeof companySettings, label: string) => {
     setEditingConfigKey(key);
     setEditingConfigLabel(label);
     setEditingConfigValue(companySettings[key] === "Ninguno indicado" ? "" : companySettings[key]);
+
+    if (key === "rangoAutorizado") {
+      const current = companySettings.rangoAutorizado || "";
+      const match = current.match(/DEL\s+([0-9]{3}-[0-9]{3}-[0-9]{2}-)\s*([0-9]{1,8})\s+AL\s+([0-9]{3}-[0-9]{3}-[0-9]{2}-)?\s*([0-9]{1,8})/i);
+      if (match) {
+        setRangoPrefijo(match[1]);
+        setRangoDesde(match[2].padStart(8, "0"));
+        setRangoHasta(match[4].padStart(8, "0"));
+      } else {
+        setRangoPrefijo("000-001-01-");
+        setRangoDesde("00000661");
+        setRangoHasta("00000760");
+      }
+    }
+
+    if (key === "fechaLimiteEmision") {
+      const current = companySettings.fechaLimiteEmision || "";
+      const matchDmy = current.match(/^(\d{1,2})\s*[\/\-]\s*(\d{1,2})\s*[\/\-]\s*(\d{4})$/);
+      if (matchDmy) {
+        setEditingConfigValue(`${matchDmy[3]}-${matchDmy[2].padStart(2, "0")}-${matchDmy[1].padStart(2, "0")}`);
+      }
+    }
+  };
+
+  const formatFechaLimite = (val: string): string => {
+    if (!val || val === "Ninguno indicado") return "Ninguno indicado";
+    const partsYmd = val.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/);
+    if (partsYmd) {
+      return `${partsYmd[3].padStart(2, "0")}/${partsYmd[2].padStart(2, "0")}/${partsYmd[1]}`;
+    }
+    const partsDmy = val.match(/^(\d{1,2})\s*[\/\-]\s*(\d{1,2})\s*[\/\-]\s*(\d{4})$/);
+    if (partsDmy) {
+      return `${partsDmy[1].padStart(2, "0")}/${partsDmy[2].padStart(2, "0")}/${partsDmy[3]}`;
+    }
+    return val.replace(/\s*\/\s*/g, "/");
   };
 
   const saveConfigField = async () => {
     if (editingConfigKey) {
-      const updatedValue = editingConfigValue.trim() || "Ninguno indicado";
+      let updatedValue = editingConfigValue.trim() || "Ninguno indicado";
       const fieldKey = editingConfigKey;
+
+      if (fieldKey === "rangoAutorizado") {
+        const cleanDesde = (rangoDesde.replace(/\D/g, "") || "0").padStart(8, "0");
+        const cleanHasta = (rangoHasta.replace(/\D/g, "") || "0").padStart(8, "0");
+        const cleanPrefijo = rangoPrefijo.trim() || "000-001-01-";
+        const prefWithDash = cleanPrefijo.endsWith("-") ? cleanPrefijo : cleanPrefijo + "-";
+        updatedValue = `DEL ${prefWithDash}${cleanDesde} AL ${prefWithDash}${cleanHasta}`;
+      }
+
+      if (fieldKey === "fechaLimiteEmision") {
+        const partsYmd = updatedValue.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/);
+        if (partsYmd) {
+          updatedValue = `${partsYmd[3].padStart(2, "0")}/${partsYmd[2].padStart(2, "0")}/${partsYmd[1]}`;
+        } else {
+          const partsDmy = updatedValue.match(/^(\d{1,2})\s*[\/\-]\s*(\d{1,2})\s*[\/\-]\s*(\d{4})$/);
+          if (partsDmy) {
+            updatedValue = `${partsDmy[1].padStart(2, "0")}/${partsDmy[2].padStart(2, "0")}/${partsDmy[3]}`;
+          } else {
+            updatedValue = updatedValue.replace(/\s*\/\s*/g, "/");
+          }
+        }
+      }
 
       // Optimistic update in UI
       setCompanySettings((prev) => ({
@@ -1662,6 +1800,20 @@ export default function AdminDashboard() {
     customerId: "",
     customerName: "",
     customerEmail: "",
+    customerAddress: "",
+    deliveredTo: "",
+    deliveryAddress: "",
+    currency: "",
+    discount: 0,
+    importeExonerado: 0,
+    importeExento: 0,
+    impGravado15: 0,
+    impGravado18: 0,
+    showImpGravado15: false,
+    applyIsv15: true,
+    applyIsv18: false,
+    isExonerated: false,
+    isExempt: false,
     paymentTerms: "Neto 30",
     invoiceDate: "2026-09-03",
     dueDate: "2026-10-03",
@@ -1683,8 +1835,128 @@ export default function AdminDashboard() {
     ],
   });
 
+  const invoiceCurrencySymbol = invoiceForm.currency || defaultCurrencySymbol;
   const invoiceSubtotal = invoiceForm.lines.reduce((sum, line) => sum + (line.amount || 0), 0);
-  const invoiceTotal = invoiceSubtotal;
+  const invoiceDiscount = invoiceForm.discount || 0;
+  const invoiceExonerated = invoiceForm.importeExonerado || 0;
+  const invoiceExempt = invoiceForm.importeExento || 0;
+  const invoiceGravado15 = (invoiceForm.impGravado15 && invoiceForm.impGravado15 > 0)
+    ? invoiceForm.impGravado15
+    : (invoiceForm.applyIsv15 && !invoiceExempt && !invoiceExonerated ? Math.max(0, invoiceSubtotal - invoiceDiscount) : 0);
+  const invoiceGravado18 = (invoiceForm.impGravado18 && invoiceForm.impGravado18 > 0)
+    ? invoiceForm.impGravado18
+    : (invoiceForm.applyIsv18 ? Math.max(0, invoiceSubtotal - invoiceDiscount) : 0);
+  const configuredIsvRate = (salesSettings?.tasaIsvGeneral ?? 15) / 100;
+  const invoiceIsv15 = invoiceForm.applyIsv15 ? Number((invoiceGravado15 * configuredIsvRate).toFixed(2)) : 0;
+  const invoiceIsv18 = invoiceForm.applyIsv18 ? Number((invoiceGravado18 * 0.18).toFixed(2)) : 0;
+  const invoiceTotal = Number((invoiceSubtotal - invoiceDiscount + invoiceIsv15 + invoiceIsv18).toFixed(2));
+
+  const numberToWordsSpanish = (amount: number): string => {
+    if (isNaN(amount) || amount === 0) return "CERO CON .00/100";
+
+    const unidades = ["", "UN", "DOS", "TRES", "CUATRO", "CINCO", "SEIS", "SIETE", "OCHO", "NUEVE"];
+    const decenas = ["", "DIEZ", "VEINTE", "TREINTA", "CUARENTA", "CINCUENTA", "SESENTA", "SETENTA", "OCHENTA", "NOVENTA"];
+    const diezY = ["DIEZ", "ONCE", "DOCE", "TRECE", "CATORCE", "QUINCE", "DIECISÉIS", "DIECISIETE", "DIECIOCHO", "DIECINUEVE"];
+    const veinti = ["VEINTE", "VEINTIUNO", "VEINTIDÓS", "VEINTITRÉS", "VEINTICUATRO", "VEINTICINCO", "VEINTISÉIS", "VEINTISIETE", "VEINTIOCHO", "VEINTINUEVE"];
+    const centenas = ["", "CIENTO", "DOSCIENTOS", "TRESCIENTOS", "CUATROCIENTOS", "QUINIENTOS", "SEISCIENTOS", "SETECIENTOS", "OCHOCIENTOS", "NOVECIENTOS"];
+
+    const convertHundreds = (n: number): string => {
+      if (n === 0) return "";
+      if (n === 100) return "CIEN";
+      let str = "";
+      const c = Math.floor(n / 100);
+      const d = Math.floor((n % 100) / 10);
+      const u = n % 10;
+
+      if (c > 0) str += centenas[c] + " ";
+
+      if (d === 1) {
+        str += diezY[u];
+      } else if (d === 2) {
+        str += veinti[u];
+      } else if (d > 2) {
+        str += decenas[d];
+        if (u > 0) str += " Y " + unidades[u];
+      } else if (u > 0) {
+        str += unidades[u];
+      }
+      return str.trim();
+    };
+
+    const convertThousands = (n: number): string => {
+      if (n === 0) return "";
+      const thousands = Math.floor(n / 1000);
+      const rest = n % 1000;
+      let str = "";
+      if (thousands === 1) {
+        str = "MIL ";
+      } else if (thousands > 1) {
+        str = convertHundreds(thousands) + " MIL ";
+      }
+      if (rest > 0) {
+        str += convertHundreds(rest);
+      }
+      return str.trim();
+    };
+
+    const convertMillions = (n: number): string => {
+      if (n === 0) return "CERO";
+      const millions = Math.floor(n / 1000000);
+      const rest = n % 1000000;
+      let str = "";
+      if (millions === 1) {
+        str = "UN MILLÓN ";
+      } else if (millions > 1) {
+        str = convertHundreds(millions) + " MILLONES ";
+      }
+      if (rest > 0) {
+        if (rest >= 1000) {
+          str += convertThousands(rest);
+        } else {
+          str += convertHundreds(rest);
+        }
+      }
+      return str.trim();
+    };
+
+    const absAmount = Math.abs(amount);
+    const intPart = Math.floor(absAmount);
+    const decPart = Math.round((absAmount - intPart) * 100);
+    const decStr = decPart.toString().padStart(2, "0");
+
+    let words = "";
+    if (intPart < 1000) {
+      words = convertHundreds(intPart);
+    } else if (intPart < 1000000) {
+      words = convertThousands(intPart);
+    } else {
+      words = convertMillions(intPart);
+    }
+
+    const currencyWord = invoiceCurrencySymbol === "L"
+      ? (intPart === 1 ? "LEMPIRA" : "LEMPIRAS")
+      : invoiceCurrencySymbol === "€"
+      ? (intPart === 1 ? "EURO" : "EUROS")
+      : (intPart === 1 ? "DÓLAR" : "DÓLARES");
+
+    return `${words || "CERO"} ${currencyWord} CON ${decStr}/100`;
+  };
+
+  const formatFiscalMoney = (amount: number | null | undefined, forceShow = false) => {
+    if ((!amount || amount === 0) && !forceShow) return "";
+    const num = amount || 0;
+    return `${invoiceCurrencySymbol}  ${num.toLocaleString("es-HN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  };
+
+  const formatFiscalInvoiceNumber = (num: string | undefined | null) => {
+    if (!num) return "000-001-01-00000001";
+    const trimmed = num.toString().trim();
+    const clean = trimmed.replace(/^000-001-01-?\s*/, "").trim();
+    if (/^\d+$/.test(clean)) {
+      return `000-001-01-${clean.padStart(8, "0")}`;
+    }
+    return `000-001-01-${clean || "00000001"}`;
+  };
 
   const addInvoiceLine = () => {
     setInvoiceForm((prev) => ({
@@ -1757,12 +2029,13 @@ export default function AdminDashboard() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           to: targetEmail,
-          invoiceNumber: invoiceForm.invoiceNumber,
+          invoiceNumber: formatFiscalInvoiceNumber(invoiceForm.invoiceNumber),
           customerName: invoiceForm.customerName || "Estimado cliente",
           invoiceDate: invoiceForm.invoiceDate,
           dueDate: invoiceForm.dueDate,
           paymentTerms: invoiceForm.paymentTerms,
           lines: invoiceForm.lines,
+          currency: invoiceCurrencySymbol,
           subtotal: invoiceSubtotal,
           total: invoiceTotal,
           paymentInstructions: invoiceForm.paymentInstructions,
@@ -1775,7 +2048,7 @@ export default function AdminDashboard() {
         throw new Error(data.error || "Falló el envío por correo.");
       }
 
-      setInvoiceSuccessMsg(`¡Factura N.º ${invoiceForm.invoiceNumber} enviada a ${targetEmail} (From: notifications@indevasa.com, Reply-To: sac@waynetrademarkhn.com)!`);
+      setInvoiceSuccessMsg(`¡Factura N.º ${formatFiscalInvoiceNumber(invoiceForm.invoiceNumber)} enviada a ${targetEmail} (From: notifications@indevasa.com, Reply-To: sac@waynetrademarkhn.com)!`);
       setTimeout(() => setInvoiceSuccessMsg(""), 5000);
     } catch (err: any) {
       alert(`Error al enviar correo por Resend: ${err.message}`);
@@ -3078,16 +3351,321 @@ export default function AdminDashboard() {
     }
   };
 
+  const [currentAdminUser, setCurrentAdminUser] = useState<{ id: string; email: string; name: string; role: string } | null>(null);
+
+  const loadCurrentUser = async () => {
+    try {
+      const res = await fetch("/api/auth/me");
+      if (res.ok) {
+        const data = await res.json();
+        if (data.authenticated && data.user) {
+          setCurrentAdminUser(data.user);
+        }
+      }
+    } catch (e) {
+      console.error("Error loading current user:", e);
+    }
+  };
+
   useEffect(() => {
     loadDashboardData();
     loadVendorReturns();
-
+    loadCurrentUser();
+    loadPettyCashData();
   }, []);
+
+  // ==========================================
+  // CAJA CHICA & CONTROL DE ARQUEOS STATE
+  // ==========================================
+  const [pettyCashFunds, setPettyCashFunds] = useState<any[]>([]);
+  const [selectedFundId, setSelectedFundId] = useState<string>("");
+  const [pettyCashLoading, setPettyCashLoading] = useState<boolean>(false);
+  const [cajaChicaActiveTab, setCajaChicaActiveTab] = useState<"movimientos" | "arqueo" | "historial" | "vales" | "reposicion">("movimientos");
+  const [pettyCashAudits, setPettyCashAudits] = useState<any[]>([]);
+  const [pettyCashVouchers, setPettyCashVouchers] = useState<any[]>([]);
+
+  // Modales
+  const [showNewExpenseModal, setShowNewExpenseModal] = useState<boolean>(false);
+  const [expenseForm, setExpenseForm] = useState({
+    type: "EXPENSE",
+    category: "Alimentación y refrigerios",
+    concept: "",
+    beneficiary: "",
+    voucherNumber: "",
+    invoiceNumber: "",
+    cai: "",
+    amount: "",
+    taxDeductible: true,
+  });
+  const [submittingExpense, setSubmittingExpense] = useState<boolean>(false);
+
+  const [showNewVoucherModal, setShowNewVoucherModal] = useState<boolean>(false);
+  const [voucherForm, setVoucherForm] = useState({
+    beneficiary: "",
+    department: "Producción",
+    concept: "",
+    amount: "",
+    expectedLiquidationDate: new Date(Date.now() + 86400000 * 3).toISOString().split("T")[0],
+  });
+  const [submittingVoucher, setSubmittingVoucher] = useState<boolean>(false);
+
+  const [liquidatingVoucher, setLiquidatingVoucher] = useState<any | null>(null);
+  const [liquidateForm, setLiquidateForm] = useState({
+    actualExpense: "",
+    returnedCash: "",
+    receiptNumber: "",
+    notes: "",
+  });
+  const [submittingLiquidation, setSubmittingLiquidation] = useState<boolean>(false);
+
+  // Arqueo Interactivo Denominaciones
+  const [cashCountHNL, setCashCountHNL] = useState<Record<string, number>>({
+    "500": 0, "200": 0, "100": 0, "50": 0, "20": 0, "10": 0, "5": 0, "2": 0, "1": 0,
+    "0.50": 0, "0.20": 0, "0.10": 0, "0.05": 0,
+  });
+  const [cashCountUSD, setCashCountUSD] = useState<Record<string, number>>({
+    "100": 0, "50": 0, "20": 0, "10": 0, "5": 0, "1": 0,
+    "0.25": 0, "0.10": 0, "0.05": 0, "0.01": 0,
+  });
+  const [auditAuditorName, setAuditAuditorName] = useState<string>("Lic. Auditoría Interna");
+  const [auditObservations, setAuditObservations] = useState<string>("");
+  const [savingAudit, setSavingAudit] = useState<boolean>(false);
+  const [selectedAuditForPrint, setSelectedAuditForPrint] = useState<any | null>(null);
+  const [pettyCashToast, setPettyCashToast] = useState<string>("");
+  const [expenseSearchQuery, setExpenseSearchQuery] = useState<string>("");
+  const [expenseCategoryFilter, setExpenseCategoryFilter] = useState<string>("TODOS");
+
+  const showPettyCashToast = (msg: string) => {
+    setPettyCashToast(msg);
+    setTimeout(() => setPettyCashToast(""), 4000);
+  };
+
+  const loadPettyCashData = async (fundIdToSelect?: string) => {
+    setPettyCashLoading(true);
+    try {
+      const [fundsRes, auditsRes, vouchersRes] = await Promise.all([
+        fetch("/api/caja-chica/funds").then((r) => r.json()),
+        fetch("/api/caja-chica/audits").then((r) => r.json()),
+        fetch("/api/caja-chica/vouchers").then((r) => r.json()),
+      ]);
+      if (fundsRes.success && Array.isArray(fundsRes.data)) {
+        setPettyCashFunds(fundsRes.data);
+        if (!selectedFundId || fundIdToSelect) {
+          const target = fundIdToSelect || fundsRes.data[0]?.id || "";
+          setSelectedFundId(target);
+        }
+      }
+      if (auditsRes.success && Array.isArray(auditsRes.data)) {
+        setPettyCashAudits(auditsRes.data);
+      }
+      if (vouchersRes.success && Array.isArray(vouchersRes.data)) {
+        setPettyCashVouchers(vouchersRes.data);
+      }
+    } catch (err) {
+      console.error("Error loading petty cash data:", err);
+    } finally {
+      setPettyCashLoading(false);
+    }
+  };
+
+  const handleCreateExpense = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedFundId) {
+      alert("Por favor seleccione un fondo de caja chica");
+      return;
+    }
+    const amt = parseFloat(expenseForm.amount);
+    if (isNaN(amt) || amt <= 0) {
+      alert("Por favor ingrese un monto válido mayor a cero");
+      return;
+    }
+    if (!expenseForm.concept.trim()) {
+      alert("Por favor ingrese el concepto del gasto");
+      return;
+    }
+
+    setSubmittingExpense(true);
+    try {
+      const res = await fetch("/api/caja-chica/transactions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fundId: selectedFundId,
+          type: expenseForm.type,
+          category: expenseForm.category,
+          concept: expenseForm.concept.trim(),
+          beneficiary: expenseForm.beneficiary.trim() || undefined,
+          voucherNumber: expenseForm.voucherNumber.trim() || undefined,
+          invoiceNumber: expenseForm.invoiceNumber.trim() || undefined,
+          cai: expenseForm.cai.trim() || undefined,
+          amount: amt,
+          taxDeductible: expenseForm.taxDeductible,
+          registeredBy: currentAdminUser?.name || "Administrador",
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        showPettyCashToast(expenseForm.type === "EXPENSE" ? "Gasto registrado exitosamente en Caja Chica" : "Reembolso / Ingreso registrado exitosamente");
+        setShowNewExpenseModal(false);
+        setExpenseForm({
+          type: "EXPENSE",
+          category: "Alimentación y refrigerios",
+          concept: "",
+          beneficiary: "",
+          voucherNumber: "",
+          invoiceNumber: "",
+          cai: "",
+          amount: "",
+          taxDeductible: true,
+        });
+        await loadPettyCashData(selectedFundId);
+      } else {
+        alert(data.error || "Error al registrar movimiento");
+      }
+    } catch (err: any) {
+      alert(err.message || "Error de red al registrar movimiento");
+    } finally {
+      setSubmittingExpense(false);
+    }
+  };
+
+  const handleCreateVoucher = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedFundId) {
+      alert("Por favor seleccione un fondo de caja chica");
+      return;
+    }
+    const amt = parseFloat(voucherForm.amount);
+    if (isNaN(amt) || amt <= 0) {
+      alert("Por favor ingrese un monto válido");
+      return;
+    }
+    if (!voucherForm.beneficiary.trim() || !voucherForm.concept.trim()) {
+      alert("Complete el beneficiario y el concepto del vale provisional");
+      return;
+    }
+
+    setSubmittingVoucher(true);
+    try {
+      const res = await fetch("/api/caja-chica/vouchers", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fundId: selectedFundId,
+          beneficiary: voucherForm.beneficiary.trim(),
+          department: voucherForm.department.trim() || undefined,
+          concept: voucherForm.concept.trim(),
+          amount: amt,
+          expectedLiquidationDate: voucherForm.expectedLiquidationDate,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        showPettyCashToast(`Vale Provisional ${data.data.voucherNumber} emitido correctamente`);
+        setShowNewVoucherModal(false);
+        setVoucherForm({
+          beneficiary: "",
+          department: "Producción",
+          concept: "",
+          amount: "",
+          expectedLiquidationDate: new Date(Date.now() + 86400000 * 3).toISOString().split("T")[0],
+        });
+        await loadPettyCashData(selectedFundId);
+      } else {
+        alert(data.error || "Error al emitir vale provisional");
+      }
+    } catch (err: any) {
+      alert(err.message || "Error al emitir vale");
+    } finally {
+      setSubmittingVoucher(false);
+    }
+  };
+
+  const handleLiquidateVoucher = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!liquidatingVoucher) return;
+    const actual = parseFloat(liquidateForm.actualExpense);
+    const returned = parseFloat(liquidateForm.returnedCash || "0");
+    if (isNaN(actual) || actual < 0) {
+      alert("Ingrese un gasto real válido");
+      return;
+    }
+
+    setSubmittingLiquidation(true);
+    try {
+      const res = await fetch("/api/caja-chica/vouchers", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "LIQUIDATE",
+          voucherId: liquidatingVoucher.id,
+          actualExpense: actual,
+          returnedCash: isNaN(returned) ? 0 : returned,
+          receiptNumber: liquidateForm.receiptNumber.trim() || undefined,
+          notes: liquidateForm.notes.trim() || undefined,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        showPettyCashToast(`Vale ${liquidatingVoucher.voucherNumber} liquidado exitosamente`);
+        setLiquidatingVoucher(null);
+        setLiquidateForm({ actualExpense: "", returnedCash: "", receiptNumber: "", notes: "" });
+        await loadPettyCashData(selectedFundId);
+      } else {
+        alert(data.error || "Error al liquidar vale");
+      }
+    } catch (err: any) {
+      alert(err.message || "Error al liquidar vale");
+    } finally {
+      setSubmittingLiquidation(false);
+    }
+  };
+
+  const handleSaveAudit = async (currentFund: any, calculatedCash: number, pendingReceipts: number, activeVales: number, diff: number, auditStatus: string) => {
+    if (!currentFund) return;
+    setSavingAudit(true);
+    try {
+      const res = await fetch("/api/caja-chica/audits", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fundId: currentFund.id,
+          theoreticalBalance: currentFund.fixedAmount - pendingReceipts - activeVales,
+          physicalCashTotal: calculatedCash,
+          pendingReceiptsTotal: pendingReceipts,
+          activeVouchersTotal: activeVales,
+          difference: diff,
+          status: auditStatus,
+          denominations: currentFund.currency === "USD" ? cashCountUSD : cashCountHNL,
+          observations: auditObservations.trim() || undefined,
+          auditorName: auditAuditorName.trim() || "Auditoría Interna",
+          custodianName: currentFund.custodianName,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        showPettyCashToast(`Acta de Arqueo ${data.data.auditNumber} registrada con éxito`);
+        setSelectedAuditForPrint({
+          ...data.data,
+          fund: currentFund,
+          unreimbursedTransactions: currentFund.transactions?.filter((t: any) => !t.isReimbursed && t.type === "EXPENSE") || [],
+          activeVouchersList: currentFund.vouchers?.filter((v: any) => v.status === "ACTIVE") || [],
+        });
+        await loadPettyCashData(selectedFundId);
+        setCajaChicaActiveTab("historial");
+      } else {
+        alert(data.error || "Error al guardar arqueo");
+      }
+    } catch (err: any) {
+      alert(err.message || "Error al guardar acta de arqueo");
+    } finally {
+      setSavingAudit(false);
+    }
+  };
 
   const handleLogout = async () => {
     await fetch("/api/auth/logout", { method: "POST" });
-    router.push("/login");
-    router.refresh();
+    window.location.href = "/login";
   };
 
   // Currency Formatter: $0,000.00
@@ -3371,7 +3949,27 @@ export default function AdminDashboard() {
     window.print();
   };
 
-  const handleCreateAccount = async (
+  const handleOpenEditAccount = (acc: Account) => {
+    setEditingAccountId(acc.id);
+    setNewAccountForm({
+      code: acc.code || "",
+      name: acc.name || "",
+      type: acc.type || "Efectivo y equivalentes de efectivo",
+      detailType: getDetailType(acc.type, acc.name) || "Banco",
+      isSubAccount: false,
+      parentAccountId: "",
+      description: acc.name || "",
+      isLocked: false,
+      currency: acc.currency || "USD",
+      balance: acc.balance || 0,
+      isActive: acc.isActive ?? true,
+    });
+    setAccountModalError("");
+    setAccountModalSuccess("");
+    setShowNewAccountModal(true);
+  };
+
+  const handleSaveAccount = async (
     e?: React.FormEvent,
     keepOpenAndNew: boolean = false
   ) => {
@@ -3381,75 +3979,110 @@ export default function AdminDashboard() {
     setAccountModalSuccess("");
 
     try {
-      const { category } = getAccountClassification(newAccountForm.type, newAccountForm.name);
-      const assignedCode =
-        newAccountForm.code.trim() ||
-        (category === "ACTIVO"
-          ? `1${100 + accounts.length}`
-          : category === "RESPONSABILIDAD"
-          ? `2${100 + accounts.length}`
-          : category === "FONDOS PROPIOS"
-          ? `3${100 + accounts.length}`
-          : category === "INGRESOS"
-          ? `4${100 + accounts.length}`
-          : `5${100 + accounts.length}`);
+      if (editingAccountId) {
+        // Mode: EDIT / UPDATE existing account
+        const res = await fetch(`/api/accounts/${editingAccountId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            code: newAccountForm.code.trim(),
+            name: newAccountForm.name.trim(),
+            type: newAccountForm.type,
+            currency: newAccountForm.currency || "USD",
+            balance: Number(newAccountForm.balance) || 0,
+            isActive: newAccountForm.isActive,
+          }),
+        });
 
-      const res = await fetch("/api/accounts", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          code: assignedCode,
-          name: newAccountForm.name.trim(),
-          type: newAccountForm.type,
-          currency: newAccountForm.currency || "USD",
-          balance: Number(newAccountForm.balance) || 0,
-          isActive: newAccountForm.isActive,
-        }),
-      });
+        const data = await res.json();
+        if (!res.ok || !data.success) {
+          throw new Error(data.error || "Error al actualizar la cuenta contable");
+        }
 
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        throw new Error(data.error || "Error al crear la cuenta contable");
-      }
+        setAccounts((prev) =>
+          prev
+            .map((a) => (a.id === editingAccountId ? data.data : a))
+            .sort((a, b) => a.code.localeCompare(b.code))
+        );
+        setAccountModalSuccess("Cuenta contable actualizada exitosamente");
 
-      setAccounts((prev) => [...prev, data.data].sort((a, b) => a.code.localeCompare(b.code)));
-      setAccountModalSuccess("Cuenta contable creada exitosamente");
-
-      if (keepOpenAndNew) {
-        setTimeout(() => {
-          setAccountModalSuccess("");
-          setNewAccountForm({
-            code: "",
-            name: "",
-            type: "Efectivo y equivalentes de efectivo",
-            detailType: "Banco",
-            isSubAccount: false,
-            parentAccountId: "",
-            description: "",
-            isLocked: false,
-            currency: "USD",
-            balance: 0,
-            isActive: true,
-          });
-        }, 600);
-      } else {
         setTimeout(() => {
           setShowNewAccountModal(false);
+          setEditingAccountId(null);
           setAccountModalSuccess("");
-          setNewAccountForm({
-            code: "",
-            name: "",
-            type: "Efectivo y equivalentes de efectivo",
-            detailType: "Banco",
-            isSubAccount: false,
-            parentAccountId: "",
-            description: "",
-            isLocked: false,
-            currency: "USD",
-            balance: 0,
-            isActive: true,
-          });
         }, 700);
+      } else {
+        // Mode: CREATE new account
+        const { category } = getAccountClassification(newAccountForm.type, newAccountForm.name);
+        const assignedCode =
+          newAccountForm.code.trim() ||
+          (category === "ACTIVO"
+            ? `1${100 + accounts.length}`
+            : category === "RESPONSABILIDAD"
+            ? `2${100 + accounts.length}`
+            : category === "FONDOS PROPIOS"
+            ? `3${100 + accounts.length}`
+            : category === "INGRESOS"
+            ? `4${100 + accounts.length}`
+            : `5${100 + accounts.length}`);
+
+        const res = await fetch("/api/accounts", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            code: assignedCode,
+            name: newAccountForm.name.trim(),
+            type: newAccountForm.type,
+            currency: newAccountForm.currency || "USD",
+            balance: Number(newAccountForm.balance) || 0,
+            isActive: newAccountForm.isActive,
+          }),
+        });
+
+        const data = await res.json();
+        if (!res.ok || !data.success) {
+          throw new Error(data.error || "Error al crear la cuenta contable");
+        }
+
+        setAccounts((prev) => [...prev, data.data].sort((a, b) => a.code.localeCompare(b.code)));
+        setAccountModalSuccess("Cuenta contable creada exitosamente");
+
+        if (keepOpenAndNew) {
+          setTimeout(() => {
+            setAccountModalSuccess("");
+            setNewAccountForm({
+              code: "",
+              name: "",
+              type: "Efectivo y equivalentes de efectivo",
+              detailType: "Banco",
+              isSubAccount: false,
+              parentAccountId: "",
+              description: "",
+              isLocked: false,
+              currency: "USD",
+              balance: 0,
+              isActive: true,
+            });
+          }, 600);
+        } else {
+          setTimeout(() => {
+            setShowNewAccountModal(false);
+            setAccountModalSuccess("");
+            setNewAccountForm({
+              code: "",
+              name: "",
+              type: "Efectivo y equivalentes de efectivo",
+              detailType: "Banco",
+              isSubAccount: false,
+              parentAccountId: "",
+              description: "",
+              isLocked: false,
+              currency: "USD",
+              balance: 0,
+              isActive: true,
+            });
+          }, 700);
+        }
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Error inesperado";
@@ -3705,6 +4338,23 @@ export default function AdminDashboard() {
       return matchesSearch && matchesFilter;
     });
   }, [purchaseInvoices, purchaseInvoicesSearch, purchaseInvoicesFilter]);
+
+  const filteredVendorReturns = useMemo(() => {
+    return vendorReturns.filter((r) => {
+      const q = vendorReturnsSearch.toLowerCase();
+      const matchesSearch =
+        !q ||
+        r.returnNumber.toLowerCase().includes(q) ||
+        r.vendorName.toLowerCase().includes(q) ||
+        (r.purchaseInvoiceNumber && r.purchaseInvoiceNumber.toLowerCase().includes(q)) ||
+        r.reason.toLowerCase().includes(q);
+
+      const matchesFilter =
+        vendorReturnsFilter === "TODAS" || r.status === vendorReturnsFilter;
+
+      return matchesSearch && matchesFilter;
+    });
+  }, [vendorReturns, vendorReturnsSearch, vendorReturnsFilter]);
 
   const openCreatePurchaseInvoice = () => {
     setPurchaseInvoiceError("");
@@ -3969,7 +4619,6 @@ export default function AdminDashboard() {
             {!sidebarCollapsed && (
               <div className="truncate">
                 <h1 className="font-bold text-sm text-slate-900 leading-tight">Wayne Admin</h1>
-                <p className="text-[11px] text-slate-500 truncate">Wayne Trademark Honduras</p>
               </div>
             )}
           </div>
@@ -4006,17 +4655,15 @@ export default function AdminDashboard() {
             <button
               onClick={() => setContabilidadOpen(!contabilidadOpen)}
               className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl transition cursor-pointer text-slate-700 hover:bg-slate-100 ${
-                currentView.includes("cuentas") || currentView === "transacciones" || currentView === "macola-sync"
+                currentView.includes("cuentas") || currentView === "transacciones" || currentView === "macola-sync" || currentView === "caja-chica"
                   ? "font-semibold text-slate-900"
                   : ""
               }`}
             >
               <div className="flex items-center gap-3 truncate">
-                <div className="w-4 h-4 rounded-full bg-[#f6821f]/15 text-[#f6821f] flex items-center justify-center shrink-0">
-                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                  </svg>
-                </div>
+                <svg className="w-4 h-4 shrink-0 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                </svg>
                 {!sidebarCollapsed && <span>Contabilidad</span>}
               </div>
               {!sidebarCollapsed && (
@@ -4066,149 +4713,233 @@ export default function AdminDashboard() {
                 >
                   Transacciones de integración
                 </button>
+                <button
+                  onClick={() => setCurrentView("caja-chica")}
+                  className={`w-full text-left px-2.5 py-1.5 rounded-lg transition cursor-pointer flex items-center justify-between ${
+                    currentView === "caja-chica"
+                      ? "bg-[#fff7ed] text-[#f6821f] font-semibold"
+                      : "text-slate-500 hover:text-slate-900 hover:bg-slate-50"
+                  }`}
+                >
+                  <span>Caja Chica & Arqueos</span>
+                  <span className="text-[9px] uppercase tracking-wider bg-orange-100 text-[#f6821f] font-bold px-1.5 py-0.5 rounded-full">Nuevo</span>
+                </button>
               </div>
             )}
           </div>
 
-          {/* Clientes */}
-          <button
-            onClick={() => setCurrentView("clientes")}
-            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition cursor-pointer ${
-              currentView === "clientes"
-                ? "bg-[#fff7ed] text-[#f6821f] font-semibold shadow-xs"
-                : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
-            }`}
-          >
-            <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-            </svg>
-            {!sidebarCollapsed && <span>Clientes ({customers.length})</span>}
-          </button>
+          {/* Ventas Collapsible Group */}
+          <div className="pt-1">
+            <button
+              onClick={() => setVentasOpen(!ventasOpen)}
+              title={sidebarCollapsed ? "Ventas" : undefined}
+              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl transition cursor-pointer text-slate-700 hover:bg-slate-100 ${
+                currentView === "clientes" ||
+                currentView === "lista-facturas" ||
+                currentView === "factura-editor" ||
+                currentView === "notas-credito-debito" ||
+                currentView === "vendedores" ||
+                currentView === "comisiones"
+                  ? "font-semibold text-slate-900"
+                  : ""
+              }`}
+            >
+              <div className="flex items-center gap-3 truncate">
+                <Tag className="w-4 h-4 shrink-0 text-slate-600" />
+                {!sidebarCollapsed && <span>Ventas</span>}
+              </div>
+              {!sidebarCollapsed && (
+                <svg
+                  className={`w-3.5 h-3.5 text-slate-400 transition-transform ${
+                    ventasOpen ? "rotate-180" : "rotate-0"
+                  }`}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                </svg>
+              )}
+            </button>
 
-          {/* Facturas (abajo de Clientes) */}
-          <button
-            onClick={() => setCurrentView("lista-facturas")}
-            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition cursor-pointer ${
-              currentView === "lista-facturas" || currentView === "factura-editor"
-                ? "bg-[#fff7ed] text-[#f6821f] font-semibold shadow-xs"
-                : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
-            }`}
-          >
-            <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
-            {!sidebarCollapsed && <span>Facturas</span>}
-          </button>
+            {ventasOpen && !sidebarCollapsed && (
+              <div className="ml-7 mt-1 pl-2 border-l border-slate-200 space-y-1 text-xs">
+                {/* 1. Clientes */}
+                <button
+                  onClick={() => setCurrentView("clientes")}
+                  className={`w-full text-left px-2.5 py-1.5 rounded-lg transition cursor-pointer flex items-center justify-between ${
+                    currentView === "clientes"
+                      ? "bg-[#fff7ed] text-[#f6821f] font-semibold"
+                      : "text-slate-500 hover:text-slate-900 hover:bg-slate-50"
+                  }`}
+                >
+                  <span>Clientes</span>
+                  <span className="text-[10px] text-slate-400 font-normal">
+                    {customers.length}
+                  </span>
+                </button>
 
-          {/* Notas de Crédito & Débito */}
-          <button
-            onClick={() => setCurrentView("notas-credito-debito")}
-            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition cursor-pointer ${
-              currentView === "notas-credito-debito"
-                ? "bg-[#fff7ed] text-[#f6821f] font-semibold shadow-xs"
-                : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
-            }`}
-          >
-            <FileText className="w-4 h-4 shrink-0 text-slate-600" />
-            {!sidebarCollapsed && <span>Notas Crédito / Débito</span>}
-          </button>
+                {/* 2. Facturas */}
+                <button
+                  onClick={() => setCurrentView("lista-facturas")}
+                  className={`w-full text-left px-2.5 py-1.5 rounded-lg transition cursor-pointer ${
+                    currentView === "lista-facturas" || currentView === "factura-editor"
+                      ? "bg-[#fff7ed] text-[#f6821f] font-semibold"
+                      : "text-slate-500 hover:text-slate-900 hover:bg-slate-50"
+                  }`}
+                >
+                  <span>Facturas</span>
+                </button>
 
-          {/* Vendedores */}
-          <button
-            onClick={() => setCurrentView("vendedores")}
-            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition cursor-pointer ${
-              currentView === "vendedores"
-                ? "bg-[#fff7ed] text-[#f6821f] font-semibold shadow-xs"
-                : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
-            }`}
-          >
-            <Users className="w-4 h-4 shrink-0 text-slate-600" />
-            {!sidebarCollapsed && <span>Vendedores ({salesReps.length})</span>}
-          </button>
+                {/* 3. Notas de Crédito & Débito */}
+                <button
+                  onClick={() => setCurrentView("notas-credito-debito")}
+                  className={`w-full text-left px-2.5 py-1.5 rounded-lg transition cursor-pointer ${
+                    currentView === "notas-credito-debito"
+                      ? "bg-[#fff7ed] text-[#f6821f] font-semibold"
+                      : "text-slate-500 hover:text-slate-900 hover:bg-slate-50"
+                  }`}
+                >
+                  <span>Notas Crédito / Débito</span>
+                </button>
 
-          {/* Comisiones */}
-          <button
-            onClick={() => setCurrentView("comisiones")}
-            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition cursor-pointer ${
-              currentView === "comisiones"
-                ? "bg-[#fff7ed] text-[#f6821f] font-semibold shadow-xs"
-                : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
-            }`}
-          >
-            <svg className="w-4 h-4 shrink-0 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            {!sidebarCollapsed && <span>Esquema de Comisiones</span>}
-          </button>
+                {/* 4. Vendedores */}
+                <button
+                  onClick={() => setCurrentView("vendedores")}
+                  className={`w-full text-left px-2.5 py-1.5 rounded-lg transition cursor-pointer flex items-center justify-between ${
+                    currentView === "vendedores"
+                      ? "bg-[#fff7ed] text-[#f6821f] font-semibold"
+                      : "text-slate-500 hover:text-slate-900 hover:bg-slate-50"
+                  }`}
+                >
+                  <span>Vendedores</span>
+                  <span className="text-[10px] text-slate-400 font-normal">
+                    {salesReps.length}
+                  </span>
+                </button>
+
+                {/* 5. Comisiones */}
+                <button
+                  onClick={() => setCurrentView("comisiones")}
+                  className={`w-full text-left px-2.5 py-1.5 rounded-lg transition cursor-pointer ${
+                    currentView === "comisiones"
+                      ? "bg-[#fff7ed] text-[#f6821f] font-semibold"
+                      : "text-slate-500 hover:text-slate-900 hover:bg-slate-50"
+                  }`}
+                >
+                  <span>Comisiones</span>
+                </button>
+              </div>
+            )}
+          </div>
 
 
 
-          {/* Proveedores */}
-          <button
-            onClick={() => setCurrentView("proveedores")}
-            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition cursor-pointer ${
-              currentView === "proveedores"
-                ? "bg-[#fff7ed] text-[#f6821f] font-semibold shadow-xs"
-                : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
-            }`}
-          >
-            <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-            </svg>
-            {!sidebarCollapsed && <span>Proveedores ({vendors.length})</span>}
-          </button>
-
-          {/* Órdenes de compra (abajo de Proveedores) */}
-          <button
-            onClick={() => setCurrentView("lista-ordenes-compra")}
-            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition cursor-pointer ${
-              currentView === "lista-ordenes-compra"
-                ? "bg-[#fff7ed] text-[#f6821f] font-semibold shadow-xs"
-                : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
-            }`}
-          >
-            <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 11V7a4 4 0 00-8 0v4M5 11h14l1 12H4L5 11z" />
-            </svg>
-            {!sidebarCollapsed && <span>Órdenes de compra</span>}
-          </button>
-
-          {/* Facturas de compra (Entradas de Inventario) */}
-          <button
-            onClick={() => setCurrentView("factura-compra-lista")}
-            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition cursor-pointer ${
-              currentView === "factura-compra-lista" || currentView === "factura-compra-editor"
-                ? "bg-[#fff7ed] text-[#f6821f] font-semibold shadow-xs"
-                : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
-            }`}
-          >
-            <FileText className="w-4 h-4 shrink-0 text-slate-600" />
-            {!sidebarCollapsed && <span>Facturas de compra</span>}
-          </button>
-
-          {/* Devoluciones a Proveedores */}
-          <button
-            onClick={() => { setCurrentView("devoluciones-proveedor"); loadVendorReturns(); }}
-            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition cursor-pointer ${
-              currentView === "devoluciones-proveedor"
-                ? "bg-[#fff7ed] text-[#f6821f] font-semibold shadow-xs"
-                : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
-            }`}
-          >
-            <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
-            </svg>
-            {!sidebarCollapsed && (
-              <span className="flex items-center gap-1.5">
-                Devoluciones a Prov.
-                {vendorReturns.filter((r) => r.status === "BORRADOR").length > 0 && (
-                  <span className="bg-amber-100 text-amber-800 text-[10px] font-bold px-1.5 rounded-full">
-                    {vendorReturns.filter((r) => r.status === "BORRADOR").length}
+          {/* Compras Collapsible Group */}
+          <div className="pt-1">
+            <button
+              onClick={() => setComprasOpen(!comprasOpen)}
+              title={sidebarCollapsed ? "Compras" : undefined}
+              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl transition cursor-pointer text-slate-700 hover:bg-slate-100 ${
+                currentView === "proveedores" ||
+                currentView === "lista-ordenes-compra" ||
+                currentView === "orden-compra-editor" ||
+                currentView === "factura-compra-lista" ||
+                currentView === "factura-compra-editor" ||
+                currentView === "devoluciones-proveedor"
+                  ? "font-semibold text-slate-900"
+                  : ""
+              }`}
+            >
+              <div className="flex items-center gap-3 truncate">
+                <svg className="w-4 h-4 shrink-0 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 11V7a4 4 0 00-8 0v4M5 11h14l1 12H4L5 11z" />
+                </svg>
+                {!sidebarCollapsed && (
+                  <span className="flex items-center gap-1.5">
+                    Compras
+                    {vendorReturns.filter((r) => r.status === "BORRADOR").length > 0 && !comprasOpen && (
+                      <span className="bg-amber-100 text-amber-800 text-[10px] font-bold px-1.5 rounded-full">
+                        {vendorReturns.filter((r) => r.status === "BORRADOR").length}
+                      </span>
+                    )}
                   </span>
                 )}
-              </span>
+              </div>
+              {!sidebarCollapsed && (
+                <svg
+                  className={`w-3.5 h-3.5 text-slate-400 transition-transform ${
+                    comprasOpen ? "rotate-180" : "rotate-0"
+                  }`}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                </svg>
+              )}
+            </button>
+
+            {comprasOpen && !sidebarCollapsed && (
+              <div className="ml-7 mt-1 pl-2 border-l border-slate-200 space-y-1 text-xs">
+                {/* 1. Proveedores */}
+                <button
+                  onClick={() => setCurrentView("proveedores")}
+                  className={`w-full text-left px-2.5 py-1.5 rounded-lg transition cursor-pointer flex items-center justify-between ${
+                    currentView === "proveedores"
+                      ? "bg-[#fff7ed] text-[#f6821f] font-semibold"
+                      : "text-slate-500 hover:text-slate-900 hover:bg-slate-50"
+                  }`}
+                >
+                  <span>Proveedores</span>
+                  <span className="text-[10px] text-slate-400 font-normal">
+                    {vendors.length}
+                  </span>
+                </button>
+
+                {/* 2. Órdenes de compra */}
+                <button
+                  onClick={() => setCurrentView("lista-ordenes-compra")}
+                  className={`w-full text-left px-2.5 py-1.5 rounded-lg transition cursor-pointer ${
+                    currentView === "lista-ordenes-compra" || currentView === "orden-compra-editor"
+                      ? "bg-[#fff7ed] text-[#f6821f] font-semibold"
+                      : "text-slate-500 hover:text-slate-900 hover:bg-slate-50"
+                  }`}
+                >
+                  <span>Órdenes de compra</span>
+                </button>
+
+                {/* 3. Facturas de compra */}
+                <button
+                  onClick={() => setCurrentView("factura-compra-lista")}
+                  className={`w-full text-left px-2.5 py-1.5 rounded-lg transition cursor-pointer ${
+                    currentView === "factura-compra-lista" || currentView === "factura-compra-editor"
+                      ? "bg-[#fff7ed] text-[#f6821f] font-semibold"
+                      : "text-slate-500 hover:text-slate-900 hover:bg-slate-50"
+                  }`}
+                >
+                  <span>Facturas de compra</span>
+                </button>
+
+                {/* 4. Devoluciones a proveedores */}
+                <button
+                  onClick={() => { setCurrentView("devoluciones-proveedor"); loadVendorReturns(); }}
+                  className={`w-full text-left px-2.5 py-1.5 rounded-lg transition cursor-pointer flex items-center justify-between ${
+                    currentView === "devoluciones-proveedor"
+                      ? "bg-[#fff7ed] text-[#f6821f] font-semibold"
+                      : "text-slate-500 hover:text-slate-900 hover:bg-slate-50"
+                  }`}
+                >
+                  <span>Devoluciones a Prov.</span>
+                  {vendorReturns.filter((r) => r.status === "BORRADOR").length > 0 && (
+                    <span className="bg-amber-100 text-amber-800 text-[10px] font-bold px-1.5 rounded-full">
+                      {vendorReturns.filter((r) => r.status === "BORRADOR").length}
+                    </span>
+                  )}
+                </button>
+              </div>
             )}
-          </button>
+          </div>
 
 
           {/* Inventario Collapsible Group */}
@@ -4281,13 +5012,17 @@ export default function AdminDashboard() {
         <div className="p-3 border-t border-slate-100">
           <div className="flex items-center justify-between p-2 rounded-xl bg-slate-50 border border-slate-200/60">
             <div className="flex items-center gap-2.5 overflow-hidden">
-              <div className="w-8 h-8 rounded-lg bg-[#f6821f] text-white flex items-center justify-center font-bold text-xs shrink-0">
-                WA
+              <div className="w-8 h-8 rounded-lg bg-[#f6821f] text-white flex items-center justify-center font-bold text-xs shrink-0 uppercase">
+                {currentAdminUser?.name ? currentAdminUser.name.substring(0, 2) : "WA"}
               </div>
               {!sidebarCollapsed && (
                 <div className="truncate">
-                  <p className="font-semibold text-slate-800 text-xs truncate">Administrador</p>
-                  <p className="text-[10px] text-slate-500 truncate">admin@waynetrademarkhn.com</p>
+                  <p className="font-semibold text-slate-800 text-xs truncate">
+                    {currentAdminUser?.name || "Administrador"}
+                  </p>
+                  <p className="text-[10px] text-slate-500 truncate">
+                    {currentAdminUser?.email || "admin"}
+                  </p>
                 </div>
               )}
             </div>
@@ -4327,14 +5062,19 @@ export default function AdminDashboard() {
                   {currentView === "plan-cuentas" && "Contabilidad / Plan de Cuentas"}
                   {currentView === "transacciones" && "Contabilidad / Transacciones Bancarias"}
                   {currentView === "macola-sync" && "Contabilidad / Transacciones de Integración"}
+                  {currentView === "caja-chica" && "Contabilidad / Arqueo & Control de Caja Chica"}
                   {currentView === "clientes" && "Directorio de Clientes"}
                   {currentView === "lista-facturas" && "Gestión de Facturas"}
+                  {currentView === "notas-credito-debito" && "Notas de Crédito / Débito"}
                   {currentView === "proveedores" && "Directorio de Proveedores"}
                   {currentView === "lista-ordenes-compra" && "Gestión de Órdenes de Compra"}
                   {currentView === "factura-compra-lista" && "Facturas de Compra & Entradas"}
+                  {currentView === "devoluciones-proveedor" && "Devoluciones a Proveedores"}
                   {currentView === "vendedores" && "Fuerza de Ventas"}
                   {currentView === "comisiones" && "Control de Comisiones"}
                   {currentView === "inventario" && "Control Maestro de Inventario"}
+                  {currentView === "lotes" && "Control de Lotes"}
+                  {currentView === "series" && "Control de Números de Serie"}
                   {currentView === "reportes" && "Centro de Reportes"}
                   {currentView === "configuracion" && "Configuración del Sistema"}
                 </span>
@@ -4343,7 +5083,6 @@ export default function AdminDashboard() {
                   Conectado
                 </span>
               </div>
-              <p className="text-xs text-slate-500">Wayne Trademark Honduras</p>
             </div>
           </div>
 
@@ -4798,7 +5537,25 @@ export default function AdminDashboard() {
                   </button>
 
                   <button
-                    onClick={() => setShowNewAccountModal(true)}
+                    onClick={() => {
+                      setEditingAccountId(null);
+                      setNewAccountForm({
+                        code: "",
+                        name: "",
+                        type: "Efectivo y equivalentes de efectivo",
+                        detailType: "Banco",
+                        isSubAccount: false,
+                        parentAccountId: "",
+                        description: "",
+                        isLocked: false,
+                        currency: "USD",
+                        balance: 0,
+                        isActive: true,
+                      });
+                      setAccountModalError("");
+                      setAccountModalSuccess("");
+                      setShowNewAccountModal(true);
+                    }}
                     className="px-4 py-2 rounded-xl bg-[#f6821f] hover:bg-[#e07216] text-white text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer shadow-md shadow-[#f6821f]/20"
                   >
                     <span>Nueva cuenta</span>
@@ -4913,7 +5670,9 @@ export default function AdminDashboard() {
                     <h2 className="font-semibold text-sm text-slate-900">
                       Catálogo Contable ({displayedAccounts.length} de {filteredAccounts.length})
                     </h2>
-                    <p className="text-xs text-slate-500">Plan estándar con cuentas activas en Wayne Trademark Honduras</p>
+                    <p className="text-xs text-slate-500">
+                      Plan estándar con cuentas activas en Wayne Trademark Honduras. Haz clic en el número de cuenta para editarla.
+                    </p>
                   </div>
                   {filteredAccounts.length > pageSize && (
                     <span className="text-[11px] text-slate-500 font-medium">
@@ -4981,8 +5740,28 @@ export default function AdminDashboard() {
                               switch (colKey) {
                                 case "code":
                                   return (
-                                    <td key="code" className={`${cellPadding} font-mono font-semibold text-[#f6821f]`}>
-                                      {activateAccountNumbers ? acc.code : "—"}
+                                    <td key="code" className={`${cellPadding} font-mono font-semibold`}>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleOpenEditAccount(acc)}
+                                        className="text-[#f6821f] hover:text-[#e07216] hover:underline font-mono font-bold text-left inline-flex items-center gap-1.5 group cursor-pointer"
+                                        title="Clic para editar cuenta contable"
+                                      >
+                                        <span>{activateAccountNumbers ? acc.code : (acc.code || "—")}</span>
+                                        <svg
+                                          className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity text-[#f6821f] shrink-0"
+                                          fill="none"
+                                          stroke="currentColor"
+                                          viewBox="0 0 24 24"
+                                        >
+                                          <path
+                                             strokeLinecap="round"
+                                             strokeLinejoin="round"
+                                             strokeWidth="2"
+                                             d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"
+                                          />
+                                        </svg>
+                                      </button>
                                     </td>
                                   );
                                 case "type": {
@@ -5012,7 +5791,14 @@ export default function AdminDashboard() {
                                 case "description":
                                   return (
                                     <td key="description" className={`${cellPadding} font-medium text-slate-900`}>
-                                      {acc.name}
+                                      <button
+                                        type="button"
+                                        onClick={() => handleOpenEditAccount(acc)}
+                                        className="text-left font-medium text-slate-900 hover:text-[#f6821f] transition cursor-pointer"
+                                        title="Clic para editar cuenta contable"
+                                      >
+                                        {acc.name}
+                                      </button>
                                     </td>
                                   );
                                 case "currency":
@@ -5155,22 +5941,22 @@ export default function AdminDashboard() {
                   onClick={() => setSelectedBankId("all")}
                   className={`p-4 rounded-2xl border transition cursor-pointer flex flex-col justify-between ${
                     selectedBankId === "all"
-                      ? "bg-slate-900 border-slate-900 text-white shadow-md"
-                      : "bg-white border-slate-200 hover:border-slate-300 text-slate-800"
+                      ? "bg-white border-[#f6821f] ring-2 ring-[#f6821f]/20 shadow-sm text-slate-900"
+                      : "bg-white border-slate-200 hover:border-slate-300 text-slate-800 shadow-2xs"
                   }`}
                 >
                   <div className="flex items-center justify-between mb-3">
-                    <span className={`text-[11px] font-bold uppercase tracking-wider ${selectedBankId === "all" ? "text-slate-300" : "text-slate-500"}`}>
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
                       Visión General
                     </span>
-                    <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+                    <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
                   </div>
                   <div>
-                    <h3 className="font-bold text-sm mb-1">Todas las Cuentas</h3>
-                    <div className="text-xl font-extrabold mb-1">
+                    <h3 className="font-bold text-sm mb-1 text-slate-900">Todas las Cuentas</h3>
+                    <div className="text-xl font-extrabold mb-1 text-slate-900">
                       {formatCurrency(connectedBanks.reduce((sum, b) => sum + (b.bankBalance || 0), 0))}
                     </div>
-                    <p className={`text-[11px] ${selectedBankId === "all" ? "text-slate-300" : "text-slate-500"}`}>
+                    <p className="text-[11px] text-slate-500">
                       {bankTransactions.filter((t) => t.status === "porRevisar").length} transacciones por revisar
                     </p>
                   </div>
@@ -5702,6 +6488,26 @@ export default function AdminDashboard() {
                 </div>
               </div>
             </div>
+          )}
+
+          {/* ================= VIEW: CAJA CHICA & CONTROL DE ARQUEOS ================= */}
+          {currentView === "caja-chica" && (
+            <CajaChicaModule
+              funds={pettyCashFunds}
+              selectedFundId={selectedFundId}
+              setSelectedFundId={setSelectedFundId}
+              loading={pettyCashLoading}
+              audits={pettyCashAudits}
+              vouchers={pettyCashVouchers}
+              activeTab={cajaChicaActiveTab}
+              setActiveTab={setCajaChicaActiveTab}
+              onRefresh={loadPettyCashData}
+              currentAdminUser={currentAdminUser}
+              showToast={showPettyCashToast}
+              onBackToDashboard={() => setCurrentView("dashboard")}
+              connectedBanks={connectedBanks}
+              accounts={accounts}
+            />
           )}
 
           {/* ================= VIEW: CLIENTES ================= */}
@@ -7894,6 +8700,27 @@ export default function AdminDashboard() {
                             </button>
                           </div>
 
+                          {/* Moneda predeterminada */}
+                          <div className="py-3 flex items-start justify-between gap-4">
+                            <span className="w-40 font-semibold text-slate-800 shrink-0">Moneda predeterminada</span>
+                            <span className="flex-1 text-slate-700 font-medium">{monedasSettings.monedaPrincipal}</span>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setParamEditModal({
+                                  title: "Moneda Principal",
+                                  label: "Moneda principal del sistema",
+                                  value: monedasSettings.monedaPrincipal,
+                                  options: ["USD ($) Dólar estadounidense", "HNL (L) Lempira hondureño", "EUR (€) Euro"],
+                                  onSave: (val) => setMonedasSettings((prev) => ({ ...prev, monedaPrincipal: val })),
+                                })
+                              }
+                              className="text-xs font-semibold text-[#f6821f] hover:underline cursor-pointer shrink-0"
+                            >
+                              Editar
+                            </button>
+                          </div>
+
                           {/* Sector Row with Inline Dropdown Editor */}
                           {editingConfigKey === "sector" ? (
                             <div className="py-4 px-4 my-2 border border-slate-300 rounded-xl bg-white shadow-xs animate-in fade-in duration-150">
@@ -7969,17 +8796,6 @@ export default function AdminDashboard() {
                             </button>
                           </div>
 
-                          <div className="py-3 flex items-start justify-between gap-4">
-                            <span className="w-40 font-semibold text-slate-800 shrink-0">VAT/GST/TAX ID number</span>
-                            <span className="flex-1 text-slate-700 font-mono font-medium">{companySettings.taxId}</span>
-                            <button
-                              onClick={() => startEditConfig("taxId", "Número de Identificación Fiscal (RTN)")}
-                              className="text-xs font-semibold text-[#f6821f] hover:underline cursor-pointer shrink-0"
-                            >
-                              Editar
-                            </button>
-                          </div>
-
                           {/* Tipo de empresa - Interactive matching screenshot */}
                           {editingConfigKey === "tipoEmpresa" ? (
                             <div className="py-4 px-4 my-2 border border-slate-300 rounded-xl bg-white shadow-xs animate-in fade-in duration-150">
@@ -8039,6 +8855,52 @@ export default function AdminDashboard() {
                             <span className="flex-1 text-slate-700 font-medium whitespace-pre-line">{companySettings.domicilioLegal}</span>
                             <button
                               onClick={() => startEditConfig("domicilioLegal", "Domicilio legal")}
+                              className="text-xs font-semibold text-[#f6821f] hover:underline cursor-pointer shrink-0"
+                            >
+                              Editar
+                            </button>
+                          </div>
+
+                          <div className="py-3 flex items-start justify-between gap-4">
+                            <span className="w-40 font-semibold text-slate-800 shrink-0">RTN / TAX ID No.</span>
+                            <span className="flex-1 text-slate-700 font-mono font-medium">{companySettings.taxId}</span>
+                            <button
+                              onClick={() => startEditConfig("taxId", "Número de Identificación Fiscal (RTN / TAX ID No.)")}
+                              className="text-xs font-semibold text-[#f6821f] hover:underline cursor-pointer shrink-0"
+                            >
+                              Editar
+                            </button>
+                          </div>
+
+                          <div className="py-3 flex items-start justify-between gap-4">
+                            <span className="w-40 font-semibold text-slate-800 shrink-0">CAI</span>
+                            <span className="flex-1 text-slate-700 font-mono font-medium">{companySettings.cai}</span>
+                            <button
+                              onClick={() => startEditConfig("cai", "Código de Autorización de Impresión (CAI)")}
+                              className="text-xs font-semibold text-[#f6821f] hover:underline cursor-pointer shrink-0"
+                            >
+                              Editar
+                            </button>
+                          </div>
+
+                          <div className="py-3 flex items-start justify-between gap-4">
+                            <span className="w-40 font-semibold text-slate-800 shrink-0">Rango Autorizado</span>
+                            <span className="flex-1 text-slate-700 font-mono font-medium">{companySettings.rangoAutorizado}</span>
+                            <button
+                              onClick={() => startEditConfig("rangoAutorizado", "Rango de Facturación Autorizado")}
+                              className="text-xs font-semibold text-[#f6821f] hover:underline cursor-pointer shrink-0"
+                            >
+                              Editar
+                            </button>
+                          </div>
+
+                          <div className="py-3 flex items-start justify-between gap-4">
+                            <span className="w-40 font-semibold text-slate-800 shrink-0">Fecha Límite de Emisión</span>
+                            <span className="flex-1 text-slate-700 font-mono font-medium">
+                              {formatFechaLimite(companySettings.fechaLimiteEmision)}
+                            </span>
+                            <button
+                              onClick={() => startEditConfig("fechaLimiteEmision", "Fecha Límite de Emisión")}
                               className="text-xs font-semibold text-[#f6821f] hover:underline cursor-pointer shrink-0"
                             >
                               Editar
@@ -9210,7 +10072,132 @@ export default function AdminDashboard() {
                           )}
                         </div>
 
-                        {/* 2. Productos y servicios */}
+                        {/* 2. Impuesto Sobre Ventas (I.S.V. SAR) */}
+                        <div className="p-5 hover:bg-slate-50/60 transition group">
+                          {editingSalesSection === "impuestosIsv" ? (
+                            <div className="space-y-4 animate-in fade-in duration-150">
+                              <div className="flex items-center justify-between pb-2 border-b border-slate-200">
+                                <span className="font-bold text-slate-900 text-sm">Editar Impuesto Sobre Ventas (I.S.V. SAR)</span>
+                                <button
+                                  type="button"
+                                  onClick={() => setEditingSalesSection(null)}
+                                  className="text-slate-400 hover:text-slate-600 text-sm font-bold cursor-pointer"
+                                >
+                                  ✕
+                                </button>
+                              </div>
+
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div>
+                                  <label className="block text-[11px] font-semibold text-slate-700 mb-1">Tasa general de I.S.V. (%)</label>
+                                  <div className="relative">
+                                    <input
+                                      type="number"
+                                      min={0}
+                                      max={100}
+                                      step={1}
+                                      value={salesSettings.tasaIsvGeneral}
+                                      onChange={(e) => setSalesSettings((prev) => ({ ...prev, tasaIsvGeneral: parseFloat(e.target.value) || 0 }))}
+                                      className="w-full px-3 py-1.5 border border-slate-300 rounded-lg text-xs bg-white text-slate-800 focus:border-[#f6821f] focus:outline-none pr-8"
+                                    />
+                                    <span className="absolute right-3 top-1.5 text-xs text-slate-400 font-bold">%</span>
+                                  </div>
+                                  <span className="text-[10px] text-slate-400 mt-1 block">Tasa tributaria general oficial del SAR de Honduras (15%).</span>
+                                </div>
+
+                                <div>
+                                  <label className="block text-[11px] font-semibold text-slate-700 mb-1">Modalidad de cálculo</label>
+                                  <select
+                                    value={salesSettings.preciosIncluyenIsv ? "incluido" : "excluido"}
+                                    onChange={(e) => setSalesSettings((prev) => ({ ...prev, preciosIncluyenIsv: e.target.value === "incluido" }))}
+                                    className="w-full px-3 py-1.5 border border-slate-300 rounded-lg text-xs bg-white text-slate-800 focus:border-[#f6821f] focus:outline-none"
+                                  >
+                                    <option value="excluido">No incluido en precios (Se agrega a la base gravada)</option>
+                                    <option value="incluido">Incluido en precios unitarios</option>
+                                  </select>
+                                  <span className="text-[10px] text-slate-400 mt-1 block">Determina si los precios de productos ya contemplan el I.S.V.</span>
+                                </div>
+                              </div>
+
+                              <div className="pt-2 border-t border-slate-100 space-y-2">
+                                <label className="flex items-center gap-2 cursor-pointer select-none">
+                                  <input
+                                    type="checkbox"
+                                    checked={salesSettings.isvPredeterminado}
+                                    onChange={(e) => setSalesSettings((prev) => ({ ...prev, isvPredeterminado: e.target.checked }))}
+                                    className="rounded border-slate-300 text-[#f6821f] focus:ring-[#f6821f] cursor-pointer"
+                                  />
+                                  <span className="font-semibold text-slate-800">Aplicar I.S.V. por defecto en facturas nuevas</span>
+                                </label>
+                                <label className="flex items-center gap-2 cursor-pointer select-none">
+                                  <input
+                                    type="checkbox"
+                                    checked={salesSettings.permitirIsv18}
+                                    onChange={(e) => setSalesSettings((prev) => ({ ...prev, permitirIsv18: e.target.checked }))}
+                                    className="rounded border-slate-300 text-[#f6821f] focus:ring-[#f6821f] cursor-pointer"
+                                  />
+                                  <span className="text-slate-800">Habilitar opción de I.S.V. 18% (Tasa especial para licores, boletos de primera clase, etc.)</span>
+                                </label>
+                              </div>
+
+                              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+                                <button
+                                  type="button"
+                                  onClick={() => setEditingSalesSection(null)}
+                                  className="px-4 py-1.5 rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-100 font-semibold cursor-pointer"
+                                >
+                                  Cancelar
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setEditingSalesSection(null);
+                                    setSalesSavedNotification(true);
+                                    setTimeout(() => setSalesSavedNotification(false), 3000);
+                                  }}
+                                  className="px-4 py-1.5 rounded-lg bg-[#f6821f] hover:bg-[#e07216] text-white font-semibold cursor-pointer shadow-xs"
+                                >
+                                  Guardar
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
+                              <div className="w-56 sm:w-64 font-semibold text-slate-800 shrink-0">
+                                Impuesto Sobre Ventas (I.S.V. SAR)
+                              </div>
+                              <div className="flex-1 space-y-2">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-slate-700">Tasa general de I.S.V.</span>
+                                  <span className="text-slate-900 font-semibold">{salesSettings.tasaIsvGeneral}%</span>
+                                </div>
+                                <div className="flex items-center justify-between">
+                                  <span className="text-slate-700">Aplicar I.S.V. por defecto</span>
+                                  <span className="text-slate-600 font-medium">{salesSettings.isvPredeterminado ? `Activado (${salesSettings.tasaIsvGeneral}%)` : "Desactivado"}</span>
+                                </div>
+                                <div className="flex items-center justify-between">
+                                  <span className="text-slate-700">Tasa especial 18%</span>
+                                  <span className="text-slate-600 font-medium">{salesSettings.permitirIsv18 ? "Habilitada" : "Deshabilitada"}</span>
+                                </div>
+                                <div className="flex items-center justify-between">
+                                  <span className="text-slate-700">Modalidad de precios</span>
+                                  <span className="text-slate-600 font-medium">{salesSettings.preciosIncluyenIsv ? "I.S.V. Incluido" : "No incluido (Gravado al subtotal)"}</span>
+                                </div>
+                              </div>
+                              <div className="shrink-0 pt-0.5">
+                                <button
+                                  type="button"
+                                  onClick={() => setEditingSalesSection("impuestosIsv")}
+                                  className="text-xs font-semibold text-[#f6821f] hover:underline cursor-pointer"
+                                >
+                                  Editar
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* 3. Productos y servicios */}
                         <div className="p-5 hover:bg-slate-50/60 transition group">
                           {editingSalesSection === "productosServicios" ? (
                             <div className="space-y-4 animate-in fade-in duration-150">
@@ -10548,7 +11535,9 @@ export default function AdminDashboard() {
 
                       <div className="border border-red-200 rounded-xl p-5 bg-red-50/40">
                         <h2 className="font-bold text-sm text-red-900 mb-1">Sesión Administrativa</h2>
-                        <p className="text-xs text-red-700 mb-4">Administrador activo: admin@waynetrademarkhn.com</p>
+                        <p className="text-xs text-red-700 mb-4">
+                          Administrador activo: {currentAdminUser?.email || "admin"} ({currentAdminUser?.role || "ADMIN"})
+                        </p>
                         <button
                           type="button"
                           onClick={handleLogout}
@@ -11403,7 +12392,82 @@ export default function AdminDashboard() {
 
                     <div className="mb-5">
                       <label className="block text-xs font-semibold text-slate-700 mb-1.5">{editingConfigLabel}</label>
-                      {editingConfigKey === "direccion" || editingConfigKey === "domicilioLegal" ? (
+                      {editingConfigKey === "rangoAutorizado" ? (
+                        <div className="space-y-4">
+                          <p className="text-[11px] text-slate-500 leading-relaxed">
+                            Ingresa los últimos <strong>8 dígitos</strong> de cada parte autorizada por el SAR (el prefijo fiscal se asigna automáticamente):
+                          </p>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div>
+                              <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                                DEL (8 dígitos iniciales)
+                              </label>
+                              <div className="flex items-center rounded-xl bg-slate-50 border border-slate-300 focus-within:border-[#f6821f] focus-within:ring-1 focus-within:ring-[#f6821f] overflow-hidden">
+                                <span className="px-2.5 py-2 font-mono text-[11px] text-slate-500 bg-slate-100 border-r border-slate-200 select-none font-semibold">
+                                  {rangoPrefijo}
+                                </span>
+                                <input
+                                  type="text"
+                                  inputMode="numeric"
+                                  maxLength={8}
+                                  value={rangoDesde}
+                                  onChange={(e) => setRangoDesde(e.target.value.replace(/\D/g, "").slice(0, 8))}
+                                  placeholder="00000661"
+                                  className="w-full px-3 py-2 text-xs font-mono font-bold text-slate-900 focus:outline-none bg-transparent"
+                                />
+                              </div>
+                              <span className="text-[10px] text-slate-400 mt-1 block">
+                                {rangoDesde.length}/8 dígitos
+                              </span>
+                            </div>
+
+                            <div>
+                              <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                                AL (8 dígitos finales)
+                              </label>
+                              <div className="flex items-center rounded-xl bg-slate-50 border border-slate-300 focus-within:border-[#f6821f] focus-within:ring-1 focus-within:ring-[#f6821f] overflow-hidden">
+                                <span className="px-2.5 py-2 font-mono text-[11px] text-slate-500 bg-slate-100 border-r border-slate-200 select-none font-semibold">
+                                  {rangoPrefijo}
+                                </span>
+                                <input
+                                  type="text"
+                                  inputMode="numeric"
+                                  maxLength={8}
+                                  value={rangoHasta}
+                                  onChange={(e) => setRangoHasta(e.target.value.replace(/\D/g, "").slice(0, 8))}
+                                  placeholder="00000760"
+                                  className="w-full px-3 py-2 text-xs font-mono font-bold text-slate-900 focus:outline-none bg-transparent"
+                                />
+                              </div>
+                              <span className="text-[10px] text-slate-400 mt-1 block">
+                                {rangoHasta.length}/8 dígitos
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="p-3 bg-amber-50 rounded-xl border border-amber-200/80">
+                            <span className="text-[10px] font-bold text-amber-800 uppercase tracking-wider block mb-1">
+                              Vista Previa Oficial del Rango:
+                            </span>
+                            <span className="font-mono text-xs font-bold text-amber-950 break-all select-all">
+                              DEL {rangoPrefijo}{rangoDesde ? rangoDesde.padStart(8, "0") : "00000661"} AL {rangoPrefijo}{rangoHasta ? rangoHasta.padStart(8, "0") : "00000760"}
+                            </span>
+                          </div>
+                        </div>
+                      ) : editingConfigKey === "fechaLimiteEmision" ? (
+                        <div className="space-y-3">
+                          <p className="text-[11px] text-slate-500">
+                            Selecciona la fecha límite de emisión autorizada por el SAR:
+                          </p>
+                          <input
+                            type="date"
+                            value={editingConfigValue === "Ninguno indicado" ? "" : editingConfigValue}
+                            onChange={(e) => setEditingConfigValue(e.target.value)}
+                            className="w-full px-3.5 py-2.5 text-xs rounded-xl bg-slate-50 border border-slate-300 text-slate-900 focus:outline-none focus:border-[#f6821f] focus:ring-1 focus:ring-[#f6821f] font-medium font-mono"
+                          />
+                        </div>
+                      ) : editingConfigKey === "direccion" || editingConfigKey === "domicilioLegal" ? (
                         <textarea
                           rows={3}
                           value={editingConfigValue}
@@ -11981,6 +13045,304 @@ export default function AdminDashboard() {
             </div>
           )}
 
+          {/* ================= VIEW: DEVOLUCIONES A PROVEEDORES ================= */}
+          {currentView === "devoluciones-proveedor" && (
+            <div className="space-y-6 animate-in fade-in duration-150">
+              {/* Top Action Bar */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <button
+                    type="button"
+                    onClick={() => setCurrentView("dashboard")}
+                    className="text-xs font-semibold text-slate-500 hover:text-slate-900 transition flex items-center gap-1.5 cursor-pointer w-fit mb-1"
+                  >
+                    <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
+                    </svg>
+                    <span>Regresar a Dashboard</span>
+                  </button>
+                  <h1 className="text-xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
+                    <span>Devoluciones a Proveedores</span>
+                    <span className="text-xs font-normal text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">
+                      {vendorReturns.length} registros
+                    </span>
+                  </h1>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Gestión de notas de salida de mercancía por defectos, garantías, vencimientos o discrepancias.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-3 self-end sm:self-auto">
+                  <button
+                    type="button"
+                    onClick={() => window.print()}
+                    className="px-4 py-2 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold transition cursor-pointer shadow-2xs flex items-center gap-1.5"
+                  >
+                    <Download className="w-3.5 h-3.5 text-slate-500" />
+                    <span>Imprimir / Exportar</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={openNewVendorReturn}
+                    className="px-5 py-2 rounded-xl bg-[#f6821f] hover:bg-[#e07216] text-white text-xs font-bold flex items-center gap-2 transition cursor-pointer shadow-md shadow-[#f6821f]/20"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
+                    </svg>
+                    <span>Nueva Devolución</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Summary Metric Cards */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-slate-500">Monto Total Devoluciones</span>
+                    <div className="w-8 h-8 rounded-xl bg-orange-50 text-[#f6821f] flex items-center justify-center">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </div>
+                  </div>
+                  <div className="text-xl font-bold text-slate-900 mt-2">
+                    ${vendorReturns
+                      .filter((r) => r.status !== "ANULADA")
+                      .reduce((acc, r) => acc + (r.total || 0), 0)
+                      .toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                  </div>
+                  <div className="text-[11px] text-slate-400 mt-0.5">USD en crédito/reembolso</div>
+                </div>
+
+                <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-slate-500">Borradores Pendientes</span>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800">
+                      Acción requerida
+                    </span>
+                  </div>
+                  <div className="text-xl font-bold text-amber-900 mt-2">
+                    {vendorReturns.filter((r) => r.status === "BORRADOR").length}
+                  </div>
+                  <div className="text-[11px] text-slate-400 mt-0.5">Sin aprobar ni despachar</div>
+                </div>
+
+                <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-slate-500">Aprobadas / En Tránsito</span>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800">
+                      En curso
+                    </span>
+                  </div>
+                  <div className="text-xl font-bold text-blue-900 mt-2">
+                    {vendorReturns.filter((r) => r.status === "APROBADA" || r.status === "ENVIADA").length}
+                  </div>
+                  <div className="text-[11px] text-slate-400 mt-0.5">Esperando confirmación prov.</div>
+                </div>
+
+                <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-slate-500">Completadas</span>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                      Stock ajustado
+                    </span>
+                  </div>
+                  <div className="text-xl font-bold text-emerald-900 mt-2">
+                    {vendorReturns.filter((r) => r.status === "COMPLETADA").length}
+                  </div>
+                  <div className="text-[11px] text-slate-400 mt-0.5">Inventario actualizado</div>
+                </div>
+              </div>
+
+              {/* Toolbar & Filters */}
+              <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-3">
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {(["TODAS", "BORRADOR", "APROBADA", "ENVIADA", "COMPLETADA", "ANULADA"] as const).map((filterOpt) => {
+                    const count = filterOpt === "TODAS"
+                      ? vendorReturns.length
+                      : vendorReturns.filter((r) => r.status === filterOpt).length;
+                    return (
+                      <button
+                        key={filterOpt}
+                        type="button"
+                        onClick={() => setVendorReturnsFilter(filterOpt)}
+                        className={`px-3 py-1.5 rounded-xl font-semibold text-xs transition cursor-pointer flex items-center gap-1.5 ${
+                          vendorReturnsFilter === filterOpt
+                            ? "bg-[#f6821f] text-white shadow-xs"
+                            : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                        }`}
+                      >
+                        <span>{filterOpt}</span>
+                        <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${
+                          vendorReturnsFilter === filterOpt
+                            ? "bg-white/20 text-white font-bold"
+                            : "bg-slate-200 text-slate-600"
+                        }`}>
+                          {count}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div className="relative w-full md:w-80">
+                  <input
+                    type="text"
+                    placeholder="Buscar por N° dev, proveedor, factura o motivo..."
+                    value={vendorReturnsSearch}
+                    onChange={(e) => setVendorReturnsSearch(e.target.value)}
+                    className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:outline-none focus:border-[#f6821f]"
+                  />
+                  <svg className="w-4 h-4 text-slate-400 absolute left-3 top-2.5 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                </div>
+              </div>
+
+              {/* Data Table */}
+              <div className="bg-white border border-slate-200 rounded-2xl shadow-2xs overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead>
+                      <tr className="bg-slate-50 border-b border-slate-200 text-slate-700 font-bold">
+                        <th className="py-3.5 px-4">N° Devolución</th>
+                        <th className="py-3.5 px-4">Proveedor</th>
+                        <th className="py-3.5 px-4">Factura Ref.</th>
+                        <th className="py-3.5 px-4">Fecha</th>
+                        <th className="py-3.5 px-4">Motivo</th>
+                        <th className="py-3.5 px-4 text-center">Ítems</th>
+                        <th className="py-3.5 px-4 text-right">Total ($ USD)</th>
+                        <th className="py-3.5 px-4 text-center">Estado</th>
+                        <th className="py-3.5 px-4 text-right">Acciones</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {filteredVendorReturns.map((vr) => {
+                        const statusColors: Record<string, string> = {
+                          BORRADOR: "bg-amber-100 text-amber-800 border-amber-200",
+                          APROBADA: "bg-blue-100 text-blue-800 border-blue-200",
+                          ENVIADA: "bg-purple-100 text-purple-800 border-purple-200",
+                          COMPLETADA: "bg-emerald-100 text-emerald-800 border-emerald-200",
+                          ANULADA: "bg-slate-100 text-slate-600 border-slate-200",
+                        };
+                        const reasonLabels: Record<string, string> = {
+                          DEFECTO: "Mercancía defectuosa",
+                          EXCESO: "Exceso de pedido",
+                          INCORRECTO: "Producto incorrecto",
+                          VENCIDO: "Producto vencido",
+                          OTRO: "Otro motivo",
+                        };
+                        return (
+                          <tr key={vr.id} className="hover:bg-slate-50/70 transition">
+                            <td className="py-3.5 px-4 font-mono font-bold text-slate-900">
+                              {vr.returnNumber}
+                            </td>
+                            <td className="py-3.5 px-4 font-bold text-slate-900">
+                              {vr.vendorName}
+                            </td>
+                            <td className="py-3.5 px-4 font-mono text-slate-600">
+                              {vr.purchaseInvoiceNumber || "—"}
+                            </td>
+                            <td className="py-3.5 px-4 text-slate-600">
+                              {vr.returnDate}
+                            </td>
+                            <td className="py-3.5 px-4">
+                              <span className="px-2 py-0.5 rounded-md text-[11px] font-medium bg-slate-100 text-slate-700">
+                                {reasonLabels[vr.reason] || vr.reason}
+                              </span>
+                            </td>
+                            <td className="py-3.5 px-4 text-center font-semibold text-slate-700">
+                              {vr.items?.length || 0}
+                            </td>
+                            <td className="py-3.5 px-4 text-right font-mono font-bold text-slate-900">
+                              ${(vr.total || 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                            </td>
+                            <td className="py-3.5 px-4 text-center">
+                              <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border inline-block ${statusColors[vr.status] || "bg-slate-100 text-slate-700 border-slate-200"}`}>
+                                {vr.status}
+                              </span>
+                            </td>
+                            <td className="py-3.5 px-4 text-right space-x-1.5 whitespace-nowrap">
+                              <button
+                                type="button"
+                                onClick={() => setVendorReturnDetailModal(vr)}
+                                className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold cursor-pointer transition text-[11px] border border-slate-200"
+                              >
+                                Ver Detalle
+                              </button>
+
+                              {vr.status === "BORRADOR" && (
+                                <>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleVendorReturnStatusChange(vr, "APROBADA")}
+                                    className="px-2.5 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 font-semibold cursor-pointer transition text-[11px] border border-blue-200"
+                                  >
+                                    Aprobar
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => openEditVendorReturn(vr)}
+                                    className="px-2.5 py-1 rounded-lg bg-[#fff7ed] hover:bg-orange-100 text-[#f6821f] font-semibold cursor-pointer transition text-[11px] border border-orange-200"
+                                  >
+                                    Editar
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteVendorReturn(vr)}
+                                    className="px-2 py-1 rounded-lg hover:bg-rose-50 text-rose-600 font-semibold cursor-pointer transition text-[11px]"
+                                    title="Eliminar borrador"
+                                  >
+                                    ✕
+                                  </button>
+                                </>
+                              )}
+
+                              {vr.status === "APROBADA" && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleVendorReturnStatusChange(vr, "ENVIADA")}
+                                  className="px-2.5 py-1 rounded-lg bg-purple-50 hover:bg-purple-100 text-purple-700 font-semibold cursor-pointer transition text-[11px] border border-purple-200"
+                                >
+                                  Marcar Enviada
+                                </button>
+                              )}
+
+                              {vr.status === "ENVIADA" && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleVendorReturnStatusChange(vr, "COMPLETADA")}
+                                  className="px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold cursor-pointer transition text-[11px] border border-emerald-200"
+                                >
+                                  Completar
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                      {filteredVendorReturns.length === 0 && (
+                        <tr>
+                          <td colSpan={9} className="py-12 text-center text-slate-400">
+                            <div className="max-w-xs mx-auto space-y-2">
+                              <svg className="w-10 h-10 mx-auto text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                              </svg>
+                              <p className="font-semibold text-slate-600">No hay devoluciones registradas</p>
+                              <p className="text-[11px] text-slate-400">
+                                {vendorReturnsSearch ? "No se encontraron resultados con ese criterio de búsqueda." : "Crea la primera devolución haciendo clic en 'Nueva Devolución'."}
+                              </p>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* ================= VIEW: CREAR FACTURA DE COMPRA (Formal Registry) ================= */}
           {currentView === "factura-compra-editor" && (
             <div className="fixed inset-0 z-40 flex flex-col bg-slate-100 text-slate-800 animate-in fade-in duration-150 overflow-hidden">
@@ -12309,34 +13671,49 @@ export default function AdminDashboard() {
                     <p className="font-bold text-slate-900 text-sm mt-1">{companySettings.nombre}</p>
                     <p className="text-slate-600 text-xs">{companySettings.direccion}</p>
                     <p className="text-slate-600 text-xs">RTN: {companySettings.taxId} | Tel: {companySettings.telefono}</p>
+                    <p className="text-slate-600 text-xs font-mono">CAI: {companySettings.cai}</p>
                     <p className="text-slate-600 text-xs">Correo: {companySettings.email}</p>
                   </div>
                   <div className="text-right">
                     <h2 className="text-2xl font-black text-slate-900">FACTURA</h2>
-                    <p className="font-mono font-bold text-slate-800 text-base">N.º {invoiceForm.invoiceNumber}</p>
+                    <p className="font-mono font-bold text-slate-800 text-base">N.º {formatFiscalInvoiceNumber(invoiceForm.invoiceNumber)}</p>
                     <p className="text-slate-600 text-xs mt-1"><strong>Fecha de emisión:</strong> {invoiceForm.invoiceDate}</p>
                     <p className="text-slate-600 text-xs"><strong>Vencimiento:</strong> {invoiceForm.dueDate || "A la vista"}</p>
                     <p className="text-slate-600 text-xs"><strong>Términos:</strong> {invoiceForm.paymentTerms}</p>
                   </div>
                 </div>
 
-                {/* Customer Details Box */}
-                <div className="bg-slate-50 p-4 rounded-xl border border-slate-300 mb-6 flex justify-between items-center">
-                  <div>
-                    <span className="text-[10px] font-bold text-slate-500 uppercase block">Facturado a:</span>
-                    <span className="font-bold text-slate-900 text-sm">{invoiceForm.customerName || "Cliente Contado"}</span>
-                    {invoiceForm.customerEmail && <p className="text-slate-600 text-xs">{invoiceForm.customerEmail}</p>}
+                {/* Customer Details: Facturado a (izq) y Entregado a (der) */}
+                <div className="grid grid-cols-2 gap-4 mb-6 text-xs">
+                  {/* Facturado a */}
+                  <div className="bg-slate-50/80 p-4 rounded-2xl border border-slate-200/80 space-y-1">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Facturado a:</span>
+                    <p className="font-bold text-slate-900 text-sm">{invoiceForm.customerName || "Cliente Contado"}</p>
+                    {invoiceForm.customerAddress && (
+                      <p className="text-slate-600 text-xs">{invoiceForm.customerAddress}</p>
+                    )}
+                    {invoiceForm.customerEmail && (
+                      <p className="text-slate-600 text-xs">{invoiceForm.customerEmail}</p>
+                    )}
                   </div>
-                  <div className="text-right font-mono">
-                    <span className="text-xs text-slate-500 block">Moneda oficial:</span>
-                    <span className="font-bold text-slate-900 text-sm">USD ($)</span>
+
+                  {/* Entregado a */}
+                  <div className="bg-slate-50/80 p-4 rounded-2xl border border-slate-200/80 space-y-1">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Entregado a:</span>
+                    <p className="font-bold text-slate-900 text-sm">{invoiceForm.deliveredTo || invoiceForm.customerName || "Cliente Contado"}</p>
+                    <p className="text-slate-600 text-xs">
+                      {invoiceForm.deliveryAddress || invoiceForm.customerAddress || "Misma dirección del cliente"}
+                    </p>
+                    {invoiceForm.customerEmail && (
+                      <p className="text-slate-600 text-xs">{invoiceForm.customerEmail}</p>
+                    )}
                   </div>
                 </div>
 
                 {/* Items Table */}
                 <table className="w-full text-left border-collapse mb-6">
                   <thead>
-                    <tr className="border-b-2 border-slate-900 bg-slate-100 text-slate-900 font-bold">
+                    <tr className="border-b border-slate-200 text-slate-400 font-semibold text-[11px] uppercase tracking-wider">
                       <th className="py-2.5 px-3">#</th>
                       <th className="py-2.5 px-3">Producto / Servicio</th>
                       <th className="py-2.5 px-3">SKU</th>
@@ -12346,46 +13723,115 @@ export default function AdminDashboard() {
                       <th className="py-2.5 px-3 text-right">Total</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-200">
+                  <tbody className="divide-y divide-slate-100">
                     {invoiceForm.lines.map((l, idx) => (
                       <tr key={l.id}>
-                        <td className="py-2.5 px-3 font-mono text-slate-500">{idx + 1}</td>
-                        <td className="py-2.5 px-3 font-bold text-slate-900">{l.productName || "Artículo"}</td>
-                        <td className="py-2.5 px-3 font-mono text-slate-600">{l.sku || "—"}</td>
-                        <td className="py-2.5 px-3 text-slate-700">{l.description || "—"}</td>
-                        <td className="py-2.5 px-3 text-right font-mono">{l.quantity}</td>
-                        <td className="py-2.5 px-3 text-right font-mono">${l.rate.toFixed(2)}</td>
-                        <td className="py-2.5 px-3 text-right font-mono font-bold">${l.amount.toFixed(2)}</td>
+                        <td className="py-3 px-3 font-mono text-slate-400 text-xs">{idx + 1}</td>
+                        <td className="py-3 px-3 font-bold text-slate-900">{l.productName || "Artículo"}</td>
+                        <td className="py-3 px-3 font-mono text-slate-500 text-xs">{l.sku || "—"}</td>
+                        <td className="py-3 px-3 text-slate-600 text-xs">{l.description || "—"}</td>
+                        <td className="py-3 px-3 text-right font-mono text-slate-700">{l.quantity}</td>
+                        <td className="py-3 px-3 text-right font-mono text-slate-700">{invoiceCurrencySymbol} {l.rate.toLocaleString("es-HN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                        <td className="py-3 px-3 text-right font-mono font-bold text-slate-900">{invoiceCurrencySymbol} {l.amount.toLocaleString("es-HN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
 
-                {/* Summary & Totals */}
-                <div className="flex justify-between items-start border-t border-slate-300 pt-4 mb-8">
-                  <div className="max-w-md space-y-2 text-xs text-slate-600">
-                    {invoiceForm.paymentInstructions && (
-                      <p><strong>Instrucciones de Pago:</strong> {invoiceForm.paymentInstructions}</p>
-                    )}
-                    {invoiceForm.customerNote && (
-                      <p><strong>Nota:</strong> {invoiceForm.customerNote}</p>
-                    )}
-                  </div>
-                  <div className="w-64 space-y-2 text-right text-xs font-sans">
-                    <div className="flex justify-between text-slate-600 font-medium">
-                      <span>Subtotal:</span>
-                      <span className="font-bold text-slate-900">${invoiceSubtotal.toFixed(2)}</span>
+                {/* SAR Fiscal Totals & Valor en Letras (Limpio y Moderno) */}
+                <div className="grid grid-cols-12 gap-6 my-6 items-start">
+                  {/* Left: VALOR EN LETRAS */}
+                  <div className="col-span-7 bg-slate-50/80 rounded-2xl p-3.5 border border-slate-200/80 flex flex-col justify-between">
+                    <div>
+                      <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block mb-1.5">
+                        Valor en Letras
+                      </span>
+                      <p className="font-bold text-slate-800 text-xs uppercase leading-relaxed tracking-wide">
+                        {numberToWordsSpanish(invoiceTotal)}
+                      </p>
                     </div>
-                    <div className="flex justify-between items-baseline text-[#f6821f] border-t-2 border-slate-900 pt-2">
-                      <span className="text-xs font-bold uppercase tracking-wider">TOTAL A PAGAR:</span>
-                      <span className="text-2xl font-bold">${invoiceTotal.toFixed(2)} USD</span>
+                    <div className="pt-3 border-t border-slate-200/60 mt-3 flex items-center justify-between text-[11px] text-slate-400">
+                      <span className="font-medium">Documento Fiscal Autorizado por SAR</span>
+                      <span className="font-mono font-semibold">{companySettings.cai ? "CAI Válido" : ""}</span>
                     </div>
                   </div>
 
+                  {/* Right: Breakdown Table */}
+                  <div className="col-span-5 bg-white rounded-2xl border border-slate-200/80 p-3.5 shadow-sm space-y-0.5 text-xs">
+                    {/* SUBTOTAL */}
+                    <div className="flex justify-between items-center py-[2px] text-slate-600">
+                      <span className="font-semibold text-slate-500 uppercase text-[10px] tracking-wider">Subtotal</span>
+                      <span className="font-mono font-bold text-slate-900">{formatFiscalMoney(invoiceSubtotal, true)}</span>
+                    </div>
+
+                    {/* DESCUENTOS */}
+                    <div className="flex justify-between items-center py-[2px] text-slate-600">
+                      <span className="font-semibold text-slate-500 uppercase text-[10px] tracking-wider">Descuentos</span>
+                      <span className="font-mono font-medium text-slate-700">{formatFiscalMoney(invoiceDiscount) || "—"}</span>
+                    </div>
+
+                    {/* IMPORTE EXONERADO */}
+                    <div className="flex justify-between items-center py-[2px] text-slate-600">
+                      <span className="font-semibold text-slate-500 uppercase text-[10px] tracking-wider">Importe Exonerado</span>
+                      <span className="font-mono font-medium text-slate-700">{formatFiscalMoney(invoiceExonerated) || "—"}</span>
+                    </div>
+
+                    {/* IMPORTE EXENTO */}
+                    <div className="flex justify-between items-center py-[2px] text-slate-600">
+                      <span className="font-semibold text-slate-500 uppercase text-[10px] tracking-wider">Importe Exento</span>
+                      <span className="font-mono font-medium text-slate-700">{formatFiscalMoney(invoiceExempt) || "—"}</span>
+                    </div>
+
+                    <div className="border-t border-slate-100 my-0.5" />
+
+                    {/* IMP GRAVADO GENERAL */}
+                    <div className="flex justify-between items-center py-[2px] text-slate-600">
+                      <span className="font-semibold text-slate-500 uppercase text-[10px] tracking-wider">Imp. Gravado {salesSettings?.tasaIsvGeneral ?? 15}%</span>
+                      <span className="font-mono font-medium text-slate-700">{formatFiscalMoney(invoiceForm.showImpGravado15 ? invoiceGravado15 : 0) || "—"}</span>
+                    </div>
+
+                    {/* IMP GRAVADO 18% */}
+                    <div className="flex justify-between items-center py-[2px] text-slate-600">
+                      <span className="font-semibold text-slate-500 uppercase text-[10px] tracking-wider">Imp. Gravado 18%</span>
+                      <span className="font-mono font-medium text-slate-700">{formatFiscalMoney(invoiceGravado18) || "—"}</span>
+                    </div>
+
+                    {/* I.S.V. GENERAL */}
+                    <div className="flex justify-between items-center py-[2px] text-slate-600">
+                      <span className="font-semibold text-slate-500 uppercase text-[10px] tracking-wider">I.S.V. {salesSettings?.tasaIsvGeneral ?? 15}%</span>
+                      <span className="font-mono font-medium text-slate-700">{formatFiscalMoney(invoiceIsv15, invoiceForm.applyIsv15) || "—"}</span>
+                    </div>
+
+                    {/* I.S.V. 18% */}
+                    <div className="flex justify-between items-center py-[2px] text-slate-600">
+                      <span className="font-semibold text-slate-500 uppercase text-[10px] tracking-wider">I.S.V. 18%</span>
+                      <span className="font-mono font-medium text-slate-700">{formatFiscalMoney(invoiceIsv18, invoiceForm.applyIsv18) || "—"}</span>
+                    </div>
+
+                    {/* TOTAL A PAGAR */}
+                    <div className="pt-1">
+                      <div className="flex justify-between items-center py-2 px-3 bg-slate-200 border border-slate-300 text-slate-900 rounded-xl shadow-xs">
+                        <span className="font-black text-xs uppercase tracking-wider text-slate-700">Total a Pagar</span>
+                        <span className="font-mono font-black text-base text-slate-900">{formatFiscalMoney(invoiceTotal, true)}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Fiscal Footer SAR */}
+                <div className="mt-4 pt-3 border-t border-slate-300 flex justify-between items-center text-xs text-slate-700">
+                  <div>
+                    <span className="font-bold text-slate-900">Rango Autorizado: </span>
+                    <span className="font-mono">{companySettings.rangoAutorizado}</span>
+                  </div>
+                  <div className="text-right">
+                    <span className="font-bold text-slate-900">Fecha Límite de Emisión: </span>
+                    <span className="font-mono">{formatFechaLimite(companySettings.fechaLimiteEmision)}</span>
+                  </div>
                 </div>
 
                 {/* Signatures & Footer */}
-                <div className="mt-16 pt-8 border-t border-slate-200 grid grid-cols-2 gap-12 text-center text-xs text-slate-500">
+                <div className="mt-10 pt-6 border-t border-slate-200 grid grid-cols-2 gap-12 text-center text-xs text-slate-500">
                   <div>
                     <div className="border-b border-slate-400 w-48 mx-auto mb-2" />
                     <p className="font-semibold text-slate-700">Entregado por (Wayne Trademark)</p>
@@ -12475,6 +13921,8 @@ export default function AdminDashboard() {
                           <p className="font-bold text-slate-900 uppercase">{companySettings.nombre}</p>
                           <p>{companySettings.email} • {companySettings.telefono}</p>
                           <p>{companySettings.direccion}</p>
+                          <p className="font-mono text-slate-700">RTN: {companySettings.taxId}</p>
+                          <p className="font-mono text-slate-700">CAI: {companySettings.cai}</p>
                           <button
                             type="button"
                             onClick={() => setCurrentView("configuracion")}
@@ -12487,7 +13935,7 @@ export default function AdminDashboard() {
                         {/* Balance & Logo */}
                         <div className="text-right space-y-3">
                           <div className="text-xs font-semibold text-slate-500">
-                            Saldo pendiente: <span className="font-bold text-slate-900 text-sm">${invoiceTotal.toLocaleString("es-HN", { minimumFractionDigits: 2 })}</span>
+                            Saldo pendiente: <span className="font-bold text-slate-900 text-sm">{invoiceCurrencySymbol} {invoiceTotal.toLocaleString("es-HN", { minimumFractionDigits: 2 })}</span>
                           </div>
                           {companyLogo ? (
                             <img src={companyLogo} alt="Logo" className="h-12 object-contain ml-auto" />
@@ -12513,6 +13961,9 @@ export default function AdminDashboard() {
                                 customerId: e.target.value,
                                 customerName: selected ? selected.name : "",
                                 customerEmail: selected ? selected.email || "" : "",
+                                customerAddress: selected ? selected.address || "" : "",
+                                deliveredTo: selected ? selected.name : "",
+                                deliveryAddress: selected ? selected.address || "" : "",
                               });
                             }}
                             className="w-full px-3.5 py-2 text-xs rounded-xl bg-white border border-slate-300 text-slate-900 focus:outline-none focus:border-[#f6821f] font-semibold cursor-pointer shadow-2xs"
@@ -12530,6 +13981,29 @@ export default function AdminDashboard() {
                               Correo de notificación: <span className="font-mono text-slate-700 font-semibold">{invoiceForm.customerEmail}</span>
                             </p>
                           )}
+
+                          <div className="grid grid-cols-2 gap-2 pt-1">
+                            <div>
+                              <label className="block text-[11px] font-semibold text-slate-600 mb-0.5">Entregado a (Receptor)</label>
+                              <input
+                                type="text"
+                                value={invoiceForm.deliveredTo}
+                                onChange={(e) => setInvoiceForm({ ...invoiceForm, deliveredTo: e.target.value })}
+                                placeholder={invoiceForm.customerName || "Nombre receptor"}
+                                className="w-full px-2.5 py-1 text-xs rounded-lg bg-white border border-slate-300 text-slate-800 focus:outline-none focus:border-[#f6821f]"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[11px] font-semibold text-slate-600 mb-0.5">Dirección de entrega</label>
+                              <input
+                                type="text"
+                                value={invoiceForm.deliveryAddress}
+                                onChange={(e) => setInvoiceForm({ ...invoiceForm, deliveryAddress: e.target.value })}
+                                placeholder="Planta principal / Destino"
+                                className="w-full px-2.5 py-1 text-xs rounded-lg bg-white border border-slate-300 text-slate-800 focus:outline-none focus:border-[#f6821f]"
+                              />
+                            </div>
+                          </div>
                         </div>
 
                         {/* Invoice Metadata Grid */}
@@ -12540,8 +14014,10 @@ export default function AdminDashboard() {
                               type="text"
                               value={invoiceForm.invoiceNumber}
                               onChange={(e) => setInvoiceForm({ ...invoiceForm, invoiceNumber: e.target.value })}
+                              placeholder="00000001 o 1001"
                               className="w-full px-3 py-1.5 rounded-xl bg-white border border-slate-300 text-slate-900 font-mono text-xs focus:outline-none focus:border-[#f6821f]"
                             />
+                            <span className="text-[10px] text-slate-400 font-mono mt-0.5 block">Prefijo fiscal: 000-001-01-</span>
                           </div>
 
                           <div>
@@ -12658,8 +14134,8 @@ export default function AdminDashboard() {
                                       className="w-20 px-2 py-1 text-xs rounded-lg border border-slate-200 text-right font-mono focus:outline-none focus:border-[#f6821f]"
                                     />
                                   </td>
-                                  <td className="p-3 text-right font-bold text-slate-900">
-                                    ${line.amount.toLocaleString("es-HN", { minimumFractionDigits: 2 })}
+                                  <td className="p-3 text-right font-bold text-slate-900 font-mono">
+                                    {invoiceCurrencySymbol} {line.amount.toLocaleString("es-HN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                   </td>
                                   <td className="p-3 text-center">
                                     <button
@@ -12739,20 +14215,109 @@ export default function AdminDashboard() {
                         </div>
 
                         {/* Totals Summary Column */}
-                        <div className="space-y-3 text-xs text-right bg-slate-50/70 p-5 rounded-2xl border border-slate-200/80 flex flex-col justify-between">
-                          <div className="space-y-2">
-                            <div className="flex justify-between items-center text-slate-600">
-                              <span>Subtotal</span>
-                              <span className="font-bold text-slate-900">${invoiceSubtotal.toLocaleString("es-HN", { minimumFractionDigits: 2 })}</span>
+                        <div className="space-y-3 text-xs bg-slate-50/70 p-5 rounded-2xl border border-slate-200/80">
+                          {/* Fiscal Controls */}
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pb-3 border-b border-slate-200 text-xs">
+                            <div>
+                              <label className="block text-[11px] font-bold text-slate-700 mb-1">Moneda</label>
+                              <select
+                                value={invoiceForm.currency || defaultCurrencySymbol}
+                                onChange={(e) => setInvoiceForm({ ...invoiceForm, currency: e.target.value })}
+                                className="w-full px-2 py-1 rounded-lg bg-white border border-slate-300 text-slate-800 font-bold"
+                              >
+                                <option value="L">Lempiras (L){defaultCurrencySymbol === "L" ? " — Predeterminada" : ""}</option>
+                                <option value="$">Dólares ($){defaultCurrencySymbol === "$" ? " — Predeterminada" : ""}</option>
+                                <option value="€">Euros (€){defaultCurrencySymbol === "€" ? " — Predeterminada" : ""}</option>
+                              </select>
                             </div>
-                            <div className="border-t border-slate-200 pt-3 flex justify-between items-center text-sm font-bold text-slate-900">
-                              <span>Facturar en total</span>
-                              <span className="text-3xl font-bold text-slate-900">${invoiceTotal.toLocaleString("es-HN", { minimumFractionDigits: 2 })} USD</span>
+                            <div>
+                              <label className="block text-[11px] font-bold text-slate-700 mb-1">Descuentos</label>
+                              <input
+                                type="number"
+                                min={0}
+                                step={0.01}
+                                value={invoiceForm.discount || ""}
+                                onChange={(e) => setInvoiceForm({ ...invoiceForm, discount: parseFloat(e.target.value) || 0 })}
+                                placeholder="0.00"
+                                className="w-full px-2 py-1 rounded-lg bg-white border border-slate-300 text-slate-800"
+                              />
+                            </div>
+                            <div className="flex flex-col justify-center gap-1">
+                              <label className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-700 cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={invoiceForm.applyIsv15}
+                                  onChange={(e) => setInvoiceForm({ ...invoiceForm, applyIsv15: e.target.checked })}
+                                  className="rounded text-[#f6821f]"
+                                />
+                                <span>I.S.V. {salesSettings?.tasaIsvGeneral ?? 15}%</span>
+                              </label>
+                              <label className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-700 cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={invoiceForm.applyIsv18}
+                                  onChange={(e) => setInvoiceForm({ ...invoiceForm, applyIsv18: e.target.checked })}
+                                  className="rounded text-[#f6821f]"
+                                />
+                                <span>I.S.V. 18%</span>
+                              </label>
+                            </div>
+                            <div className="flex flex-col justify-center gap-1">
+                              <label className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-700 cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={invoiceForm.isExonerated}
+                                  onChange={(e) => setInvoiceForm({ ...invoiceForm, isExonerated: e.target.checked })}
+                                  className="rounded text-[#f6821f]"
+                                />
+                                <span>Exonerado</span>
+                              </label>
+                              <label className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-700 cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={invoiceForm.isExempt}
+                                  onChange={(e) => setInvoiceForm({ ...invoiceForm, isExempt: e.target.checked })}
+                                  className="rounded text-[#f6821f]"
+                                />
+                                <span>Exento</span>
+                              </label>
                             </div>
                           </div>
-                          <p className="text-[11px] text-slate-400 italic text-left pt-4">
-                            Moneda oficial de emisión: USD ($). Impuestos aplicables según normativa fiscal de Honduras.
-                          </p>
+
+                          {/* Fiscal Summary Preview */}
+                          <div className="space-y-1.5 pt-1 text-right">
+                            <div className="flex justify-between items-center text-slate-600">
+                              <span>SUBTOTAL:</span>
+                              <span className="font-mono font-bold text-slate-900">{invoiceCurrencySymbol} {invoiceSubtotal.toLocaleString("es-HN", { minimumFractionDigits: 2 })}</span>
+                            </div>
+                            {invoiceDiscount > 0 && (
+                              <div className="flex justify-between items-center text-slate-600">
+                                <span>DESCUENTOS:</span>
+                                <span className="font-mono text-slate-900">-{invoiceCurrencySymbol} {invoiceDiscount.toLocaleString("es-HN", { minimumFractionDigits: 2 })}</span>
+                              </div>
+                            )}
+                            {invoiceIsv15 > 0 && (
+                              <div className="flex justify-between items-center text-slate-600">
+                                <span>I.S.V. {salesSettings?.tasaIsvGeneral ?? 15}%:</span>
+                                <span className="font-mono font-bold text-slate-900">{invoiceCurrencySymbol} {invoiceIsv15.toLocaleString("es-HN", { minimumFractionDigits: 2 })}</span>
+                              </div>
+                            )}
+                            {invoiceIsv18 > 0 && (
+                              <div className="flex justify-between items-center text-slate-600">
+                                <span>I.S.V. 18%:</span>
+                                <span className="font-mono font-bold text-slate-900">{invoiceCurrencySymbol} {invoiceIsv18.toLocaleString("es-HN", { minimumFractionDigits: 2 })}</span>
+                              </div>
+                            )}
+                            <div className="border-t border-slate-300 pt-2 flex justify-between items-center text-sm font-bold text-slate-900">
+                              <span className="text-xs uppercase">TOTAL A PAGAR:</span>
+                              <span className="text-2xl font-bold text-slate-900 font-mono">{invoiceCurrencySymbol} {invoiceTotal.toLocaleString("es-HN", { minimumFractionDigits: 2 })}</span>
+                            </div>
+                          </div>
+
+                          <div className="pt-2 border-t border-slate-200 text-left">
+                            <span className="text-[10px] font-bold text-slate-400 block uppercase">Valor en letras:</span>
+                            <p className="text-xs font-bold text-slate-800 uppercase mt-0.5">{numberToWordsSpanish(invoiceTotal)}</p>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -12769,17 +14334,17 @@ export default function AdminDashboard() {
                       <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 text-xs space-y-2">
                         <p><strong>De:</strong> {companySettings.email}</p>
                         <p><strong>Para:</strong> {invoiceForm.customerEmail || "cliente@empresa.hn"}</p>
-                        <p><strong>Asunto:</strong> Factura {invoiceForm.invoiceNumber} de Wayne Trademark Honduras</p>
+                        <p><strong>Asunto:</strong> Factura {formatFiscalInvoiceNumber(invoiceForm.invoiceNumber)} de Wayne Trademark Honduras</p>
                       </div>
 
                       <div className="p-6 border border-slate-200 rounded-2xl space-y-4 bg-white text-xs text-slate-700 leading-relaxed">
                         <p className="font-semibold text-slate-900">Estimado cliente,</p>
-                        <p>Le adjuntamos la Factura N.º <strong>{invoiceForm.invoiceNumber}</strong> correspondiente a su orden de empaque/impresión flexográfica.</p>
+                        <p>Le adjuntamos la Factura N.º <strong>{formatFiscalInvoiceNumber(invoiceForm.invoiceNumber)}</strong> correspondiente a su orden de empaque/impresión flexográfica.</p>
                         
                         <div className="my-4 p-4 rounded-xl bg-[#fff7ed] border border-[#f6821f]/30 flex justify-between items-center">
                           <div>
                             <span className="text-xs font-bold text-[#f6821f] block">Monto Total a Pagar</span>
-                            <span className="text-xl font-bold text-slate-900">${invoiceTotal.toLocaleString("es-HN", { minimumFractionDigits: 2 })} USD</span>
+                            <span className="text-xl font-bold text-slate-900">{invoiceCurrencySymbol} {invoiceTotal.toLocaleString("es-HN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {invoiceCurrencySymbol === "L" ? "HNL" : invoiceCurrencySymbol === "€" ? "EUR" : "USD"}</span>
                           </div>
                           <span className="text-xs font-semibold text-slate-600">Vence: {invoiceForm.dueDate}</span>
                         </div>
@@ -12792,60 +14357,165 @@ export default function AdminDashboard() {
 
                   {/* VISTA DE PDF */}
                   {activeInvoiceTab === "Vista de PDF" && (
-                    <div className="bg-white border border-slate-200 rounded-2xl p-10 shadow-lg max-w-3xl mx-auto space-y-6 animate-in fade-in duration-150 text-xs text-slate-800">
-                      <div className="flex justify-between items-start border-b border-slate-300 pb-6">
-                        <div>
-                          <h1 className="text-2xl font-black text-[#f6821f]">WAYNE TRADEMARK</h1>
-                          <p className="font-bold text-slate-900 mt-1">{companySettings.nombre}</p>
-                          <p className="text-slate-500">{companySettings.direccion}</p>
-                          <p className="text-slate-500">RTN: {companySettings.taxId}</p>
-                        </div>
-                        <div className="text-right">
-                          <h2 className="text-xl font-bold text-slate-900">FACTURA</h2>
-                          <p className="font-mono font-bold text-slate-700 text-sm">N.º {invoiceForm.invoiceNumber}</p>
-                          <p className="text-slate-500 mt-1">Fecha: {invoiceForm.invoiceDate}</p>
-                          <p className="text-slate-500">Vencimiento: {invoiceForm.dueDate}</p>
-                        </div>
-                      </div>
+                    <div className="overflow-x-auto pb-12 flex justify-center">
+                      <div className="w-[8.5in] min-h-[11in] bg-white border border-slate-300 rounded-xs shadow-2xl p-12 flex flex-col justify-between animate-in fade-in duration-150 text-xs text-slate-800 shrink-0">
+                        <div className="space-y-6">
+                          <div className="flex justify-between items-start border-b border-slate-300 pb-6">
+                            <div>
+                              <h1 className="text-2xl font-black text-[#f6821f]">WAYNE TRADEMARK</h1>
+                              <p className="font-bold text-slate-900 mt-1">{companySettings.nombre}</p>
+                              <p className="text-slate-500">{companySettings.direccion}</p>
+                              <p className="text-slate-500">RTN: {companySettings.taxId}</p>
+                              <p className="text-slate-500 font-mono">CAI: {companySettings.cai}</p>
+                            </div>
+                            <div className="text-right">
+                              <h2 className="text-xl font-bold text-slate-900">FACTURA</h2>
+                              <p className="font-mono font-bold text-slate-700 text-sm">N.º {formatFiscalInvoiceNumber(invoiceForm.invoiceNumber)}</p>
+                              <p className="text-slate-500 mt-1">Fecha: {invoiceForm.invoiceDate}</p>
+                              <p className="text-slate-500">Vencimiento: {invoiceForm.dueDate}</p>
+                              <p className="text-slate-500">Términos: {invoiceForm.paymentTerms}</p>
+                            </div>
+                          </div>
 
-                      <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 flex justify-between items-center">
-                        <div>
-                          <span className="text-[10px] font-bold text-slate-500 uppercase block">Facturado a:</span>
-                          <span className="font-bold text-slate-900 text-sm">{invoiceForm.customerName || "Cliente Contado"}</span>
-                        </div>
-                        <div className="text-right font-mono">
-                          <span className="text-xs text-slate-500 block">Términos</span>
-                          <span className="font-bold text-slate-800">{invoiceForm.paymentTerms}</span>
-                        </div>
-                      </div>
+                          {/* Facturado a (izq) y Entregado a (der) */}
+                          <div className="grid grid-cols-2 gap-4 text-xs mb-6">
+                            {/* Facturado a */}
+                            <div className="bg-slate-50/80 p-4 rounded-2xl border border-slate-200/80 space-y-1">
+                              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Facturado a:</span>
+                              <p className="font-bold text-slate-900 text-sm">{invoiceForm.customerName || "Cliente Contado"}</p>
+                              {invoiceForm.customerAddress && (
+                                <p className="text-slate-500 text-xs">{invoiceForm.customerAddress}</p>
+                              )}
+                              {invoiceForm.customerEmail && (
+                                <p className="text-slate-500 text-xs">{invoiceForm.customerEmail}</p>
+                              )}
+                            </div>
 
-                      {/* PDF Table */}
-                      <table className="w-full text-left border-collapse">
-                        <thead>
-                          <tr className="border-b-2 border-slate-900 text-slate-900 font-bold">
-                            <th className="py-2">Descripción</th>
-                            <th className="py-2 text-right">Cant.</th>
-                            <th className="py-2 text-right">Precio Unit.</th>
-                            <th className="py-2 text-right">Total</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-200">
-                          {invoiceForm.lines.map((l) => (
-                            <tr key={l.id}>
-                              <td className="py-3 font-medium">{l.productName || l.description || "Artículo"}</td>
-                              <td className="py-3 text-right font-mono">{l.quantity}</td>
-                              <td className="py-3 text-right font-mono">${l.rate.toFixed(2)}</td>
-                              <td className="py-3 text-right font-mono font-bold">${l.amount.toFixed(2)}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                            {/* Entregado a */}
+                            <div className="bg-slate-50/80 p-4 rounded-2xl border border-slate-200/80 space-y-1">
+                              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Entregado a:</span>
+                              <p className="font-bold text-slate-900 text-sm">{invoiceForm.deliveredTo || invoiceForm.customerName || "Cliente Contado"}</p>
+                              <p className="text-slate-500 text-xs">
+                                {invoiceForm.deliveryAddress || invoiceForm.customerAddress || "Misma dirección del cliente"}
+                              </p>
+                              {invoiceForm.customerEmail && (
+                                <p className="text-slate-500 text-xs">{invoiceForm.customerEmail}</p>
+                              )}
+                            </div>
+                          </div>
 
-                      <div className="flex justify-end pt-4 border-t border-slate-300">
-                        <div className="w-64 space-y-1 text-right font-mono">
-                          <div className="flex justify-between"><span>Subtotal:</span><span>${invoiceSubtotal.toFixed(2)}</span></div>
-                          <div className="flex justify-between font-bold text-base text-[#f6821f] pt-2 border-t border-slate-200">
-                            <span>TOTAL:</span><span>${invoiceTotal.toFixed(2)}</span>
+                          {/* PDF Table */}
+                          <table className="w-full text-left border-collapse mb-6">
+                            <thead>
+                              <tr className="border-b border-slate-200 text-slate-400 font-semibold text-[11px] uppercase tracking-wider">
+                                <th className="py-2.5">Descripción</th>
+                                <th className="py-2.5 text-right">Cant.</th>
+                                <th className="py-2.5 text-right">Precio</th>
+                                <th className="py-2.5 text-right">Total</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                              {invoiceForm.lines.map((l) => (
+                                <tr key={l.id}>
+                                  <td className="py-3 font-semibold text-slate-900">{l.productName || l.description || "Artículo"}</td>
+                                  <td className="py-3 text-right font-mono text-slate-700">{l.quantity}</td>
+                                  <td className="py-3 text-right font-mono text-slate-700">{invoiceCurrencySymbol} {l.rate.toLocaleString("es-HN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                                  <td className="py-3 text-right font-mono font-bold text-slate-900">{invoiceCurrencySymbol} {l.amount.toLocaleString("es-HN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+
+                          {/* SAR Fiscal Totals & Valor en Letras (Limpio y Moderno) */}
+                          <div className="grid grid-cols-12 gap-6 my-6 items-start">
+                            {/* Left: VALOR EN LETRAS */}
+                            <div className="col-span-7 bg-slate-50/80 rounded-2xl p-3.5 border border-slate-200/80 flex flex-col justify-between">
+                              <div>
+                                <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block mb-1.5">
+                                  Valor en Letras
+                                </span>
+                                <p className="font-bold text-slate-800 text-xs uppercase leading-relaxed tracking-wide">
+                                  {numberToWordsSpanish(invoiceTotal)}
+                                </p>
+                              </div>
+                              <div className="pt-3 border-t border-slate-200/60 mt-3 flex items-center justify-between text-[11px] text-slate-400">
+                                <span className="font-medium">Documento Fiscal Autorizado por SAR</span>
+                                <span className="font-mono font-semibold">{companySettings.cai ? "CAI Válido" : ""}</span>
+                              </div>
+                            </div>
+
+                            {/* Right: Breakdown Table */}
+                            <div className="col-span-5 bg-white rounded-2xl border border-slate-200/80 p-3.5 shadow-sm space-y-0.5 text-xs">
+                              {/* SUBTOTAL */}
+                              <div className="flex justify-between items-center py-[2px] text-slate-600">
+                                <span className="font-semibold text-slate-500 uppercase text-[10px] tracking-wider">Subtotal</span>
+                                <span className="font-mono font-bold text-slate-900">{formatFiscalMoney(invoiceSubtotal, true)}</span>
+                              </div>
+
+                              {/* DESCUENTOS */}
+                              <div className="flex justify-between items-center py-[2px] text-slate-600">
+                                <span className="font-semibold text-slate-500 uppercase text-[10px] tracking-wider">Descuentos</span>
+                                <span className="font-mono font-medium text-slate-700">{formatFiscalMoney(invoiceDiscount) || "—"}</span>
+                              </div>
+
+                              {/* IMPORTE EXONERADO */}
+                              <div className="flex justify-between items-center py-[2px] text-slate-600">
+                                <span className="font-semibold text-slate-500 uppercase text-[10px] tracking-wider">Importe Exonerado</span>
+                                <span className="font-mono font-medium text-slate-700">{formatFiscalMoney(invoiceExonerated) || "—"}</span>
+                              </div>
+
+                              {/* IMPORTE EXENTO */}
+                              <div className="flex justify-between items-center py-[2px] text-slate-600">
+                                <span className="font-semibold text-slate-500 uppercase text-[10px] tracking-wider">Importe Exento</span>
+                                <span className="font-mono font-medium text-slate-700">{formatFiscalMoney(invoiceExempt) || "—"}</span>
+                              </div>
+
+                              <div className="border-t border-slate-100 my-0.5" />
+
+                              {/* IMP GRAVADO GENERAL */}
+                              <div className="flex justify-between items-center py-[2px] text-slate-600">
+                                <span className="font-semibold text-slate-500 uppercase text-[10px] tracking-wider">Imp. Gravado {salesSettings?.tasaIsvGeneral ?? 15}%</span>
+                                <span className="font-mono font-medium text-slate-700">{formatFiscalMoney(invoiceForm.showImpGravado15 ? invoiceGravado15 : 0) || "—"}</span>
+                              </div>
+
+                              {/* IMP GRAVADO 18% */}
+                              <div className="flex justify-between items-center py-[2px] text-slate-600">
+                                <span className="font-semibold text-slate-500 uppercase text-[10px] tracking-wider">Imp. Gravado 18%</span>
+                                <span className="font-mono font-medium text-slate-700">{formatFiscalMoney(invoiceGravado18) || "—"}</span>
+                              </div>
+
+                              {/* I.S.V. GENERAL */}
+                              <div className="flex justify-between items-center py-[2px] text-slate-600">
+                                <span className="font-semibold text-slate-500 uppercase text-[10px] tracking-wider">I.S.V. {salesSettings?.tasaIsvGeneral ?? 15}%</span>
+                                <span className="font-mono font-medium text-slate-700">{formatFiscalMoney(invoiceIsv15, invoiceForm.applyIsv15) || "—"}</span>
+                              </div>
+
+                              {/* I.S.V. 18% */}
+                              <div className="flex justify-between items-center py-[2px] text-slate-600">
+                                <span className="font-semibold text-slate-500 uppercase text-[10px] tracking-wider">I.S.V. 18%</span>
+                                <span className="font-mono font-medium text-slate-700">{formatFiscalMoney(invoiceIsv18, invoiceForm.applyIsv18) || "—"}</span>
+                              </div>
+
+                              {/* TOTAL A PAGAR */}
+                              <div className="pt-1">
+                                <div className="flex justify-between items-center py-2 px-3 bg-slate-200 border border-slate-300 text-slate-900 rounded-xl shadow-xs">
+                                  <span className="font-black text-xs uppercase tracking-wider text-slate-700">Total a Pagar</span>
+                                  <span className="font-mono font-black text-base text-slate-900">{formatFiscalMoney(invoiceTotal, true)}</span>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Fiscal Footer SAR */}
+                        <div className="pt-4 mt-8 border-t border-slate-200 flex justify-between items-center text-xs text-slate-700">
+                          <div>
+                            <span className="font-bold text-slate-900">Rango Autorizado: </span>
+                            <span className="font-mono">{companySettings.rangoAutorizado}</span>
+                          </div>
+                          <div className="text-right">
+                            <span className="font-bold text-slate-900">Fecha Límite de Emisión: </span>
+                            <span className="font-mono">{formatFechaLimite(companySettings.fechaLimiteEmision)}</span>
                           </div>
                         </div>
                       </div>
@@ -13297,6 +14967,7 @@ export default function AdminDashboard() {
                     <p className="font-bold text-slate-900 text-sm mt-1">{companySettings.nombre}</p>
                     <p className="text-slate-600 text-xs">{companySettings.direccion}</p>
                     <p className="text-slate-600 text-xs">RTN: {companySettings.taxId} | Tel: {companySettings.telefono}</p>
+                    <p className="text-slate-600 text-xs font-mono">CAI: {companySettings.cai}</p>
                     <p className="text-slate-600 text-xs">Correo: {companySettings.email}</p>
                   </div>
                   <div className="text-right">
@@ -13371,8 +15042,20 @@ export default function AdminDashboard() {
                   </div>
                 </div>
 
+                {/* Fiscal Footer SAR */}
+                <div className="mt-4 pt-3 border-t border-slate-300 flex justify-between items-center text-xs text-slate-700">
+                  <div>
+                    <span className="font-bold text-slate-900">Rango Autorizado: </span>
+                    <span className="font-mono">{companySettings.rangoAutorizado}</span>
+                  </div>
+                  <div className="text-right">
+                    <span className="font-bold text-slate-900">Fecha Límite de Emisión: </span>
+                    <span className="font-mono">{formatFechaLimite(companySettings.fechaLimiteEmision)}</span>
+                  </div>
+                </div>
+
                 {/* Signatures & Footer */}
-                <div className="mt-16 pt-8 border-t border-slate-200 grid grid-cols-2 gap-12 text-center text-xs text-slate-500">
+                <div className="mt-10 pt-6 border-t border-slate-200 grid grid-cols-2 gap-12 text-center text-xs text-slate-500">
                   <div>
                     <div className="border-b border-slate-400 w-48 mx-auto mb-2" />
                     <p className="font-semibold text-slate-700">Autorizado por (Wayne Trademark)</p>
@@ -16751,12 +18434,22 @@ export default function AdminDashboard() {
             {/* Header */}
             <div className="border-b border-slate-200 px-6 py-4 flex items-center justify-between">
               <div className="w-5" />
-              <h2 className="text-base font-semibold text-slate-800 text-center">
-                Nueva cuenta
-              </h2>
+              <div className="text-center">
+                <h2 className="text-base font-semibold text-slate-800">
+                  {editingAccountId ? "Editar cuenta contable" : "Nueva cuenta"}
+                </h2>
+                {editingAccountId && newAccountForm.code && (
+                  <span className="text-[11px] font-mono text-[#f6821f] font-semibold">
+                    Cuenta N.º {newAccountForm.code}
+                  </span>
+                )}
+              </div>
               <button
                 type="button"
-                onClick={() => setShowNewAccountModal(false)}
+                onClick={() => {
+                  setShowNewAccountModal(false);
+                  setEditingAccountId(null);
+                }}
                 className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition cursor-pointer"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -16766,7 +18459,7 @@ export default function AdminDashboard() {
             </div>
 
             {/* Form */}
-            <form onSubmit={handleCreateAccount} className="flex-1 flex flex-col min-h-0">
+            <form onSubmit={handleSaveAccount} className="flex-1 flex flex-col min-h-0">
               {/* Scrollable Body */}
               <div className="flex-1 overflow-y-auto p-6 space-y-5 text-xs">
                 {accountModalError && (
@@ -16953,6 +18646,27 @@ export default function AdminDashboard() {
                   />
                 </div>
 
+                {/* Estado de la cuenta (Activa / Inactiva) */}
+                <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-200">
+                  <div>
+                    <span className="font-semibold text-slate-800 block text-xs">Estado de la cuenta</span>
+                    <span className="text-[11px] text-slate-500">
+                      {newAccountForm.isActive ? "Cuenta activa disponible para transacciones y reportes" : "Cuenta inactiva (deshabilitada)"}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setNewAccountForm({ ...newAccountForm, isActive: !newAccountForm.isActive })}
+                    className={`px-3 py-1 rounded-full text-xs font-bold border transition cursor-pointer flex items-center gap-1.5 ${
+                      newAccountForm.isActive
+                        ? "bg-emerald-50 text-emerald-700 border-emerald-300 hover:bg-emerald-100"
+                        : "bg-slate-200 text-slate-600 border-slate-300 hover:bg-slate-300"
+                    }`}
+                  >
+                    <span>{newAccountForm.isActive ? "✓ Activa" : "✕ Inactiva"}</span>
+                  </button>
+                </div>
+
                 {/* Divider & Bloquear cuenta */}
                 <div className="border-t border-slate-200 pt-4">
                   <div className="flex items-center justify-between">
@@ -17013,54 +18727,67 @@ export default function AdminDashboard() {
               <div className="border-t border-slate-200 px-6 py-3.5 bg-slate-50/50 flex items-center justify-end gap-2.5">
                 <button
                   type="button"
-                  onClick={() => setShowNewAccountModal(false)}
+                  onClick={() => {
+                    setShowNewAccountModal(false);
+                    setEditingAccountId(null);
+                  }}
                   className="px-4 py-2 rounded-lg border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 font-semibold text-xs transition cursor-pointer"
                 >
                   Cancelar
                 </button>
 
-                <div data-dropdown="true" className="relative inline-flex rounded-lg shadow-sm">
+                {editingAccountId ? (
                   <button
                     type="submit"
                     disabled={accountModalLoading}
-                    className="px-4 py-2 rounded-l-lg bg-[#f6821f] hover:bg-[#e07216] text-white font-semibold text-xs transition cursor-pointer disabled:opacity-50 flex items-center gap-1"
+                    className="px-5 py-2 rounded-lg bg-[#f6821f] hover:bg-[#e07216] text-white font-semibold text-xs transition cursor-pointer disabled:opacity-50 flex items-center gap-1.5 shadow-sm"
                   >
-                    {accountModalLoading ? "Guardando..." : "Guardar"}
+                    {accountModalLoading ? "Guardando cambios..." : "Guardar cambios"}
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => setShowSaveDropdown(!showSaveDropdown)}
-                    className="px-2 py-2 rounded-r-lg bg-[#e07216] hover:bg-[#d06512] text-white border-l border-white/20 transition cursor-pointer flex items-center justify-center"
-                  >
-                    <svg
-                      className={`w-3.5 h-3.5 transition-transform ${showSaveDropdown ? "rotate-180" : "rotate-0"}`}
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
+                ) : (
+                  <div data-dropdown="true" className="relative inline-flex rounded-lg shadow-sm">
+                    <button
+                      type="submit"
+                      disabled={accountModalLoading}
+                      className="px-4 py-2 rounded-l-lg bg-[#f6821f] hover:bg-[#e07216] text-white font-semibold text-xs transition cursor-pointer disabled:opacity-50 flex items-center gap-1"
                     >
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
-                    </svg>
-                  </button>
-
-                  {/* Dropdown: Guardar y crear nueva */}
-                  {showSaveDropdown && (
-                    <div className="absolute bottom-full right-0 mb-2 w-52 bg-white rounded-xl shadow-2xl border border-slate-200 py-1 z-30 animate-in fade-in zoom-in-95 duration-150">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setShowSaveDropdown(false);
-                          handleCreateAccount(undefined, true);
-                        }}
-                        className="w-full text-left px-4 py-2.5 text-xs text-slate-700 hover:bg-[#fff7ed] hover:text-[#f6821f] font-semibold transition cursor-pointer flex items-center gap-2"
+                      {accountModalLoading ? "Guardando..." : "Guardar"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowSaveDropdown(!showSaveDropdown)}
+                      className="px-2 py-2 rounded-r-lg bg-[#e07216] hover:bg-[#d06512] text-white border-l border-white/20 transition cursor-pointer flex items-center justify-center"
+                    >
+                      <svg
+                        className={`w-3.5 h-3.5 transition-transform ${showSaveDropdown ? "rotate-180" : "rotate-0"}`}
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
                       >
-                        <svg className="w-4 h-4 text-[#f6821f]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
-                        </svg>
-                        <span>Guardar y crear nueva</span>
-                      </button>
-                    </div>
-                  )}
-                </div>
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
+
+                    {/* Dropdown: Guardar y crear nueva */}
+                    {showSaveDropdown && (
+                      <div className="absolute bottom-full right-0 mb-2 w-52 bg-white rounded-xl shadow-2xl border border-slate-200 py-1 z-30 animate-in fade-in zoom-in-95 duration-150">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowSaveDropdown(false);
+                            handleSaveAccount(undefined, true);
+                          }}
+                          className="w-full text-left px-4 py-2.5 text-xs text-slate-700 hover:bg-[#fff7ed] hover:text-[#f6821f] font-semibold transition cursor-pointer flex items-center gap-2"
+                        >
+                          <svg className="w-4 h-4 text-[#f6821f]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
+                          </svg>
+                          <span>Guardar y crear nueva</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </form>
           </aside>
@@ -19590,6 +21317,433 @@ export default function AdminDashboard() {
               <button
                 type="button"
                 onClick={() => setSelectedDetailPurchaseInvoice(null)}
+                className="px-5 py-2 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold text-xs transition cursor-pointer"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ================= MODAL / DRAWER: CREAR O EDITAR DEVOLUCIÓN A PROVEEDOR ================= */}
+      {showVendorReturnDrawer && (
+        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-4xl w-full overflow-hidden animate-in zoom-in-95 duration-150 flex flex-col max-h-[92vh]">
+            {/* Header */}
+            <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50 shrink-0">
+              <div>
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                  {editingVendorReturn ? "Edición de Devolución" : "Nueva Devolución a Proveedor"}
+                </span>
+                <h3 className="font-bold text-base text-slate-900 font-mono">
+                  {vendorReturnForm.returnNumber || "DEV-2026-XXX"}
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowVendorReturnDrawer(false)}
+                className="text-slate-400 hover:text-slate-600 transition cursor-pointer p-1"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Form Scrollable Body */}
+            <div className="p-6 space-y-6 overflow-y-auto flex-1 text-xs">
+              {vendorReturnError && (
+                <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl font-medium">
+                  {vendorReturnError}
+                </div>
+              )}
+              {vendorReturnSuccess && (
+                <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-xl font-bold flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span>{vendorReturnSuccess}</span>
+                </div>
+              )}
+
+              {/* General Info Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200">
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">N° Devolución *</label>
+                  <input
+                    type="text"
+                    value={vendorReturnForm.returnNumber}
+                    onChange={(e) => setVendorReturnForm({ ...vendorReturnForm, returnNumber: e.target.value })}
+                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl font-mono text-xs text-slate-900 focus:outline-none focus:border-[#f6821f]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">Proveedor *</label>
+                  <input
+                    type="text"
+                    list="vendors-list-datalist"
+                    placeholder="Escriba o elija proveedor..."
+                    value={vendorReturnForm.vendorName}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      const matched = vendors.find((v) => v.name.toLowerCase() === val.toLowerCase());
+                      setVendorReturnForm({
+                        ...vendorReturnForm,
+                        vendorName: val,
+                        vendorId: matched ? matched.id : vendorReturnForm.vendorId,
+                      });
+                    }}
+                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs text-slate-900 focus:outline-none focus:border-[#f6821f]"
+                  />
+                  <datalist id="vendors-list-datalist">
+                    {vendors.map((v) => (
+                      <option key={v.id} value={v.name} />
+                    ))}
+                  </datalist>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">Factura Compra Ref.</label>
+                  <input
+                    type="text"
+                    list="purchase-invoices-datalist"
+                    placeholder="Ej. FPROV-2026-001..."
+                    value={vendorReturnForm.purchaseInvoiceNumber}
+                    onChange={(e) => setVendorReturnForm({ ...vendorReturnForm, purchaseInvoiceNumber: e.target.value })}
+                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl font-mono text-xs text-slate-900 focus:outline-none focus:border-[#f6821f]"
+                  />
+                  <datalist id="purchase-invoices-datalist">
+                    {purchaseInvoices.map((pi) => (
+                      <option key={pi.id} value={pi.invoiceNumber}>
+                        {pi.vendorName} (${pi.total.toFixed(2)})
+                      </option>
+                    ))}
+                  </datalist>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">Fecha Devolución *</label>
+                  <input
+                    type="date"
+                    value={vendorReturnForm.returnDate}
+                    onChange={(e) => setVendorReturnForm({ ...vendorReturnForm, returnDate: e.target.value })}
+                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs text-slate-900 focus:outline-none focus:border-[#f6821f]"
+                  />
+                </div>
+
+                <div className="sm:col-span-2">
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">Motivo de la Devolución</label>
+                  <select
+                    value={vendorReturnForm.reason}
+                    onChange={(e) => setVendorReturnForm({ ...vendorReturnForm, reason: e.target.value })}
+                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs text-slate-900 focus:outline-none focus:border-[#f6821f]"
+                  >
+                    <option value="DEFECTO">Mercancía defectuosa / dañada en origen</option>
+                    <option value="EXCESO">Exceso de pedido / error en despacho</option>
+                    <option value="INCORRECTO">Producto incorrecto (SKU no corresponde)</option>
+                    <option value="VENCIDO">Producto vencido / vida útil insuficiente</option>
+                    <option value="OTRO">Otro motivo</option>
+                  </select>
+                </div>
+
+                <div className="sm:col-span-2">
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">Estado Inicial</label>
+                  <select
+                    value={vendorReturnForm.status}
+                    onChange={(e) => setVendorReturnForm({ ...vendorReturnForm, status: e.target.value })}
+                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs text-slate-900 focus:outline-none focus:border-[#f6821f]"
+                  >
+                    <option value="BORRADOR">Borrador (En revisión)</option>
+                    <option value="APROBADA">Aprobada (Lista para despachar)</option>
+                    <option value="ENVIADA">Enviada (En tránsito hacia proveedor)</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Items Section */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="font-bold text-slate-900 text-sm">Artículos a Devolver</h4>
+                    <p className="text-[11px] text-slate-500">Seleccione del inventario existente o ingrese manualmente los ítems.</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={addVendorReturnLine}
+                    className="px-3.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition cursor-pointer flex items-center gap-1.5"
+                  >
+                    <svg className="w-3.5 h-3.5 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
+                    </svg>
+                    <span>Agregar Ítem</span>
+                  </button>
+                </div>
+
+                <div className="border border-slate-200 rounded-xl overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-slate-50 border-b border-slate-200 text-slate-700 font-bold">
+                      <tr>
+                        <th className="p-3 w-48">SKU / Selección</th>
+                        <th className="p-3">Descripción</th>
+                        <th className="p-3 w-20 text-center">Cant.</th>
+                        <th className="p-3 w-28 text-right">Costo Unit. ($)</th>
+                        <th className="p-3 w-28">N° Lote</th>
+                        <th className="p-3 w-36">Motivo Ítem</th>
+                        <th className="p-3 w-28 text-right">Total ($)</th>
+                        <th className="p-3 w-10 text-center"></th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {vendorReturnForm.items.map((it, idx) => (
+                        <tr key={idx} className="hover:bg-slate-50/50">
+                          <td className="p-2.5">
+                            <select
+                              onChange={(e) => {
+                                const selected = inventory.find((i) => i.sku === e.target.value);
+                                if (selected) {
+                                  fillVendorReturnLineFromInventory(idx, {
+                                    sku: selected.sku,
+                                    name: selected.description,
+                                    unitCost: selected.cost,
+                                  });
+                                }
+                              }}
+                              className="w-full px-2 py-1.5 bg-slate-50 border border-slate-300 rounded-lg text-xs font-mono focus:outline-none focus:border-[#f6821f]"
+                              value={it.sku || ""}
+                            >
+                              <option value="">Seleccionar SKU...</option>
+                              {inventory.map((inv) => (
+                                <option key={inv.id} value={inv.sku}>
+                                  {inv.sku} - {inv.description.slice(0, 20)}...
+                                </option>
+                              ))}
+                            </select>
+                          </td>
+                          <td className="p-2.5">
+                            <input
+                              type="text"
+                              value={it.description}
+                              onChange={(e) => updateVendorReturnLine(idx, "description", e.target.value)}
+                              placeholder="Descripción..."
+                              className="w-full px-2 py-1.5 bg-slate-50 border border-slate-300 rounded-lg text-xs focus:outline-none focus:border-[#f6821f]"
+                            />
+                          </td>
+                          <td className="p-2.5">
+                            <input
+                              type="number"
+                              min="1"
+                              value={it.quantity}
+                              onChange={(e) => updateVendorReturnLine(idx, "quantity", Number(e.target.value))}
+                              className="w-full px-2 py-1.5 bg-slate-50 border border-slate-300 rounded-lg text-xs text-center font-bold focus:outline-none focus:border-[#f6821f]"
+                            />
+                          </td>
+                          <td className="p-2.5">
+                            <input
+                              type="number"
+                              step="0.01"
+                              value={it.unitCost}
+                              onChange={(e) => updateVendorReturnLine(idx, "unitCost", Number(e.target.value))}
+                              className="w-full px-2 py-1.5 bg-slate-50 border border-slate-300 rounded-lg text-xs text-right font-mono focus:outline-none focus:border-[#f6821f]"
+                            />
+                          </td>
+                          <td className="p-2.5">
+                            <input
+                              type="text"
+                              value={it.lotNumber}
+                              onChange={(e) => updateVendorReturnLine(idx, "lotNumber", e.target.value)}
+                              placeholder="Lote opc."
+                              className="w-full px-2 py-1.5 bg-slate-50 border border-slate-300 rounded-lg text-xs font-mono focus:outline-none focus:border-[#f6821f]"
+                            />
+                          </td>
+                          <td className="p-2.5">
+                            <input
+                              type="text"
+                              value={it.itemReason}
+                              onChange={(e) => updateVendorReturnLine(idx, "itemReason", e.target.value)}
+                              placeholder="Detalle defecto..."
+                              className="w-full px-2 py-1.5 bg-slate-50 border border-slate-300 rounded-lg text-xs focus:outline-none focus:border-[#f6821f]"
+                            />
+                          </td>
+                          <td className="p-2.5 text-right font-mono font-bold text-slate-900">
+                            ${((it.quantity ?? 0) * (it.unitCost ?? 0)).toFixed(2)}
+                          </td>
+                          <td className="p-2.5 text-center">
+                            <button
+                              type="button"
+                              onClick={() => removeVendorReturnLine(idx)}
+                              className="text-slate-400 hover:text-rose-600 font-bold p-1 cursor-pointer transition"
+                              title="Quitar línea"
+                            >
+                              ✕
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                      {vendorReturnForm.items.length === 0 && (
+                        <tr>
+                          <td colSpan={8} className="py-8 text-center text-slate-400">
+                            Haga clic en "+ Agregar Ítem" para incluir productos a la devolución.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="flex justify-between items-center bg-slate-50 p-4 rounded-xl border border-slate-200">
+                  <span className="font-bold text-slate-700">Total a Reclamar / Devolver:</span>
+                  <span className="text-base font-bold font-mono text-[#f6821f]">
+                    ${vendorReturnSubtotal.toLocaleString("en-US", { minimumFractionDigits: 2 })} USD
+                  </span>
+                </div>
+              </div>
+
+              {/* Notes Textarea */}
+              <div className="space-y-1">
+                <label className="block text-[11px] font-bold text-slate-700">Observaciones y Guía de Despacho</label>
+                <textarea
+                  rows={3}
+                  value={vendorReturnForm.notes}
+                  onChange={(e) => setVendorReturnForm({ ...vendorReturnForm, notes: e.target.value })}
+                  placeholder="Detalles sobre número de guía, transportista, acuerdo con el proveedor o número de RMA..."
+                  className="w-full p-3 bg-slate-50 border border-slate-300 rounded-xl text-xs text-slate-900 focus:outline-none focus:border-[#f6821f] resize-none"
+                />
+              </div>
+            </div>
+
+            {/* Footer Buttons */}
+            <div className="p-4 border-t border-slate-100 flex justify-between items-center bg-slate-50 shrink-0">
+              <button
+                type="button"
+                onClick={() => setShowVendorReturnDrawer(false)}
+                className="px-4 py-2 rounded-xl border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 font-semibold text-xs transition cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleSaveVendorReturn(false)}
+                  disabled={vendorReturnLoading}
+                  className="px-4 py-2 rounded-xl border border-[#f6821f] bg-white hover:bg-[#fff7ed] text-[#f6821f] font-bold text-xs transition cursor-pointer disabled:opacity-50"
+                >
+                  {vendorReturnLoading ? "Guardando..." : "Guardar como Borrador"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSaveVendorReturn(true)}
+                  disabled={vendorReturnLoading}
+                  className="px-5 py-2 rounded-xl bg-[#f6821f] hover:bg-[#e07216] text-white font-bold text-xs transition cursor-pointer shadow-md shadow-[#f6821f]/20 disabled:opacity-50"
+                >
+                  {vendorReturnLoading ? "Guardando..." : "Guardar & Aprobar"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ================= MODAL: DETALLE DE DEVOLUCIÓN A PROVEEDOR ================= */}
+      {vendorReturnDetailModal && (
+        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-2xl w-full overflow-hidden animate-in zoom-in-95 duration-150">
+            <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+              <div>
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Comprobante de Devolución</span>
+                <h3 className="font-bold text-base text-slate-900 font-mono">
+                  {vendorReturnDetailModal.returnNumber}
+                </h3>
+              </div>
+              <button
+                onClick={() => setVendorReturnDetailModal(null)}
+                className="text-slate-400 hover:text-slate-600 transition cursor-pointer p-1"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-5 text-xs">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200">
+                <div>
+                  <span className="text-slate-500 text-[11px] block">Proveedor</span>
+                  <span className="font-bold text-slate-900 block mt-0.5">{vendorReturnDetailModal.vendorName}</span>
+                </div>
+                <div>
+                  <span className="text-slate-500 text-[11px] block">Factura Compra</span>
+                  <span className="font-mono font-bold text-slate-800 block mt-0.5">{vendorReturnDetailModal.purchaseInvoiceNumber || "—"}</span>
+                </div>
+                <div>
+                  <span className="text-slate-500 text-[11px] block">Fecha</span>
+                  <span className="font-medium text-slate-800 block mt-0.5">{vendorReturnDetailModal.returnDate}</span>
+                </div>
+                <div>
+                  <span className="text-slate-500 text-[11px] block">Estado</span>
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold inline-block mt-0.5 ${
+                    vendorReturnDetailModal.status === "COMPLETADA"
+                      ? "bg-emerald-100 text-emerald-800"
+                      : vendorReturnDetailModal.status === "BORRADOR"
+                      ? "bg-amber-100 text-amber-800"
+                      : "bg-blue-100 text-blue-800"
+                  }`}>
+                    {vendorReturnDetailModal.status}
+                  </span>
+                </div>
+              </div>
+
+              <div>
+                <h4 className="font-bold text-slate-900 mb-2">Artículos Devueltos</h4>
+                <div className="border border-slate-200 rounded-xl overflow-hidden">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-slate-50 border-b border-slate-200 text-slate-700 font-bold">
+                      <tr>
+                        <th className="p-2.5">SKU</th>
+                        <th className="p-2.5">Descripción</th>
+                        <th className="p-2.5 text-center">Cant.</th>
+                        <th className="p-2.5 text-right">Costo Unit.</th>
+                        <th className="p-2.5 text-center">Lote</th>
+                        <th className="p-2.5 text-right">Total ($)</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {vendorReturnDetailModal.items?.map((it, idx) => (
+                        <tr key={idx}>
+                          <td className="p-2.5 font-mono font-bold text-slate-800">{it.sku}</td>
+                          <td className="p-2.5 text-slate-700">{it.description}</td>
+                          <td className="p-2.5 text-center font-bold text-rose-600">-{it.quantity}</td>
+                          <td className="p-2.5 text-right font-mono">${(it.unitCost || 0).toFixed(2)}</td>
+                          <td className="p-2.5 text-center font-mono text-amber-800">{it.lotNumber || "—"}</td>
+                          <td className="p-2.5 text-right font-bold text-slate-900">${(it.totalCost || 0).toFixed(2)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 flex justify-between items-center font-bold text-slate-900">
+                <span>Total Reclamado:</span>
+                <span className="text-base text-[#f6821f] font-mono">${(vendorReturnDetailModal.total || 0).toFixed(2)} USD</span>
+              </div>
+
+              {vendorReturnDetailModal.notes && (
+                <div className="text-[11px] text-slate-600 bg-amber-50/40 p-3 rounded-xl border border-amber-200/60">
+                  <span className="font-bold block mb-0.5">Observaciones / Guía:</span>
+                  {vendorReturnDetailModal.notes}
+                </div>
+              )}
+            </div>
+
+            <div className="p-4 border-t border-slate-100 flex justify-between items-center bg-slate-50">
+              <button
+                type="button"
+                onClick={() => window.print()}
+                className="px-4 py-2 rounded-xl border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 font-semibold text-xs transition cursor-pointer flex items-center gap-1.5"
+              >
+                <Download className="w-3.5 h-3.5 text-slate-500" />
+                <span>Imprimir Comprobante</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setVendorReturnDetailModal(null)}
                 className="px-5 py-2 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold text-xs transition cursor-pointer"
               >
                 Cerrar

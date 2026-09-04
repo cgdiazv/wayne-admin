@@ -4,6 +4,11 @@ const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
 };
 
+// If cached client was created before the User or PettyCash models were loaded, reset it
+if (globalForPrisma.prisma && (!(globalForPrisma.prisma as any).user || !(globalForPrisma.prisma as any).pettyCashFund)) {
+  globalForPrisma.prisma = undefined;
+}
+
 export const prisma =
   globalForPrisma.prisma ??
   new PrismaClient({
@@ -15,3 +20,4 @@ if (process.env.NODE_ENV !== "production") {
 }
 
 export default prisma;
+

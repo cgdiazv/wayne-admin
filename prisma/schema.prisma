@@ -92,9 +92,12 @@ model CompanySettings {
   telefono         String   @default("+50494522666")
   sitioWeb         String   @default("Ninguno indicado")
   sector           String   @default("Manufactura y Producción Industrial (Manufacturing)")
-  nombreLegal      String   @default("WAYNE TRADEMARK PRINTING AND PACKAGING DE HONDURAS S DE RL")
-  taxId            String   @default("05019008183490")
-  tipoEmpresa      String   @default("Sociedad anónima (pequeña empresa) con dos o más propietarios")
+  nombreLegal         String   @default("WAYNE TRADEMARK PRINTING AND PACKAGING DE HONDURAS S DE RL")
+  taxId               String   @default("05019008183490")
+  cai                 String   @default("Ninguno indicado")
+  rangoAutorizado     String   @default("Ninguno indicado")
+  fechaLimiteEmision  String   @default("Ninguno indicado")
+  tipoEmpresa         String   @default("Sociedad anónima (pequeña empresa) con dos o más propietarios")
   domicilioLegal   String   @default("Zip Búfalo Edificio 1B, Villanueva, Cortés 21101")
   emailCliente     String   @default("R.mondragon@waynetrademarkhn.com")
   direccionCliente String   @default("Ninguno indicado")
@@ -286,6 +289,88 @@ model VendorReturnItem {
   updatedAt      DateTime     @updatedAt
 }
 
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String
+  password  String   // Hashed with bcrypt
+  role      String   @default("ADMIN") // "SUPER_ADMIN" | "ADMIN" | "USER"
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
 
+model PettyCashFund {
+  id             String                 @id @default(cuid())
+  name           String                 // e.g. "Caja Chica Administrativa", "Caja Chica Planta Búfalo"
+  code           String                 @unique // e.g. "CC-001"
+  custodianName  String                 // Custodio responsable e.g. "Lic. Roberto Mondragón"
+  custodianEmail String?
+  currency       String                 @default("HNL") // "HNL" | "USD"
+  initialAmount  Float                  @default(10000) // Fondo fijo asignado
+  currentBalance Float                  @default(10000) // Saldo disponible actual
+  minThreshold   Float                  @default(3000)  // Alerta mínima para reposición
+  status         String                 @default("ACTIVO") // "ACTIVO" | "EN_REPOSICION" | "BLOQUEADO"
+  notes          String?
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+  transactions   PettyCashTransaction[]
+  audits         PettyCashAudit[]
+  vouchers       PettyCashVoucher[]
+}
 
+model PettyCashTransaction {
+  id            String         @id @default(cuid())
+  fundId        String
+  fund          PettyCashFund  @relation(fields: [fundId], references: [id], onDelete: Cascade)
+  date          String         // e.g. "2026-09-03"
+  type          String         // "EGRESO" | "INGRESO" | "REPOSICION"
+  concept       String         // Concepto o descripción
+  category      String         // "Transporte y Fletes", "Cafetería y Alimentos", "Suministros de Oficina", "Mantenimiento y Reparación", "Combustible", "Otros"
+  beneficiary   String         // A quién se le pagó o quién ingresó el dinero
+  voucherNumber String?        // Número de factura o recibo físico
+  cai           String?        // CAI fiscal si aplica factura SAR
+  amount        Float          @default(0)
+  taxDeductible Boolean        @default(true) // Si cuenta con comprobante fiscal válido
+  status        String         @default("REGISTRADO") // "REGISTRADO" | "REEMBOLSADO" | "ANULADO"
+  notes         String?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+}
 
+model PettyCashAudit {
+  id                String        @id @default(cuid())
+  fundId            String
+  fund              PettyCashFund @relation(fields: [fundId], references: [id], onDelete: Cascade)
+  auditNumber       String        @unique // e.g. "ARQ-2026-001"
+  auditDate         String        // e.g. "2026-09-03 16:30"
+  auditorName       String        // Auditor interno o supervisor
+  custodianName     String        // Custodio que entrega cuentas
+  systemBalance     Float         @default(0) // Saldo que debería haber según fondo fijo y gastos
+  cashCounted       Float         @default(0) // Total dinero físico en efectivo contado
+  vouchersTotal     Float         @default(0) // Total facturas y comprobantes en custodia
+  pendingLoansTotal Float         @default(0) // Total vales provisionales activos
+  totalCounted      Float         @default(0) // cashCounted + vouchersTotal + pendingLoansTotal
+  difference        Float         @default(0) // totalCounted - systemBalance (0 = cuadrado, >0 = sobrante, <0 = faltante)
+  resultStatus      String        @default("CUADRADO") // "CUADRADO" | "SOBRANTE" | "FALTANTE"
+  denominations     Json?         // Detalle de billetes y monedas contados
+  observations      String?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+}
+
+model PettyCashVoucher {
+  id            String        @id @default(cuid())
+  fundId        String
+  fund          PettyCashFund @relation(fields: [fundId], references: [id], onDelete: Cascade)
+  voucherNumber String        @unique // e.g. "VALE-001"
+  employeeName  String
+  amount        Float         @default(0)
+  issueDate     String        // e.g. "2026-09-03"
+  dueDate       String        // e.g. "2026-09-05"
+  purpose       String        // Motivo del anticipo
+  status        String        @default("PENDIENTE") // "PENDIENTE" | "LIQUIDADO" | "VENCIDO"
+  notes         String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+}

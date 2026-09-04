@@ -28,8 +28,10 @@ export default function LoginPage() {
         throw new Error(data.error || "Login failed");
       }
 
-      router.push("/");
-      router.refresh();
+      const callbackUrl = typeof window !== "undefined"
+        ? new URLSearchParams(window.location.search).get("callbackUrl") || "/"
+        : "/";
+      window.location.href = callbackUrl;
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Authentication failed");
     } finally {
@@ -42,11 +44,13 @@ export default function LoginPage() {
       <div className="w-full max-w-md bg-white border border-slate-200/80 rounded-2xl p-8 shadow-xl shadow-slate-200/60">
         {/* Brand Header */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-[#fff7ed] border border-[#f6821f]/30 text-[#f6821f] font-bold text-2xl mb-4 shadow-sm">
-            W
+          <div className="flex items-center justify-center">
+            <img
+              src="/logo.webp"
+              alt="Wayne Trademark"
+              className="h-16 w-auto max-w-[260px] object-contain"
+            />
           </div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">Wayne Admin</h1>
-          <p className="text-xs text-slate-500 mt-1 uppercase tracking-widest font-medium">Wayne Trademark Honduras</p>
         </div>
 
         {error && (

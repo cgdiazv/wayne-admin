@@ -12,6 +12,7 @@ export async function POST(req: NextRequest) {
       dueDate = "",
       paymentTerms = "Neto 30",
       lines = [],
+      currency = "L",
       subtotal = 0,
       total = 0,
       paymentInstructions = "",
@@ -39,8 +40,8 @@ export async function POST(req: NextRequest) {
           <td style="padding: 10px; font-size: 11px; color: #f6821f; font-family: monospace;">${line.sku || "—"}</td>
           <td style="padding: 10px; font-size: 12px; color: #334155;">${line.description || "—"}</td>
           <td style="padding: 10px; font-size: 12px; color: #0f172a; text-align: right; font-family: monospace;">${line.quantity || 1}</td>
-          <td style="padding: 10px; font-size: 12px; color: #0f172a; text-align: right; font-family: monospace;">$${(line.rate || 0).toFixed(2)}</td>
-          <td style="padding: 10px; font-size: 12px; color: #0f172a; text-align: right; font-family: monospace; font-weight: 700;">$${(line.amount || 0).toFixed(2)}</td>
+          <td style="padding: 10px; font-size: 12px; color: #0f172a; text-align: right; font-family: monospace;">${currency} ${(line.rate || 0).toFixed(2)}</td>
+          <td style="padding: 10px; font-size: 12px; color: #0f172a; text-align: right; font-family: monospace; font-weight: 700;">${currency} ${(line.amount || 0).toFixed(2)}</td>
         </tr>
       `
       )
@@ -99,7 +100,7 @@ export async function POST(req: NextRequest) {
                     <strong>Términos de pago:</strong> <span style="color: #0f172a;">${paymentTerms}</span>
                   </td>
                   <td width="50%" style="font-size: 12px; color: #64748b;" align="right">
-                    <strong>Moneda:</strong> <span style="color: #0f172a;">USD ($)</span>
+                    <strong>Moneda:</strong> <span style="color: #0f172a;">${currency === "$" ? "USD ($)" : "HNL (L)"}</span>
                   </td>
                 </tr>
               </table>
@@ -130,11 +131,11 @@ export async function POST(req: NextRequest) {
                     <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #fff7ed; border-radius: 12px; border: 1px solid #fed7aa; padding: 16px;">
                       <tr>
                         <td style="font-size: 12px; color: #475569;">Subtotal:</td>
-                        <td align="right" style="font-size: 12px; font-weight: 700; color: #0f172a; font-family: monospace;">$${subtotal.toFixed(2)}</td>
+                        <td align="right" style="font-size: 12px; font-weight: 700; color: #0f172a; font-family: monospace;">${currency} ${subtotal.toFixed(2)}</td>
                       </tr>
                       <tr>
                         <td style="font-size: 14px; font-weight: 800; color: #0f172a; padding-top: 8px;">Total a pagar:</td>
-                        <td align="right" style="font-size: 18px; font-weight: 900; color: #f6821f; font-family: monospace; padding-top: 8px;">$${total.toFixed(2)} USD</td>
+                        <td align="right" style="font-size: 18px; font-weight: 900; color: #f6821f; font-family: monospace; padding-top: 8px;">${currency} ${total.toFixed(2)} ${currency === "$" ? "USD" : "HNL"}</td>
                       </tr>
                     </table>
                   </td>

@@ -64,6 +64,8 @@ body {
   #printable-invoice-document,
   #printable-po-document,
   #printable-note-document,
+  #printable-cash-audit-document,
+  #printable-check-voucher,
   .printable-document {
     display: block !important;
     visibility: visible !important;
@@ -84,6 +86,8 @@ body {
   #printable-invoice-document *,
   #printable-po-document *,
   #printable-note-document *,
+  #printable-cash-audit-document *,
+  #printable-check-voucher *,
   .printable-document * {
     visibility: visible !important;
   }
