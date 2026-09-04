@@ -305,7 +305,7 @@ model PettyCashFund {
   id             String                 @id @default(cuid())
   name           String                 // e.g. "Caja Chica Administrativa", "Caja Chica Planta Búfalo"
   code           String                 @unique // e.g. "CC-001"
-  custodianName  String                 // Custodio responsable e.g. "Lic. Roberto Mondragón"
+  custodianName  String                 // Custodio responsable e.g. "Lic. Ruben Mondragón"
   custodianEmail String?
   currency       String                 @default("HNL") // "HNL" | "USD"
   initialAmount  Float                  @default(10000) // Fondo fijo asignado

@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { Users, Factory, Package, Tag, Boxes, AlertCircle, Clock, CheckCircle2, ShieldAlert, Layers, Hash, BookOpen, Download, Upload, FileSpreadsheet, ArrowRight, ArrowLeft, RefreshCw, X, FileText, Calendar, CreditCard } from "lucide-react";
 import CajaChicaModule from "@/components/CajaChicaModule";
 import AccountingBooksModule from "@/components/AccountingBooksModule";
+import CustomerAgingReportModule from "@/components/CustomerAgingReportModule";
+import CustomerStatementModule from "@/components/CustomerStatementModule";
 
 
 
@@ -190,7 +192,7 @@ type PurchaseInvoice = {
   createdAt?: string;
 };
 
-type NavItem = "dashboard" | "plan-cuentas" | "transacciones" | "macola-sync" | "caja-chica" | "clientes" | "proveedores" | "vendedores" | "comisiones" | "inventario" | "lotes" | "series" | "notas-credito-debito" | "reportes" | "configuracion" | "factura-editor" | "lista-facturas" | "lista-ordenes-compra" | "orden-compra-editor" | "factura-compra-lista" | "factura-compra-editor" | "deposito-bancario" | "recibir-pago" | "agregar-gasto" | "pagar-proveedor" | "devoluciones-proveedor";
+type NavItem = "dashboard" | "plan-cuentas" | "transacciones" | "macola-sync" | "caja-chica" | "clientes" | "proveedores" | "vendedores" | "comisiones" | "inventario" | "lotes" | "series" | "notas-credito-debito" | "reportes" | "configuracion" | "factura-editor" | "lista-facturas" | "lista-ordenes-compra" | "orden-compra-editor" | "factura-compra-lista" | "factura-compra-editor" | "deposito-bancario" | "recibir-pago" | "agregar-gasto" | "pagar-proveedor" | "devoluciones-proveedor" | "antiguedad-saldos" | "estado-cuenta-cliente";
 
 
 
@@ -201,6 +203,12 @@ export default function AdminDashboard() {
   const router = useRouter();
   const [currentView, setCurrentView] = useState<NavItem>("dashboard");
   const [previousInvoiceView, setPreviousInvoiceView] = useState<NavItem>("dashboard");
+  const [selectedStatementCustomerId, setSelectedStatementCustomerId] = useState<string>("");
+
+  const openCustomerStatement = (customerIdOrName: string) => {
+    setSelectedStatementCustomerId(customerIdOrName);
+    setCurrentView("estado-cuenta-cliente");
+  };
 
   const closeInvoiceEditor = () => {
     setSelectedPrintNote(null);
@@ -3173,28 +3181,118 @@ export default function AdminDashboard() {
   const depositTotalLines = depositForm.lines.reduce((acc, l) => acc + (l.amount || 0), 0);
   const depositFinalTotal = depositTotalLines - (depositForm.cashbackAmount || 0);
 
-  const handleSaveDeposit = (createAnother = false) => {
-    setDepositSuccessMsg(`¡Depósito bancario por $${depositFinalTotal.toFixed(2)} USD registrado correctamente!`);
-    setTimeout(() => {
-      setDepositSuccessMsg("");
-      if (createAnother) {
-        setDepositForm({
-          account: "1002 - Banco Ficohsa USD",
-          accountBalance: 45200.00,
-          date: new Date().toISOString().split("T")[0],
-          currency: "USD",
-          memo: "",
-          cashbackAccount: "",
-          cashbackMemo: "",
-          cashbackAmount: 0,
-          lines: [
-            { id: Date.now().toString(), receivedFrom: "", account: "1100 - Cuentas por Cobrar", memo: "", paymentMethod: "Transferencia bancaria", reference: "", amount: 0 },
-          ],
-        });
-      } else {
-        closeDepositoBancarioView();
+  const handleSaveDeposit = async (createAnother = false) => {
+    if (depositFinalTotal <= 0) {
+      alert("Por favor ingresa al menos una línea con importe válido mayor a 0.");
+      return;
+    }
+
+    try {
+      // 1. Map destination bank account
+      let destCode = "1100";
+      let destName = "Bancos Nacionales (Cuenta de Cheques)";
+      if (depositForm.account.includes("Ficohsa")) {
+        destCode = "1100";
+        destName = "Bancos Nacionales — Banco Ficohsa USD";
+      } else if (depositForm.account.includes("Atlántida")) {
+        destCode = "1100";
+        destName = "Bancos Nacionales — Banco Atlántida HNL";
+      } else if (depositForm.account.includes("Caja")) {
+        destCode = "1000";
+        destName = "Caja General y Efectivo";
       }
-    }, 1200);
+
+      // 2. Build Double-Entry lines
+      const validLines = depositForm.lines.filter((l) => Number(l.amount) > 0);
+      const journalLines: {
+        accountCode: string;
+        accountName: string;
+        description: string;
+        debit: number;
+        credit: number;
+      }[] = [
+        {
+          accountCode: destCode,
+          accountName: destName,
+          description: depositForm.memo || `Depósito recibido en ${destName}`,
+          debit: Math.round(depositFinalTotal * 100) / 100,
+          credit: 0,
+        },
+      ];
+
+      for (const line of validLines) {
+        let srcCode = "1200";
+        let srcName = "Accounts Receivable (Cuentas por Cobrar Clientes)";
+        if (line.account.includes("Ventas") || line.account.includes("7000")) {
+          srcCode = "4000";
+          srcName = "Sales Revenue (Ventas de Mercancías y Empaques)";
+        } else if (line.account.includes("Pagar") || line.account.includes("2100")) {
+          srcCode = "2000";
+          srcName = "Accounts Payable (Cuentas por Pagar Proveedores)";
+        } else if (line.account.includes("Ingresos Financieros") || line.account.includes("7100")) {
+          srcCode = "4300";
+          srcName = "Ingresos Financieros e Intereses Ganados";
+        } else if (line.account.includes("Cash") || line.account.includes("1000")) {
+          srcCode = "1000";
+          srcName = "Caja General";
+        }
+
+        journalLines.push({
+          accountCode: srcCode,
+          accountName: srcName,
+          description: line.memo || (line.receivedFrom ? `Depósito de ${line.receivedFrom}` : `Abono de depósito`),
+          debit: 0,
+          credit: Math.round(Number(line.amount) * 100) / 100,
+        });
+      }
+
+      // 3. Post to Journal Entries API
+      const res = await fetch("/api/journal-entries", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          date: depositForm.date,
+          concept: depositForm.memo || `Depósito Bancario: ${destName} - $${depositFinalTotal.toFixed(2)}`,
+          referenceType: "BANK_TX",
+          currency: depositForm.currency || "USD",
+          lines: journalLines,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "Error al registrar asiento contable del depósito.");
+      }
+
+      const entryNum = data.data?.entryNumber ? ` [Asiento: ${data.data.entryNumber}]` : "";
+      setDepositSuccessMsg(`¡Depósito bancario por $${depositFinalTotal.toFixed(2)} USD vinculado al Plan de Cuentas con éxito!${entryNum}`);
+
+      // Refresh accounts & balances
+      await loadDashboardData();
+
+      setTimeout(() => {
+        setDepositSuccessMsg("");
+        if (createAnother) {
+          setDepositForm({
+            account: "1002 - Banco Ficohsa USD",
+            accountBalance: 45200.00,
+            date: new Date().toISOString().split("T")[0],
+            currency: "USD",
+            memo: "",
+            cashbackAccount: "",
+            cashbackMemo: "",
+            cashbackAmount: 0,
+            lines: [
+              { id: Date.now().toString(), receivedFrom: "", account: "1100 - Cuentas por Cobrar", memo: "", paymentMethod: "Transferencia bancaria", reference: "", amount: 0 },
+            ],
+          });
+        } else {
+          closeDepositoBancarioView();
+        }
+      }, 1500);
+    } catch (err: any) {
+      alert(err.message || "Error al procesar el depósito bancario.");
+    }
   };
 
   // Gasto Full-Page Editor State
@@ -3298,28 +3396,138 @@ export default function AdminDashboard() {
     }));
   };
 
-  const handleSaveGasto = (createAnother = false) => {
-    setGastoSuccessMsg("¡Gasto registrado correctamente!");
-    setTimeout(() => {
-      setGastoSuccessMsg("");
-      if (createAnother) {
-        setGastoForm({
-          payeeId: "",
-          payeeName: "",
-          paymentAccount: "Accrued Liabilities",
-          paymentDate: new Date().toISOString().split("T")[0],
-          paymentMethod: "Efectivo",
-          refNumber: "",
-          notes: "",
-          lines: [
-            { id: "1", category: "", description: "", amount: 0 },
-            { id: "2", category: "", description: "", amount: 0 },
-          ],
-        });
-      } else {
-        closeGastoView();
+  const handleSaveGasto = async (createAnother = false) => {
+    if (gastoTotal <= 0) {
+      alert("Por favor ingresa al menos una categoría con importe mayor a 0.");
+      return;
+    }
+
+    try {
+      // 1. Map payment account
+      let payCode = "1100";
+      let payName = "Bancos Nacionales (Cuenta de Cheques)";
+      if (gastoForm.paymentAccount.includes("Caja Chica") || gastoForm.paymentAccount.includes("1005")) {
+        payCode = "1010";
+        payName = "Caja Chica y Fondos Fijos";
+      } else if (gastoForm.paymentAccount.includes("Cash") || gastoForm.paymentAccount.includes("1000") || gastoForm.paymentMethod === "Efectivo") {
+        payCode = "1000";
+        payName = "Caja General y Efectivo";
+      } else if (gastoForm.paymentAccount.includes("Liabilities")) {
+        payCode = "2000";
+        payName = "Accounts Payable (Cuentas por Pagar Proveedores)";
+      } else if (gastoForm.paymentAccount.includes("FICOHSA")) {
+        payCode = "1100";
+        payName = "Bancos Nacionales — Banco FICOHSA HNL";
+      } else if (gastoForm.paymentAccount.includes("BAC")) {
+        payCode = "1100";
+        payName = "Bancos Nacionales — Banco BAC USD";
       }
-    }, 1200);
+
+      // 2. Build Debit Lines for each expense item
+      const validLines = gastoForm.lines.filter((l) => Number(l.amount) > 0);
+      const journalLines: {
+        accountCode: string;
+        accountName: string;
+        description: string;
+        debit: number;
+        credit: number;
+      }[] = [];
+
+      for (const line of validLines) {
+        let expCode = "6200";
+        let expName = "Papelería, Útiles de Oficina y Gastos Operativos";
+        if (line.category.includes("Publicidad")) {
+          expCode = "6300";
+          expName = "Publicidad, Mercadeo y Comisiones de Venta";
+        } else if (line.category.includes("Públicos")) {
+          expCode = "6150";
+          expName = "Servicios Públicos (Energía, Agua, Telecomunicaciones)";
+        } else if (line.category.includes("Mantenimiento")) {
+          expCode = "5300";
+          expName = "Costos Indirectos de Fabricación y Mantenimiento";
+        } else if (line.category.includes("Materia Prima")) {
+          expCode = "5100";
+          expName = "Materia Prima Directa";
+        } else if (line.category.includes("Transporte") || line.category.includes("Fletes")) {
+          expCode = "6100";
+          expName = "Combustibles, Lubricantes y Transporte";
+        } else if (line.category.includes("Seguros")) {
+          expCode = "6000";
+          expName = "Gastos Operativos & Administrativos (Seguros)";
+        } else if (line.category.includes("Honorarios")) {
+          expCode = "6000";
+          expName = "Honorarios Profesionales y Asesoría Legal/Contable";
+        } else if (line.category.includes("Representación")) {
+          expCode = "6400";
+          expName = "Gastos de Cafetería y Alimentación de Personal";
+        }
+
+        journalLines.push({
+          accountCode: expCode,
+          accountName: expName,
+          description: line.description || `${line.category || "Gasto operativo"} - ${gastoForm.payeeName || "General"}`,
+          debit: Math.round(Number(line.amount) * 100) / 100,
+          credit: 0,
+        });
+      }
+
+      // 3. Credit the Payment Account for total amount
+      journalLines.push({
+        accountCode: payCode,
+        accountName: payName,
+        description: `Desembolso pago a ${gastoForm.payeeName || "Proveedor"} vía ${gastoForm.paymentMethod}${gastoForm.refNumber ? ` #${gastoForm.refNumber}` : ""}`,
+        debit: 0,
+        credit: Math.round(gastoTotal * 100) / 100,
+      });
+
+      // 4. Post to Journal Entries API
+      const res = await fetch("/api/journal-entries", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          date: gastoForm.paymentDate,
+          concept: `Gasto Operativo: ${gastoForm.payeeName || "General"}${gastoForm.refNumber ? ` (Ref #${gastoForm.refNumber})` : ""}`,
+          referenceType: "MANUAL",
+          referenceId: gastoForm.refNumber || undefined,
+          currency: "USD",
+          lines: journalLines,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "Error al registrar asiento contable del gasto.");
+      }
+
+      const entryNum = data.data?.entryNumber ? ` [Asiento: ${data.data.entryNumber}]` : "";
+      setGastoSuccessMsg(`¡Gasto por $${gastoTotal.toFixed(2)} USD vinculado al Plan de Cuentas con éxito!${entryNum}`);
+
+      // Refresh accounts & balances
+      await loadDashboardData();
+
+      setTimeout(() => {
+        setGastoSuccessMsg("");
+        if (createAnother) {
+          setGastoForm({
+            payeeId: "",
+            payeeName: "",
+            paymentAccount: "Accrued Liabilities",
+            paymentDate: new Date().toISOString().split("T")[0],
+            paymentMethod: "Efectivo",
+            refNumber: "",
+            notes: "",
+            lines: [
+              { id: "1", category: "", description: "", amount: 0 },
+              { id: "2", category: "", description: "", amount: 0 },
+            ],
+          });
+        } else {
+          closeGastoView();
+        }
+      }, 1500);
+    } catch (err: any) {
+      alert(err.message || "Error al registrar el gasto.");
+    }
   };
 
   // Pagar a Proveedor State
@@ -5326,7 +5534,8 @@ export default function AdminDashboard() {
                 currentView === "factura-editor" ||
                 currentView === "notas-credito-debito" ||
                 currentView === "vendedores" ||
-                currentView === "comisiones"
+                currentView === "comisiones" ||
+                currentView === "antiguedad-saldos"
                   ? "font-semibold text-slate-900"
                   : ""
               }`}
@@ -5415,6 +5624,18 @@ export default function AdminDashboard() {
                   }`}
                 >
                   <span>Comisiones</span>
+                </button>
+
+                {/* 6. Antigüedad de Saldos */}
+                <button
+                  onClick={() => setCurrentView("antiguedad-saldos")}
+                  className={`w-full text-left px-2.5 py-1.5 rounded-lg transition cursor-pointer ${
+                    currentView === "antiguedad-saldos"
+                      ? "bg-[#fff7ed] text-[#f6821f] font-semibold"
+                      : "text-slate-500 hover:text-slate-900 hover:bg-slate-50"
+                  }`}
+                >
+                  <span>Antigüedad de Saldos</span>
                 </button>
               </div>
             )}
@@ -5598,12 +5819,9 @@ export default function AdminDashboard() {
         {/* Footer / User Profile */}
         <div className="p-3 border-t border-slate-100">
           <div className="flex items-center justify-between p-2 rounded-xl bg-slate-50 border border-slate-200/60">
-            <div className="flex items-center gap-2.5 overflow-hidden">
-              <div className="w-8 h-8 rounded-lg bg-[#f6821f] text-white flex items-center justify-center font-bold text-xs shrink-0 uppercase">
-                {currentAdminUser?.name ? currentAdminUser.name.substring(0, 2) : "WA"}
-              </div>
-              {!sidebarCollapsed && (
-                <div className="truncate">
+            {!sidebarCollapsed ? (
+              <>
+                <div className="truncate min-w-0 pr-2">
                   <p className="font-semibold text-slate-800 text-xs truncate">
                     {currentAdminUser?.name || "Administrador"}
                   </p>
@@ -5611,13 +5829,21 @@ export default function AdminDashboard() {
                     {currentAdminUser?.email || "admin"}
                   </p>
                 </div>
-              )}
-            </div>
-            {!sidebarCollapsed && (
+                <button
+                  onClick={handleLogout}
+                  title="Cerrar sesión"
+                  className="p-1.5 text-slate-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition cursor-pointer shrink-0"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                  </svg>
+                </button>
+              </>
+            ) : (
               <button
                 onClick={handleLogout}
                 title="Cerrar sesión"
-                className="p-1.5 text-slate-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition cursor-pointer"
+                className="w-full flex items-center justify-center p-1.5 text-slate-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition cursor-pointer"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
@@ -5663,6 +5889,8 @@ export default function AdminDashboard() {
                   {currentView === "lotes" && "Control de Lotes"}
                   {currentView === "series" && "Control de Números de Serie"}
                   {currentView === "reportes" && "Centro de Reportes"}
+                  {currentView === "antiguedad-saldos" && "Reportes / Antigüedad de Saldos Clientes"}
+                  {currentView === "estado-cuenta-cliente" && "Clientes / Estado de Cuenta Individual"}
                   {currentView === "configuracion" && "Configuración del Sistema"}
                 </span>
                 <span className="px-2 py-0.5 text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full flex items-center gap-1">
@@ -6977,16 +7205,27 @@ export default function AdminDashboard() {
                           <td className="p-3.5 text-slate-500 truncate max-w-xs">{c.address || "—"}</td>
                           <td className="p-3.5 font-medium">{c.currency}</td>
                           <td className="p-3.5 text-right">
-                            <button
-                              type="button"
-                              onClick={() => handleOpenEditCustomer(c)}
-                              className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-[#fff7ed] hover:text-[#f6821f] text-slate-700 font-semibold cursor-pointer transition text-[11px] inline-flex items-center gap-1 border border-slate-200"
-                            >
-                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                              </svg>
-                              <span>Editar</span>
-                            </button>
+                            <div className="flex items-center justify-end gap-1.5">
+                              <button
+                                type="button"
+                                onClick={() => openCustomerStatement(c.id)}
+                                className="px-2.5 py-1 rounded-lg bg-[#fff7ed] hover:bg-[#ffedd5] text-[#f6821f] font-semibold cursor-pointer transition text-[11px] inline-flex items-center gap-1 border border-[#fed7aa]"
+                                title="Ver Estado de Cuenta del cliente"
+                              >
+                                <FileText className="w-3 h-3" />
+                                <span>Estado de Cuenta</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleOpenEditCustomer(c)}
+                                className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold cursor-pointer transition text-[11px] inline-flex items-center gap-1 border border-slate-200"
+                              >
+                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                </svg>
+                                <span>Editar</span>
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       ))}
@@ -8770,19 +9009,35 @@ export default function AdminDashboard() {
                   </div>
 
                   {/* Reporte 4: Cuentas por Cobrar (Clientes) */}
-                  <div className="p-5 rounded-xl border border-slate-200 hover:border-[#f6821f]/50 hover:shadow-xs transition bg-white flex flex-col justify-between group">
+                  <div
+                    onClick={() => setCurrentView("antiguedad-saldos")}
+                    className="p-5 rounded-xl border border-slate-200 hover:border-[#f6821f] hover:shadow-md transition bg-white flex flex-col justify-between group cursor-pointer"
+                  >
                     <div>
-                      <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-700 flex items-center justify-center mb-3">
+                      <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-700 flex items-center justify-center mb-3 group-hover:scale-105 transition">
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
                         </svg>
                       </div>
-                      <h3 className="font-semibold text-sm text-slate-900 group-hover:text-[#f6821f] transition">Antigüedad de Saldos Clientes</h3>
-                      <p className="text-xs text-slate-500 mt-1">Detalle de facturación pendiente y estados de cuenta por cliente.</p>
+                      <div className="flex items-center justify-between">
+                        <h3 className="font-semibold text-sm text-slate-900 group-hover:text-[#f6821f] transition">Antigüedad de Saldos Clientes</h3>
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-800">30/60/90</span>
+                      </div>
+                      <p className="text-xs text-slate-500 mt-1">Monitoreo de cuentas por cobrar por tramos de vencimiento, morosidad y detalle por factura.</p>
                     </div>
                     <div className="pt-4 mt-4 border-t border-slate-100 flex items-center justify-between">
                       <span className="text-[11px] font-medium text-slate-400">{customers.length} clientes</span>
-                      <button className="text-xs font-semibold text-[#f6821f] hover:underline cursor-pointer">Descargar CSV</button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setCurrentView("antiguedad-saldos");
+                        }}
+                        className="text-xs font-bold text-[#f6821f] hover:text-[#e07216] flex items-center gap-1 cursor-pointer"
+                      >
+                        <span>Ver Reporte</span>
+                        <span className="text-sm">→</span>
+                      </button>
                     </div>
                   </div>
 
@@ -8822,6 +9077,46 @@ export default function AdminDashboard() {
                 </div>
               </div>
             </div>
+          )}
+
+          {/* ================= VIEW: ANTIGÜEDAD DE SALDOS (AGING CLIENTES) ================= */}
+          {currentView === "antiguedad-saldos" && (
+            <CustomerAgingReportModule
+              onBack={() => setCurrentView("reportes")}
+              onNavigateToInvoice={(invNum) => {
+                setCurrentView("lista-facturas");
+              }}
+              onNavigateToPayment={(custName) => {
+                const found = customers.find((c) => c.name.toLowerCase() === custName.toLowerCase());
+                openRecibirPagoView(found?.id);
+              }}
+              onNavigateToStatement={(cust) => {
+                openCustomerStatement(cust);
+              }}
+              formatCurrency={formatCurrency}
+            />
+          )}
+
+          {/* ================= VIEW: ESTADO DE CUENTA INDIVIDUAL DE CLIENTE ================= */}
+          {currentView === "estado-cuenta-cliente" && (
+            <CustomerStatementModule
+              initialCustomerId={selectedStatementCustomerId}
+              customersList={customers.map((c) => ({
+                id: c.id,
+                name: c.name,
+                macolaCode: c.macolaCode,
+                email: c.email,
+              }))}
+              onBack={() => setCurrentView("clientes")}
+              onNavigateToInvoice={(invNum) => {
+                setCurrentView("lista-facturas");
+              }}
+              onNavigateToPayment={(custName) => {
+                const found = customers.find((c) => c.name.toLowerCase() === custName.toLowerCase());
+                openRecibirPagoView(found?.id);
+              }}
+              formatCurrency={formatCurrency}
+            />
           )}
 
           {/* ================= VIEW: CONFIGURACIÓN ================= */}

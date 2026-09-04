@@ -758,7 +758,7 @@ export default function CajaChicaModule({
             </span>
           </div>
           <div className="mt-2">
-            <span className="text-2xl font-black text-slate-900 font-mono tracking-tight">
+            <span className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
               {formatAmount(fixedAmount)}
             </span>
           </div>
@@ -786,7 +786,7 @@ export default function CajaChicaModule({
           </div>
           <div className="mt-2 flex items-baseline gap-2">
             <span
-              className={`text-2xl font-black font-mono tracking-tight ${
+              className={`text-2xl sm:text-3xl font-bold tracking-tight ${
                 isReplenishmentRequired ? "text-rose-600" : "text-slate-900"
               }`}
             >
@@ -816,7 +816,7 @@ export default function CajaChicaModule({
             </span>
           </div>
           <div className="mt-2">
-            <span className="text-2xl font-black text-slate-900 font-mono tracking-tight">
+            <span className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
               {formatAmount(unreimbursedTotal)}
             </span>
           </div>
@@ -840,7 +840,7 @@ export default function CajaChicaModule({
             </span>
           </div>
           <div className="mt-2">
-            <span className="text-2xl font-black text-slate-900 font-mono tracking-tight">
+            <span className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
               {formatAmount(activeVouchersTotal)}
             </span>
           </div>
@@ -862,7 +862,7 @@ export default function CajaChicaModule({
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
           </div>
           <div className="mt-2">
-            <span className="text-2xl font-black text-slate-900 font-mono tracking-tight">
+            <span className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
               {formatAmount(currentCash + unreimbursedTotal + activeVouchersTotal)}
             </span>
           </div>
@@ -1669,7 +1669,7 @@ export default function CajaChicaModule({
               <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
                 Total por Desembolsar
               </span>
-              <span className="text-2xl font-black font-mono text-slate-900">
+              <span className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
                 {formatAmount(unreimbursedTotal)}
               </span>
               <span className="text-[11px] text-slate-500 block">
@@ -2459,7 +2459,7 @@ export default function CajaChicaModule({
                   <input
                     type="text"
                     required
-                    placeholder="Ej. Lic. Roberto Mondragón"
+                    placeholder="Ej. Lic. Ruben Mondragón"
                     value={fundForm.custodianName}
                     onChange={(e) => setFundForm({ ...fundForm, custodianName: e.target.value })}
                     className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#f6821f]"
