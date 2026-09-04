@@ -1862,6 +1862,7 @@ export default function AdminDashboard() {
   const [showInvoiceSaveDropdown, setShowInvoiceSaveDropdown] = useState(false);
   const [showInvoiceSendDropdown, setShowInvoiceSendDropdown] = useState(false);
   const [showPrintDownloadDropdown, setShowPrintDownloadDropdown] = useState(false);
+  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
   const [invoiceSuccessMsg, setInvoiceSuccessMsg] = useState("");
   const [invoiceDesign, setInvoiceDesign] = useState({
     template: "Moderno",
@@ -1926,6 +1927,84 @@ export default function AdminDashboard() {
   const invoiceIsv15 = invoiceForm.applyIsv15 ? Number((invoiceGravado15 * configuredIsvRate).toFixed(2)) : 0;
   const invoiceIsv18 = invoiceForm.applyIsv18 ? Number((invoiceGravado18 * 0.18).toFixed(2)) : 0;
   const invoiceTotal = Number((invoiceSubtotal - invoiceDiscount + invoiceIsv15 + invoiceIsv18).toFixed(2));
+
+  const downloadInvoicePDF = async () => {
+    setShowPrintDownloadDropdown(false);
+    setIsGeneratingPDF(true);
+    try {
+      const printableElem = document.getElementById("printable-invoice-document");
+      if (!printableElem) {
+        window.print();
+        return;
+      }
+
+      const wrapper = document.createElement("div");
+      wrapper.style.position = "fixed";
+      wrapper.style.left = "-9999px";
+      wrapper.style.top = "0";
+      wrapper.style.width = "816px";
+      wrapper.style.background = "#ffffff";
+      wrapper.style.color = "#000000";
+      wrapper.style.zIndex = "-9999";
+
+      const clone = printableElem.cloneNode(true) as HTMLElement;
+      clone.classList.remove("hidden");
+      clone.classList.remove("print:block");
+      clone.style.display = "block";
+      clone.style.width = "100%";
+      clone.style.background = "#ffffff";
+      clone.style.color = "#000000";
+      clone.style.padding = "32px";
+      clone.style.boxSizing = "border-box";
+
+      wrapper.appendChild(clone);
+      document.body.appendChild(wrapper);
+
+      const html2canvasModule = await import("html2canvas");
+      const html2canvas = html2canvasModule.default || html2canvasModule;
+      const { jsPDF } = await import("jspdf");
+
+      const canvas = await html2canvas(clone, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        backgroundColor: "#ffffff",
+        windowWidth: 816,
+      });
+
+      document.body.removeChild(wrapper);
+
+      const imgData = canvas.toDataURL("image/jpeg", 0.95);
+      const pdf = new jsPDF({
+        orientation: "portrait",
+        unit: "mm",
+        format: "letter",
+      });
+
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = pdf.internal.pageSize.getHeight();
+      const imgHeight = (canvas.height * pdfWidth) / canvas.width;
+
+      let position = 0;
+      pdf.addImage(imgData, "JPEG", 0, position, pdfWidth, imgHeight);
+      let heightLeft = imgHeight - pdfHeight;
+
+      while (heightLeft > 5) {
+        position -= pdfHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, "JPEG", 0, position, pdfWidth, imgHeight);
+        heightLeft -= pdfHeight;
+      }
+
+      const cleanNum = (invoiceForm.invoiceNumber || "factura").replace(/[^a-zA-Z0-9_-]/g, "_");
+      pdf.save(`Factura_${cleanNum}.pdf`);
+    } catch (error) {
+      console.error("Error al generar PDF de factura:", error);
+      window.print();
+    } finally {
+      setIsGeneratingPDF(false);
+    }
+  };
 
   const openInvoiceEditor = (invoiceToEdit?: any) => {
     if (currentView !== "factura-editor") {
@@ -2677,6 +2756,84 @@ export default function AdminDashboard() {
 
   const poSubtotal = poForm.lines.reduce((acc, l) => acc + (l.total || 0), 0);
   const poTotal = poSubtotal;
+
+  const downloadPOPDF = async () => {
+    setShowPOPrintDropdown(false);
+    setIsGeneratingPDF(true);
+    try {
+      const printableElem = document.getElementById("printable-po-document");
+      if (!printableElem) {
+        window.print();
+        return;
+      }
+
+      const wrapper = document.createElement("div");
+      wrapper.style.position = "fixed";
+      wrapper.style.left = "-9999px";
+      wrapper.style.top = "0";
+      wrapper.style.width = "816px";
+      wrapper.style.background = "#ffffff";
+      wrapper.style.color = "#000000";
+      wrapper.style.zIndex = "-9999";
+
+      const clone = printableElem.cloneNode(true) as HTMLElement;
+      clone.classList.remove("hidden");
+      clone.classList.remove("print:block");
+      clone.style.display = "block";
+      clone.style.width = "100%";
+      clone.style.background = "#ffffff";
+      clone.style.color = "#000000";
+      clone.style.padding = "32px";
+      clone.style.boxSizing = "border-box";
+
+      wrapper.appendChild(clone);
+      document.body.appendChild(wrapper);
+
+      const html2canvasModule = await import("html2canvas");
+      const html2canvas = html2canvasModule.default || html2canvasModule;
+      const { jsPDF } = await import("jspdf");
+
+      const canvas = await html2canvas(clone, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        backgroundColor: "#ffffff",
+        windowWidth: 816,
+      });
+
+      document.body.removeChild(wrapper);
+
+      const imgData = canvas.toDataURL("image/jpeg", 0.95);
+      const pdf = new jsPDF({
+        orientation: "portrait",
+        unit: "mm",
+        format: "letter",
+      });
+
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = pdf.internal.pageSize.getHeight();
+      const imgHeight = (canvas.height * pdfWidth) / canvas.width;
+
+      let position = 0;
+      pdf.addImage(imgData, "JPEG", 0, position, pdfWidth, imgHeight);
+      let heightLeft = imgHeight - pdfHeight;
+
+      while (heightLeft > 5) {
+        position -= pdfHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, "JPEG", 0, position, pdfWidth, imgHeight);
+        heightLeft -= pdfHeight;
+      }
+
+      const cleanNum = (poForm.num || "orden_compra").replace(/[^a-zA-Z0-9_-]/g, "_");
+      pdf.save(`Orden_Compra_${cleanNum}.pdf`);
+    } catch (error) {
+      console.error("Error al generar PDF de orden de compra:", error);
+      window.print();
+    } finally {
+      setIsGeneratingPDF(false);
+    }
+  };
 
   const openPurchaseOrderEditor = (poToEdit?: any) => {
     if (poToEdit) {
@@ -14718,7 +14875,32 @@ export default function AdminDashboard() {
 
                   {/* VISTA DE PDF */}
                   {activeInvoiceTab === "Vista de PDF" && (
-                    <div className="overflow-x-auto pb-12 flex justify-center">
+                    <div className="overflow-x-auto pb-12 flex flex-col items-center">
+                      <div className="w-[8.5in] mb-4 flex items-center justify-between bg-white px-5 py-3 rounded-2xl border border-slate-200 shadow-xs">
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-xs text-slate-800">Vista Previa Fiscal de Factura</span>
+                          <span className="text-[11px] text-slate-400 font-mono">N.º {formatFiscalInvoiceNumber(invoiceForm.invoiceNumber)}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => window.print()}
+                            className="px-3.5 py-1.5 rounded-xl border border-slate-300 hover:bg-slate-50 text-xs font-semibold text-slate-700 transition cursor-pointer"
+                          >
+                            Imprimir
+                          </button>
+                          <button
+                            type="button"
+                            onClick={downloadInvoicePDF}
+                            disabled={isGeneratingPDF}
+                            className="px-3.5 py-1.5 rounded-xl bg-[#f6821f] hover:bg-[#e07216] text-white text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 shadow-xs"
+                          >
+                            <Download className="w-3.5 h-3.5" />
+                            <span>{isGeneratingPDF ? "Descargando..." : "Descargar PDF"}</span>
+                          </button>
+                        </div>
+                      </div>
+
                       <div className="w-[8.5in] min-h-[11in] bg-white border border-slate-300 rounded-xs shadow-2xl p-12 flex flex-col justify-between animate-in fade-in duration-150 text-xs text-slate-800 shrink-0">
                         <div className="space-y-6">
                           <div className="flex justify-between items-start border-b border-slate-300 pb-6">
@@ -15145,9 +15327,17 @@ export default function AdminDashboard() {
                   <button
                     type="button"
                     onClick={() => setShowPrintDownloadDropdown(!showPrintDownloadDropdown)}
+                    disabled={isGeneratingPDF}
                     className="px-4 py-2 rounded-xl bg-slate-100/90 hover:bg-slate-200/80 text-[#004d40] font-bold text-xs transition cursor-pointer flex items-center gap-1.5"
                   >
-                    <span>Imprimir o descargar</span>
+                    {isGeneratingPDF ? (
+                      <>
+                        <span className="inline-block w-3 h-3 border-2 border-[#004d40] border-t-transparent rounded-full animate-spin"></span>
+                        <span>Generando PDF...</span>
+                      </>
+                    ) : (
+                      <span>Imprimir o descargar</span>
+                    )}
                   </button>
 
                   {showPrintDownloadDropdown && (
@@ -15164,13 +15354,16 @@ export default function AdminDashboard() {
                       </button>
                       <button
                         type="button"
-                        onClick={() => {
-                          setShowPrintDownloadDropdown(false);
-                          setActiveInvoiceTab("Vista de PDF");
-                        }}
-                        className="w-full text-left px-4 py-2.5 hover:bg-slate-50 transition cursor-pointer font-medium text-slate-800"
+                        onClick={downloadInvoicePDF}
+                        disabled={isGeneratingPDF}
+                        className="w-full text-left px-4 py-2.5 hover:bg-slate-50 transition cursor-pointer font-medium text-slate-800 flex items-center justify-between"
                       >
-                        Descargar
+                        <span>Descargar</span>
+                        {isGeneratingPDF ? (
+                          <span className="text-[10px] text-amber-600 font-semibold animate-pulse">Generando...</span>
+                        ) : (
+                          <Download className="w-3.5 h-3.5 text-slate-400" />
+                        )}
                       </button>
                       <button
                         type="button"
@@ -15838,13 +16031,24 @@ export default function AdminDashboard() {
                     <div className="bg-white border border-slate-200 rounded-2xl p-8 shadow-xs max-w-4xl mx-auto space-y-6 animate-in fade-in duration-150 text-xs">
                       <div className="flex justify-between items-center border-b border-slate-200 pb-4">
                         <h3 className="font-bold text-base text-slate-900">Vista Previa de Documento PDF</h3>
-                        <button
-                          type="button"
-                          onClick={() => window.print()}
-                          className="px-4 py-1.5 rounded-xl bg-[#f6821f] text-white font-bold text-xs hover:bg-[#e07216] transition cursor-pointer"
-                        >
-                          Imprimir PDF
-                        </button>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => window.print()}
+                            className="px-3.5 py-1.5 rounded-xl border border-slate-300 hover:bg-slate-50 text-xs font-semibold text-slate-700 transition cursor-pointer"
+                          >
+                            Imprimir
+                          </button>
+                          <button
+                            type="button"
+                            onClick={downloadPOPDF}
+                            disabled={isGeneratingPDF}
+                            className="px-3.5 py-1.5 rounded-xl bg-[#f6821f] hover:bg-[#e07216] text-white text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 shadow-xs"
+                          >
+                            <Download className="w-3.5 h-3.5" />
+                            <span>{isGeneratingPDF ? "Descargando..." : "Descargar PDF"}</span>
+                          </button>
+                        </div>
                       </div>
 
                       <div className="p-8 border border-slate-200 rounded-xl bg-slate-50 space-y-6">
@@ -15891,9 +16095,17 @@ export default function AdminDashboard() {
                   <button
                     type="button"
                     onClick={() => setShowPOPrintDropdown(!showPOPrintDropdown)}
+                    disabled={isGeneratingPDF}
                     className="px-4 py-2 rounded-xl bg-slate-100/90 hover:bg-slate-200/80 text-[#004d40] font-bold text-xs transition cursor-pointer flex items-center gap-1.5"
                   >
-                    <span>Imprimir o descargar</span>
+                    {isGeneratingPDF ? (
+                      <>
+                        <span className="inline-block w-3 h-3 border-2 border-[#004d40] border-t-transparent rounded-full animate-spin"></span>
+                        <span>Generando PDF...</span>
+                      </>
+                    ) : (
+                      <span>Imprimir o descargar</span>
+                    )}
                   </button>
 
                   {showPOPrintDropdown && (
@@ -15910,13 +16122,16 @@ export default function AdminDashboard() {
                       </button>
                       <button
                         type="button"
-                        onClick={() => {
-                          setShowPOPrintDropdown(false);
-                          setActivePOTab("Vista de PDF");
-                        }}
-                        className="w-full text-left px-4 py-2.5 hover:bg-slate-50 transition cursor-pointer font-medium text-slate-800"
+                        onClick={downloadPOPDF}
+                        disabled={isGeneratingPDF}
+                        className="w-full text-left px-4 py-2.5 hover:bg-slate-50 transition cursor-pointer font-medium text-slate-800 flex items-center justify-between"
                       >
-                        Descargar PDF
+                        <span>Descargar PDF</span>
+                        {isGeneratingPDF ? (
+                          <span className="text-[10px] text-amber-600 font-semibold animate-pulse">Generando...</span>
+                        ) : (
+                          <Download className="w-3.5 h-3.5 text-slate-400" />
+                        )}
                       </button>
                     </div>
                   )}
