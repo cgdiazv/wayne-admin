@@ -1790,7 +1790,16 @@ export default function AdminDashboard() {
       const current = companySettings.fechaLimiteEmision || "";
       const matchDmy = current.match(/^(\d{1,2})\s*[\/\-]\s*(\d{1,2})\s*[\/\-]\s*(\d{4})$/);
       if (matchDmy) {
-        setEditingConfigValue(`${matchDmy[3]}-${matchDmy[2].padStart(2, "0")}-${matchDmy[1].padStart(2, "0")}`);
+        setEditingConfigValue(`${matchDmy[1].padStart(2, "0")} / ${matchDmy[2].padStart(2, "0")} / ${matchDmy[3]}`);
+      } else {
+        const matchYmd = current.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/);
+        if (matchYmd) {
+          setEditingConfigValue(`${matchYmd[3].padStart(2, "0")} / ${matchYmd[2].padStart(2, "0")} / ${matchYmd[1]}`);
+        } else if (current && current !== "Ninguno indicado") {
+          setEditingConfigValue(current);
+        } else {
+          setEditingConfigValue("");
+        }
       }
     }
   };
@@ -1830,7 +1839,12 @@ export default function AdminDashboard() {
           if (partsDmy) {
             updatedValue = `${partsDmy[1].padStart(2, "0")}/${partsDmy[2].padStart(2, "0")}/${partsDmy[3]}`;
           } else {
-            updatedValue = updatedValue.replace(/\s*\/\s*/g, "/");
+            const digits = updatedValue.replace(/\D/g, "");
+            if (digits.length === 8) {
+              updatedValue = `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4, 8)}`;
+            } else {
+              updatedValue = updatedValue.replace(/\s*\/\s*/g, "/");
+            }
           }
         }
       }
@@ -1920,12 +1934,12 @@ export default function AdminDashboard() {
   const invoiceGravado15 = (invoiceForm.impGravado15 && invoiceForm.impGravado15 > 0)
     ? invoiceForm.impGravado15
     : (invoiceForm.applyIsv15 && !invoiceExempt && !invoiceExonerated ? Math.max(0, invoiceSubtotal - invoiceDiscount) : 0);
-  const invoiceGravado18 = (invoiceForm.impGravado18 && invoiceForm.impGravado18 > 0)
+  const invoiceGravado18 = (salesSettings.permitirIsv18 && invoiceForm.impGravado18 && invoiceForm.impGravado18 > 0)
     ? invoiceForm.impGravado18
-    : (invoiceForm.applyIsv18 ? Math.max(0, invoiceSubtotal - invoiceDiscount) : 0);
+    : (salesSettings.permitirIsv18 && invoiceForm.applyIsv18 ? Math.max(0, invoiceSubtotal - invoiceDiscount) : 0);
   const configuredIsvRate = (salesSettings?.tasaIsvGeneral ?? 15) / 100;
   const invoiceIsv15 = invoiceForm.applyIsv15 ? Number((invoiceGravado15 * configuredIsvRate).toFixed(2)) : 0;
-  const invoiceIsv18 = invoiceForm.applyIsv18 ? Number((invoiceGravado18 * 0.18).toFixed(2)) : 0;
+  const invoiceIsv18 = (salesSettings.permitirIsv18 && invoiceForm.applyIsv18) ? Number((invoiceGravado18 * 0.18).toFixed(2)) : 0;
   const invoiceTotal = Number((invoiceSubtotal - invoiceDiscount + invoiceIsv15 + invoiceIsv18).toFixed(2));
 
   const downloadInvoicePDF = async () => {
@@ -12960,12 +12974,80 @@ export default function AdminDashboard() {
                           <p className="text-[11px] text-slate-500">
                             Selecciona la fecha límite de emisión autorizada por el SAR:
                           </p>
-                          <input
-                            type="date"
-                            value={editingConfigValue === "Ninguno indicado" ? "" : editingConfigValue}
-                            onChange={(e) => setEditingConfigValue(e.target.value)}
-                            className="w-full px-3.5 py-2.5 text-xs rounded-xl bg-slate-50 border border-slate-300 text-slate-900 focus:outline-none focus:border-[#f6821f] focus:ring-1 focus:ring-[#f6821f] font-medium font-mono"
-                          />
+                          <div className="relative flex items-center w-full rounded-xl bg-slate-50 border border-slate-300 focus-within:border-[#f6821f] focus-within:ring-1 focus-within:ring-[#f6821f] focus-within:bg-white transition shadow-2xs">
+                            <input
+                              type="text"
+                              inputMode="numeric"
+                              placeholder="dd / mm / yyyy"
+                              value={editingConfigValue === "Ninguno indicado" ? "" : editingConfigValue}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                const clean = val.replace(/[^\d\s\/\-]/g, "");
+                                const digits = clean.replace(/\D/g, "");
+                                if (digits.length === 8 && !clean.includes("/")) {
+                                  setEditingConfigValue(`${digits.slice(0, 2)} / ${digits.slice(2, 4)} / ${digits.slice(4, 8)}`);
+                                } else {
+                                  setEditingConfigValue(clean);
+                                }
+                              }}
+                              onBlur={() => {
+                                const digits = editingConfigValue.replace(/\D/g, "");
+                                if (digits.length === 8) {
+                                  setEditingConfigValue(`${digits.slice(0, 2)} / ${digits.slice(2, 4)} / ${digits.slice(4, 8)}`);
+                                }
+                              }}
+                              className="w-full px-3.5 py-2.5 text-xs rounded-xl text-slate-900 bg-transparent focus:outline-none font-medium font-mono tracking-wider"
+                            />
+                            {/* Calendar Picker Icon & Overlay Trigger */}
+                            <div className="relative pr-3.5 flex items-center justify-center shrink-0 cursor-pointer">
+                              <svg
+                                className="w-4 h-4 text-slate-500 pointer-events-none"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth="1.8"
+                                  d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                                />
+                              </svg>
+                              <input
+                                type="date"
+                                value={(() => {
+                                  const digits = editingConfigValue.replace(/\D/g, "");
+                                  if (digits.length === 8) {
+                                    return `${digits.slice(4, 8)}-${digits.slice(2, 4)}-${digits.slice(0, 2)}`;
+                                  }
+                                  const parts = editingConfigValue.match(/^(\d{1,2})\s*[\/\-]\s*(\d{1,2})\s*[\/\-]\s*(\d{4})$/);
+                                  if (parts) {
+                                    return `${parts[3]}-${parts[2].padStart(2, "0")}-${parts[1].padStart(2, "0")}`;
+                                  }
+                                  return "";
+                                })()}
+                                onChange={(e) => {
+                                  const ymd = e.target.value;
+                                  if (ymd) {
+                                    const [y, m, d] = ymd.split("-");
+                                    setEditingConfigValue(`${d} / ${m} / ${y}`);
+                                  }
+                                }}
+                                className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                                tabIndex={-1}
+                                title="Seleccionar fecha"
+                              />
+                            </div>
+                          </div>
+                          <div className="flex items-center justify-between text-[10px] text-slate-400 px-1">
+                            <span>Formato: <strong className="text-slate-600 font-mono">dd / mm / yyyy</strong></span>
+                            {(() => {
+                              const digits = editingConfigValue.replace(/\D/g, "");
+                              return digits.length === 8 ? (
+                                <span className="text-emerald-600 font-medium">✓ Fecha válida</span>
+                              ) : null;
+                            })()}
+                          </div>
                         </div>
                       ) : editingConfigKey === "direccion" || editingConfigKey === "domicilioLegal" ? (
                         <textarea
@@ -14291,10 +14373,12 @@ export default function AdminDashboard() {
                     </div>
 
                     {/* IMP GRAVADO 18% */}
-                    <div className="flex justify-between items-center py-[2px] text-slate-600">
-                      <span className="font-semibold text-slate-500 uppercase text-[10px] tracking-wider">Imp. Gravado 18%</span>
-                      <span className="font-mono font-medium text-slate-700">{formatFiscalMoney(invoiceGravado18) || "—"}</span>
-                    </div>
+                    {salesSettings.permitirIsv18 && (
+                      <div className="flex justify-between items-center py-[2px] text-slate-600">
+                        <span className="font-semibold text-slate-500 uppercase text-[10px] tracking-wider">Imp. Gravado 18%</span>
+                        <span className="font-mono font-medium text-slate-700">{formatFiscalMoney(invoiceGravado18) || "—"}</span>
+                      </div>
+                    )}
 
                     {/* I.S.V. GENERAL */}
                     <div className="flex justify-between items-center py-[2px] text-slate-600">
@@ -14303,10 +14387,12 @@ export default function AdminDashboard() {
                     </div>
 
                     {/* I.S.V. 18% */}
-                    <div className="flex justify-between items-center py-[2px] text-slate-600">
-                      <span className="font-semibold text-slate-500 uppercase text-[10px] tracking-wider">I.S.V. 18%</span>
-                      <span className="font-mono font-medium text-slate-700">{formatFiscalMoney(invoiceIsv18, invoiceForm.applyIsv18) || "—"}</span>
-                    </div>
+                    {salesSettings.permitirIsv18 && (
+                      <div className="flex justify-between items-center py-[2px] text-slate-600">
+                        <span className="font-semibold text-slate-500 uppercase text-[10px] tracking-wider">I.S.V. 18%</span>
+                        <span className="font-mono font-medium text-slate-700">{formatFiscalMoney(invoiceIsv18, invoiceForm.applyIsv18) || "—"}</span>
+                      </div>
+                    )}
 
                     {/* TOTAL A PAGAR */}
                     <div className="pt-1">
@@ -14770,15 +14856,17 @@ export default function AdminDashboard() {
                                 />
                                 <span>I.S.V. {salesSettings?.tasaIsvGeneral ?? 15}%</span>
                               </label>
-                              <label className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-700 cursor-pointer">
-                                <input
-                                  type="checkbox"
-                                  checked={invoiceForm.applyIsv18}
-                                  onChange={(e) => setInvoiceForm({ ...invoiceForm, applyIsv18: e.target.checked })}
-                                  className="rounded text-[#f6821f]"
-                                />
-                                <span>I.S.V. 18%</span>
-                              </label>
+                              {salesSettings.permitirIsv18 && (
+                                <label className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-700 cursor-pointer">
+                                  <input
+                                    type="checkbox"
+                                    checked={invoiceForm.applyIsv18}
+                                    onChange={(e) => setInvoiceForm({ ...invoiceForm, applyIsv18: e.target.checked })}
+                                    className="rounded text-[#f6821f]"
+                                  />
+                                  <span>I.S.V. 18%</span>
+                                </label>
+                              )}
                             </div>
                             <div className="flex flex-col justify-center gap-1">
                               <label className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-700 cursor-pointer">
@@ -14820,7 +14908,7 @@ export default function AdminDashboard() {
                                 <span className="font-mono font-bold text-slate-900">{invoiceCurrencySymbol} {invoiceIsv15.toLocaleString("es-HN", { minimumFractionDigits: 2 })}</span>
                               </div>
                             )}
-                            {invoiceIsv18 > 0 && (
+                            {salesSettings.permitirIsv18 && invoiceIsv18 > 0 && (
                               <div className="flex justify-between items-center text-slate-600">
                                 <span>I.S.V. 18%:</span>
                                 <span className="font-mono font-bold text-slate-900">{invoiceCurrencySymbol} {invoiceIsv18.toLocaleString("es-HN", { minimumFractionDigits: 2 })}</span>
@@ -15022,10 +15110,12 @@ export default function AdminDashboard() {
                               </div>
 
                               {/* IMP GRAVADO 18% */}
-                              <div className="flex justify-between items-center py-[2px] text-slate-600">
-                                <span className="font-semibold text-slate-500 uppercase text-[10px] tracking-wider">Imp. Gravado 18%</span>
-                                <span className="font-mono font-medium text-slate-700">{formatFiscalMoney(invoiceGravado18) || "—"}</span>
-                              </div>
+                              {salesSettings.permitirIsv18 && (
+                                <div className="flex justify-between items-center py-[2px] text-slate-600">
+                                  <span className="font-semibold text-slate-500 uppercase text-[10px] tracking-wider">Imp. Gravado 18%</span>
+                                  <span className="font-mono font-medium text-slate-700">{formatFiscalMoney(invoiceGravado18) || "—"}</span>
+                                </div>
+                              )}
 
                               {/* I.S.V. GENERAL */}
                               <div className="flex justify-between items-center py-[2px] text-slate-600">
@@ -15034,10 +15124,12 @@ export default function AdminDashboard() {
                               </div>
 
                               {/* I.S.V. 18% */}
-                              <div className="flex justify-between items-center py-[2px] text-slate-600">
-                                <span className="font-semibold text-slate-500 uppercase text-[10px] tracking-wider">I.S.V. 18%</span>
-                                <span className="font-mono font-medium text-slate-700">{formatFiscalMoney(invoiceIsv18, invoiceForm.applyIsv18) || "—"}</span>
-                              </div>
+                              {salesSettings.permitirIsv18 && (
+                                <div className="flex justify-between items-center py-[2px] text-slate-600">
+                                  <span className="font-semibold text-slate-500 uppercase text-[10px] tracking-wider">I.S.V. 18%</span>
+                                  <span className="font-mono font-medium text-slate-700">{formatFiscalMoney(invoiceIsv18, invoiceForm.applyIsv18) || "—"}</span>
+                                </div>
+                              )}
 
                               {/* TOTAL A PAGAR */}
                               <div className="pt-1">
