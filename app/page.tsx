@@ -14450,18 +14450,6 @@ export default function AdminDashboard() {
                     <span className="font-mono">{formatFechaLimite(companySettings.fechaLimiteEmision)}</span>
                   </div>
                 </div>
-
-                {/* Signatures & Footer */}
-                <div className="mt-10 pt-6 border-t border-slate-200 grid grid-cols-2 gap-12 text-center text-xs text-slate-500">
-                  <div>
-                    <div className="border-b border-slate-400 w-48 mx-auto mb-2" />
-                    <p className="font-semibold text-slate-700">Entregado por (Wayne Trademark)</p>
-                  </div>
-                  <div>
-                    <div className="border-b border-slate-400 w-48 mx-auto mb-2" />
-                    <p className="font-semibold text-slate-700">Recibido conforme (Cliente)</p>
-                  </div>
-                </div>
               </div>
               
               {/* TOP HEADER BAR */}
