@@ -179,10 +179,12 @@ export default function AccountingBooksModule({
           <button
             type="button"
             onClick={onBackToDashboard}
-            className="text-xs font-semibold text-slate-600 hover:text-slate-900 transition flex items-center gap-1.5 cursor-pointer"
+            className="text-xs font-semibold text-slate-600 hover:text-slate-900 transition flex items-center gap-1.5 cursor-pointer w-fit"
           >
-            <ArrowLeft className="w-3.5 h-3.5 text-slate-500" />
-            <span>Dashboard</span>
+            <svg className="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
+            </svg>
+            <span>Regresar a Dashboard</span>
           </button>
           <span className="text-slate-300">/</span>
           <span className="text-xs font-bold text-slate-900">Motor Contable &amp; Libros</span>

@@ -7,6 +7,7 @@ import CajaChicaModule from "@/components/CajaChicaModule";
 import AccountingBooksModule from "@/components/AccountingBooksModule";
 import CustomerAgingReportModule from "@/components/CustomerAgingReportModule";
 import CustomerStatementModule from "@/components/CustomerStatementModule";
+import VendorAgingReportModule from "@/components/VendorAgingReportModule";
 
 
 
@@ -192,7 +193,7 @@ type PurchaseInvoice = {
   createdAt?: string;
 };
 
-type NavItem = "dashboard" | "plan-cuentas" | "transacciones" | "macola-sync" | "caja-chica" | "clientes" | "proveedores" | "vendedores" | "comisiones" | "inventario" | "lotes" | "series" | "notas-credito-debito" | "reportes" | "configuracion" | "factura-editor" | "lista-facturas" | "lista-ordenes-compra" | "orden-compra-editor" | "factura-compra-lista" | "factura-compra-editor" | "deposito-bancario" | "recibir-pago" | "agregar-gasto" | "pagar-proveedor" | "devoluciones-proveedor" | "antiguedad-saldos" | "estado-cuenta-cliente";
+type NavItem = "dashboard" | "plan-cuentas" | "transacciones" | "macola-sync" | "caja-chica" | "clientes" | "proveedores" | "vendedores" | "comisiones" | "inventario" | "lotes" | "series" | "notas-credito-debito" | "reportes" | "configuracion" | "factura-editor" | "lista-facturas" | "lista-ordenes-compra" | "orden-compra-editor" | "factura-compra-lista" | "factura-compra-editor" | "deposito-bancario" | "recibir-pago" | "agregar-gasto" | "pagar-proveedor" | "devoluciones-proveedor" | "antiguedad-saldos" | "antiguedad-saldos-proveedores" | "estado-cuenta-cliente";
 
 
 
@@ -3569,10 +3570,18 @@ export default function AdminDashboard() {
     }, 0);
   }, [selectedBillIds, vendorBills, customBillAmounts]);
 
-  const openPagarProveedorView = () => {
+  const openPagarProveedorView = (vendorFilter?: string | React.MouseEvent) => {
     setPreviousPagarProveedorView(currentView);
     setPagarProveedorSuccessMsg("");
     setShowPagarProveedorFilterPopover(false);
+
+    const filterName = typeof vendorFilter === "string" ? vendorFilter : undefined;
+    if (filterName) {
+      setPagarProveedorForm((prev) => ({
+        ...prev,
+        payeeFilter: filterName,
+      }));
+    }
     
     // Map existing pending/approved/received Purchase Orders from database/state to vendorBills
     const mappedBills = purchaseOrders
@@ -3586,8 +3595,12 @@ export default function AdminDashboard() {
         balanceDue: po.total,
       }));
 
+    const targetBills = filterName
+      ? mappedBills.filter((b) => b.vendorName.toLowerCase().includes(filterName.toLowerCase()))
+      : mappedBills;
+
     setVendorBills(mappedBills);
-    setSelectedBillIds(mappedBills.map((b) => b.id)); // Default select all available bills for payment
+    setSelectedBillIds(targetBills.length > 0 ? targetBills.map((b) => b.id) : mappedBills.map((b) => b.id));
     setCurrentView("pagar-proveedor");
   };
 
@@ -5654,7 +5667,8 @@ export default function AdminDashboard() {
                 currentView === "orden-compra-editor" ||
                 currentView === "factura-compra-lista" ||
                 currentView === "factura-compra-editor" ||
-                currentView === "devoluciones-proveedor"
+                currentView === "devoluciones-proveedor" ||
+                currentView === "antiguedad-saldos-proveedores"
                   ? "font-semibold text-slate-900"
                   : ""
               }`}
@@ -5744,6 +5758,18 @@ export default function AdminDashboard() {
                       {vendorReturns.filter((r) => r.status === "BORRADOR").length}
                     </span>
                   )}
+                </button>
+
+                {/* 5. Antigüedad Proveedores */}
+                <button
+                  onClick={() => setCurrentView("antiguedad-saldos-proveedores")}
+                  className={`w-full text-left px-2.5 py-1.5 rounded-lg transition cursor-pointer flex items-center justify-between ${
+                    currentView === "antiguedad-saldos-proveedores"
+                      ? "bg-[#fff7ed] text-[#f6821f] font-semibold"
+                      : "text-slate-500 hover:text-slate-900 hover:bg-slate-50"
+                  }`}
+                >
+                  <span>Antigüedad Proveedores</span>
                 </button>
               </div>
             )}
@@ -5890,6 +5916,7 @@ export default function AdminDashboard() {
                   {currentView === "series" && "Control de Números de Serie"}
                   {currentView === "reportes" && "Centro de Reportes"}
                   {currentView === "antiguedad-saldos" && "Reportes / Antigüedad de Saldos Clientes"}
+                  {currentView === "antiguedad-saldos-proveedores" && "Reportes / Antigüedad de Saldos Proveedores"}
                   {currentView === "estado-cuenta-cliente" && "Clientes / Estado de Cuenta Individual"}
                   {currentView === "configuracion" && "Configuración del Sistema"}
                 </span>
@@ -6411,10 +6438,12 @@ export default function AdminDashboard() {
                   <button
                     type="button"
                     onClick={() => setCurrentView("dashboard")}
-                    className="text-xs font-semibold text-slate-600 hover:text-slate-900 transition flex items-center gap-1.5 cursor-pointer"
+                    className="text-xs font-semibold text-slate-600 hover:text-slate-900 transition flex items-center gap-1.5 cursor-pointer w-fit"
                   >
-                    <ArrowLeft className="w-3.5 h-3.5 text-slate-500" />
-                    <span>Dashboard</span>
+                    <svg className="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
+                    </svg>
+                    <span>Regresar a Dashboard</span>
                   </button>
                   <span className="text-slate-300">/</span>
                   <span className="text-xs font-bold text-slate-900">Transacciones Bancarias &amp; Conciliación</span>
@@ -6981,7 +7010,19 @@ export default function AdminDashboard() {
 
           {/* ================= VIEW: TRANSACCIONES DE INTEGRACIÓN ================= */}
           {currentView === "macola-sync" && (
-            <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs space-y-4">
+            <div className="space-y-4">
+              <button
+                type="button"
+                onClick={() => setCurrentView("dashboard")}
+                className="text-xs font-semibold text-slate-600 hover:text-slate-900 transition flex items-center gap-1.5 cursor-pointer w-fit"
+              >
+                <svg className="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
+                </svg>
+                <span>Regresar a Dashboard</span>
+              </button>
+
+              <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs space-y-4">
               <div className="flex items-center justify-between">
                 <div>
                   <h2 className="font-bold text-base text-slate-900">Transacciones de Integración Macola</h2>
@@ -7017,6 +7058,7 @@ export default function AdminDashboard() {
                   <span className="text-emerald-700 font-medium">Sincronizado</span>
                 </div>
               </div>
+            </div>
             </div>
           )}
 
@@ -7260,13 +7302,11 @@ export default function AdminDashboard() {
                 <div className="flex items-center gap-3 self-end sm:self-auto">
                   <button
                     type="button"
-                    onClick={() => {
-                      alert("Generando reporte de proveedores...");
-                      window.print();
-                    }}
-                    className="px-4 py-2 rounded-full border border-[#f6821f] text-[#f6821f] hover:bg-[#fff7ed] text-xs font-semibold transition cursor-pointer shadow-xs"
+                    onClick={() => setCurrentView("antiguedad-saldos-proveedores")}
+                    className="px-4 py-2 rounded-full border border-slate-300 text-slate-700 hover:border-[#f6821f] hover:text-[#f6821f] hover:bg-[#fff7ed] text-xs font-semibold transition cursor-pointer shadow-xs flex items-center gap-1.5"
                   >
-                    Generar reporte
+                    <Clock className="w-3.5 h-3.5 text-[#f6821f]" />
+                    <span>Antigüedad de Saldos</span>
                   </button>
 
                   <button
@@ -7684,44 +7724,53 @@ export default function AdminDashboard() {
           {/* ================= VIEW: CONTROL DE LOTES Y VENCIMIENTOS ================= */}
           {currentView === "lotes" && (
             <div className="space-y-5">
-              {/* Header Action Bar */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <button
-                  type="button"
-                  onClick={() => setCurrentView("inventario")}
-                  className="text-xs font-semibold text-slate-600 hover:text-slate-900 transition flex items-center gap-1.5 cursor-pointer w-fit"
-                >
-                  <svg className="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
-                  </svg>
-                  <span>Regresar a Catálogo</span>
-                </button>
-
-                <div className="flex items-center gap-3 self-end sm:self-auto">
+              {/* ================= SCREEN HEADER ================= */}
+              <div className="space-y-4 print:hidden">
+                <div className="flex items-center gap-3">
                   <button
                     type="button"
-                    onClick={() => {
-                      alert("Generando reporte de lotes y vencimientos...");
-                      window.print();
-                    }}
-                    className="px-4 py-2 rounded-full border border-[#f6821f] text-[#f6821f] hover:bg-[#fff7ed] text-xs font-semibold transition cursor-pointer shadow-xs flex items-center gap-1.5"
+                    onClick={() => setCurrentView("inventario")}
+                    className="text-xs font-semibold text-slate-600 hover:text-slate-900 transition flex items-center gap-1.5 cursor-pointer w-fit"
                   >
-                    <Download className="w-3.5 h-3.5" />
-                    <span>Exportar Reporte FEFO</span>
+                    <svg className="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
+                    </svg>
+                    <span>Regresar a Catálogo</span>
                   </button>
+                  <span className="text-slate-300">/</span>
+                  <span className="text-xs font-semibold text-slate-500">Inventario</span>
+                  <span className="text-slate-300">/</span>
+                  <span className="text-xs font-bold text-slate-900">Control de Lotes</span>
                 </div>
-              </div>
 
-              {/* Title & Description */}
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white border border-slate-200 rounded-2xl p-5 shadow-xs">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <Package className="w-5 h-5 text-amber-600" />
-                    <h2 className="font-bold text-lg text-slate-900">Control Maestro de Lotes & Vencimientos</h2>
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h2 className="text-xl font-bold text-slate-900">
+                        Control Maestro de Lotes & Vencimientos
+                      </h2>
+                      <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-[#fff7ed] text-[#f6821f] border border-[#ffedd5]">
+                        Trazabilidad FEFO ({allLots.length})
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Monitoreo centralizado de frescura de insumos, caducidad por fecha de vencimiento y gestión de lotes.
+                    </p>
                   </div>
-                  <p className="text-xs text-slate-500 mt-1">
-                    Monitoreo centralizado de frescura de insumos, caducidad por fecha de vencimiento y gestión de lotes.
-                  </p>
+
+                  <div className="flex flex-wrap items-center gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        alert("Generando reporte de lotes y vencimientos...");
+                        window.print();
+                      }}
+                      className="px-3.5 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-semibold text-xs transition cursor-pointer flex items-center gap-1.5 shadow-2xs"
+                    >
+                      <Download className="w-4 h-4 text-emerald-600" />
+                      <span>Exportar Reporte FEFO</span>
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -7941,44 +7990,53 @@ export default function AdminDashboard() {
           {/* ================= VIEW: CONTROL DE NÚMEROS DE SERIE ================= */}
           {currentView === "series" && (
             <div className="space-y-5">
-              {/* Header Action Bar */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <button
-                  type="button"
-                  onClick={() => setCurrentView("inventario")}
-                  className="text-xs font-semibold text-slate-600 hover:text-slate-900 transition flex items-center gap-1.5 cursor-pointer w-fit"
-                >
-                  <svg className="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
-                  </svg>
-                  <span>Regresar a Catálogo</span>
-                </button>
-
-                <div className="flex items-center gap-3 self-end sm:self-auto">
+              {/* ================= SCREEN HEADER ================= */}
+              <div className="space-y-4 print:hidden">
+                <div className="flex items-center gap-3">
                   <button
                     type="button"
-                    onClick={() => {
-                      alert("Generando reporte de trazabilidad de números de serie...");
-                      window.print();
-                    }}
-                    className="px-4 py-2 rounded-full border border-[#f6821f] text-[#f6821f] hover:bg-[#fff7ed] text-xs font-semibold transition cursor-pointer shadow-xs flex items-center gap-1.5"
+                    onClick={() => setCurrentView("inventario")}
+                    className="text-xs font-semibold text-slate-600 hover:text-slate-900 transition flex items-center gap-1.5 cursor-pointer w-fit"
                   >
-                    <Download className="w-3.5 h-3.5" />
-                    <span>Exportar Trazabilidad</span>
+                    <svg className="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
+                    </svg>
+                    <span>Regresar a Catálogo</span>
                   </button>
+                  <span className="text-slate-300">/</span>
+                  <span className="text-xs font-semibold text-slate-500">Inventario</span>
+                  <span className="text-slate-300">/</span>
+                  <span className="text-xs font-bold text-slate-900">Números de Serie</span>
                 </div>
-              </div>
 
-              {/* Title & Description */}
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white border border-slate-200 rounded-2xl p-5 shadow-xs">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <Tag className="w-5 h-5 text-purple-600" />
-                    <h2 className="font-bold text-lg text-slate-900">Control de Números de Serie & Trazabilidad</h2>
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h2 className="text-xl font-bold text-slate-900">
+                        Control de Números de Serie & Trazabilidad
+                      </h2>
+                      <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-[#fff7ed] text-[#f6821f] border border-[#ffedd5]">
+                        Garantías & Trazabilidad ({allSerials.length})
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Búsqueda rápida por código de barras/serie, garantía y seguimiento del ciclo de vida del producto.
+                    </p>
                   </div>
-                  <p className="text-xs text-slate-500 mt-1">
-                    Búsqueda rápida por código de barras/serie, garantía y seguimiento del ciclo de vida del producto.
-                  </p>
+
+                  <div className="flex flex-wrap items-center gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        alert("Generando reporte de trazabilidad de números de serie...");
+                        window.print();
+                      }}
+                      className="px-3.5 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-semibold text-xs transition cursor-pointer flex items-center gap-1.5 shadow-2xs"
+                    >
+                      <Download className="w-4 h-4 text-emerald-600" />
+                      <span>Exportar Trazabilidad</span>
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -8171,40 +8229,50 @@ export default function AdminDashboard() {
           {/* ================= VIEW: NOTAS DE CRÉDITO Y DÉBITO ================= */}
           {currentView === "notas-credito-debito" && (
             <div className="space-y-5">
-              {/* Header Action Bar */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <button
-                  type="button"
-                  onClick={() => setCurrentView("dashboard")}
-                  className="text-xs font-semibold text-slate-600 hover:text-slate-900 transition flex items-center gap-1.5 cursor-pointer w-fit"
-                >
-                  <svg className="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
-                  </svg>
-                  <span>Regresar al Dashboard</span>
-                </button>
-
-                <div className="flex items-center gap-3 self-end sm:self-auto">
+              {/* ================= SCREEN HEADER ================= */}
+              <div className="space-y-4 print:hidden">
+                <div className="flex items-center gap-3">
                   <button
                     type="button"
-                    onClick={openCreateNoteModal}
-                    className="px-5 py-2.5 rounded-full bg-[#f6821f] hover:bg-[#e07216] text-white font-bold text-xs transition cursor-pointer shadow-md flex items-center gap-2"
+                    onClick={() => setCurrentView("dashboard")}
+                    className="text-xs font-semibold text-slate-600 hover:text-slate-900 transition flex items-center gap-1.5 cursor-pointer w-fit"
                   >
-                    <span>+ Nueva Nota de Crédito / Débito</span>
+                    <svg className="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
+                    </svg>
+                    <span>Regresar a Dashboard</span>
                   </button>
+                  <span className="text-slate-300">/</span>
+                  <span className="text-xs font-semibold text-slate-500">Ventas</span>
+                  <span className="text-slate-300">/</span>
+                  <span className="text-xs font-bold text-slate-900">Notas de Crédito y Débito</span>
                 </div>
-              </div>
 
-              {/* Title & Description */}
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white border border-slate-200 rounded-2xl p-5 shadow-xs">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <FileText className="w-5 h-5 text-[#f6821f]" />
-                    <h2 className="font-bold text-lg text-slate-900">Gestión de Notas de Crédito & Débito</h2>
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h2 className="text-xl font-bold text-slate-900">
+                        Gestión de Notas de Crédito & Débito
+                      </h2>
+                      <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-[#fff7ed] text-[#f6821f] border border-[#ffedd5]">
+                        SAR & Macola ERP
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Ajustes contables de saldo, devoluciones de mercadería, bonificaciones e intereses.
+                    </p>
                   </div>
-                  <p className="text-xs text-slate-500 mt-1">
-                    Ajustes contables de saldo, devoluciones de mercadería, bonificaciones e intereses (Integración Macola ERP & SAR).
-                  </p>
+
+                  <div className="flex flex-wrap items-center gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={openCreateNoteModal}
+                      className="px-4 py-2 rounded-xl bg-[#f6821f] hover:bg-[#e07216] text-white text-xs font-bold transition flex items-center gap-1.5 shadow-md shadow-[#f6821f]/20 cursor-pointer"
+                    >
+                      <span className="text-sm leading-none">+</span>
+                      <span>Nueva Nota de Crédito / Débito</span>
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -8442,51 +8510,57 @@ export default function AdminDashboard() {
           {/* ================= VIEW: VENDEDORES (Fuerza de Ventas & Zonas) ================= */}
           {currentView === "vendedores" && (
             <div className="space-y-6 animate-in fade-in duration-150">
-              {/* Header Action Bar */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <button
-                  type="button"
-                  onClick={() => setCurrentView("dashboard")}
-                  className="text-xs font-semibold text-slate-600 hover:text-slate-900 transition flex items-center gap-1.5 cursor-pointer w-fit"
-                >
-                  <svg className="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
-                  </svg>
-                  <span>Regresar al Dashboard</span>
-                </button>
-
-                <div className="flex items-center gap-3 self-end sm:self-auto">
+              {/* ================= SCREEN HEADER ================= */}
+              <div className="space-y-4 print:hidden">
+                <div className="flex items-center gap-3">
                   <button
                     type="button"
-                    onClick={() => setCurrentView("comisiones")}
-                    className="px-4 py-2.5 rounded-full border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-semibold text-xs transition cursor-pointer flex items-center gap-2 shadow-xs"
+                    onClick={() => setCurrentView("dashboard")}
+                    className="text-xs font-semibold text-slate-600 hover:text-slate-900 transition flex items-center gap-1.5 cursor-pointer w-fit"
                   >
-                    <span>Ver Histórico de Comisiones</span>
+                    <svg className="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
+                    </svg>
+                    <span>Regresar a Dashboard</span>
                   </button>
-                  <button
-                    type="button"
-                    onClick={openCreateSalesRepModal}
-                    className="px-5 py-2.5 rounded-full bg-[#f6821f] hover:bg-[#e07216] text-white font-bold text-xs transition cursor-pointer shadow-md flex items-center gap-2"
-                  >
-                    <span>+ Registrar Nuevo Vendedor</span>
-                  </button>
+                  <span className="text-slate-300">/</span>
+                  <span className="text-xs font-semibold text-slate-500">Ventas</span>
+                  <span className="text-slate-300">/</span>
+                  <span className="text-xs font-bold text-slate-900">Fuerza de Ventas</span>
                 </div>
-              </div>
 
-              {/* Title & Description */}
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white border border-slate-200 rounded-2xl p-5 shadow-xs">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <Users className="w-5 h-5 text-[#f6821f]" />
-                    <h2 className="font-bold text-lg text-slate-900">Fuerza de Ventas & Ejecutivos Comerciales</h2>
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h2 className="text-xl font-bold text-slate-900">
+                        Fuerza de Ventas & Ejecutivos Comerciales
+                      </h2>
+                      <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-[#fff7ed] text-[#f6821f] border border-[#ffedd5]">
+                        {salesReps.filter((r) => r.status === "ACTIVO").length} Activos
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Administra representantes de ventas, asignación de zonas geográficas y metas mensuales.
+                    </p>
                   </div>
-                  <p className="text-xs text-slate-500 mt-1">
-                    Administra representantes de ventas, asignación de zonas geográficas y metas mensuales para Wayne Trademark Honduras.
-                  </p>
-                </div>
-                <div className="flex items-center gap-2 bg-slate-50 px-3.5 py-2 rounded-xl border border-slate-200 text-xs text-slate-600 font-medium">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                  <span>{salesReps.filter((r) => r.status === "ACTIVO").length} Ejecutivos Activos</span>
+
+                  <div className="flex flex-wrap items-center gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setCurrentView("comisiones")}
+                      className="px-3.5 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-semibold text-xs transition cursor-pointer flex items-center gap-1.5 shadow-2xs"
+                    >
+                      <span>Ver Histórico de Comisiones</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={openCreateSalesRepModal}
+                      className="px-4 py-2 rounded-xl bg-[#f6821f] hover:bg-[#e07216] text-white text-xs font-bold transition flex items-center gap-1.5 shadow-md shadow-[#f6821f]/20 cursor-pointer"
+                    >
+                      <span className="text-sm leading-none">+</span>
+                      <span>Registrar Nuevo Vendedor</span>
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -8683,42 +8757,50 @@ export default function AdminDashboard() {
           {/* ================= VIEW: ESQUEMA DE COMISIONES ================= */}
           {currentView === "comisiones" && (
             <div className="space-y-6 animate-in fade-in duration-150">
-              {/* Header Action Bar */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <button
-                  type="button"
-                  onClick={() => setCurrentView("vendedores")}
-                  className="text-xs font-semibold text-slate-600 hover:text-slate-900 transition flex items-center gap-1.5 cursor-pointer w-fit"
-                >
-                  <svg className="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
-                  </svg>
-                  <span>Volver a Fuerza de Ventas</span>
-                </button>
-
-                <div className="flex items-center gap-3 self-end sm:self-auto">
+              {/* ================= SCREEN HEADER ================= */}
+              <div className="space-y-4 print:hidden">
+                <div className="flex items-center gap-3">
                   <button
                     type="button"
-                    onClick={openCreateCommissionModal}
-                    className="px-5 py-2.5 rounded-full bg-[#f6821f] hover:bg-[#e07216] text-white font-bold text-xs transition cursor-pointer shadow-md flex items-center gap-2"
+                    onClick={() => setCurrentView("vendedores")}
+                    className="text-xs font-semibold text-slate-600 hover:text-slate-900 transition flex items-center gap-1.5 cursor-pointer w-fit"
                   >
-                    <span>+ Registrar Cálculo de Comisión</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* Title & Description */}
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white border border-slate-200 rounded-2xl p-5 shadow-xs">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <svg className="w-5 h-5 text-[#f6821f]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    <svg className="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
                     </svg>
-                    <h2 className="font-bold text-lg text-slate-900">Control & Liquidación de Comisiones</h2>
+                    <span>Regresar a Fuerza de Ventas</span>
+                  </button>
+                  <span className="text-slate-300">/</span>
+                  <span className="text-xs font-semibold text-slate-500">Ventas</span>
+                  <span className="text-slate-300">/</span>
+                  <span className="text-xs font-bold text-slate-900">Liquidación de Comisiones</span>
+                </div>
+
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h2 className="text-xl font-bold text-slate-900">
+                        Control & Liquidación de Comisiones
+                      </h2>
+                      <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-[#fff7ed] text-[#f6821f] border border-[#ffedd5]">
+                        Comisiones de Venta
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Cálculo automático de comisiones sobre ventas facturadas, estados de aprobación y reporte de pago.
+                    </p>
                   </div>
-                  <p className="text-xs text-slate-500 mt-1">
-                    Cálculo automático de comisiones sobre ventas facturadas, estados de aprobación y reporte de pago.
-                  </p>
+
+                  <div className="flex flex-wrap items-center gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={openCreateCommissionModal}
+                      className="px-4 py-2 rounded-xl bg-[#f6821f] hover:bg-[#e07216] text-white text-xs font-bold transition flex items-center gap-1.5 shadow-md shadow-[#f6821f]/20 cursor-pointer"
+                    >
+                      <span className="text-sm leading-none">+</span>
+                      <span>Registrar Cálculo de Comisión</span>
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -8939,9 +9021,18 @@ export default function AdminDashboard() {
 
           {/* ================= VIEW: REPORTES ================= */}
           {currentView === "reportes" && (
+            <div className="space-y-4">
+              <button
+                type="button"
+                onClick={() => setCurrentView("dashboard")}
+                className="text-xs font-semibold text-slate-600 hover:text-slate-900 transition flex items-center gap-1.5 cursor-pointer w-fit"
+              >
+                <svg className="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
+                </svg>
+                <span>Regresar a Dashboard</span>
+              </button>
 
-
-            <div className="space-y-6">
               <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-5">
                   <div>
@@ -9042,19 +9133,35 @@ export default function AdminDashboard() {
                   </div>
 
                   {/* Reporte 5: Cuentas por Pagar (Proveedores) */}
-                  <div className="p-5 rounded-xl border border-slate-200 hover:border-[#f6821f]/50 hover:shadow-xs transition bg-white flex flex-col justify-between group">
+                  <div
+                    onClick={() => setCurrentView("antiguedad-saldos-proveedores")}
+                    className="p-5 rounded-xl border border-slate-200 hover:border-[#f6821f] hover:shadow-md transition bg-white flex flex-col justify-between group cursor-pointer"
+                  >
                     <div>
-                      <div className="w-10 h-10 rounded-xl bg-rose-50 text-rose-700 flex items-center justify-center mb-3">
+                      <div className="w-10 h-10 rounded-xl bg-rose-50 text-rose-700 flex items-center justify-center mb-3 group-hover:scale-105 transition">
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5" />
                         </svg>
                       </div>
-                      <h3 className="font-semibold text-sm text-slate-900 group-hover:text-[#f6821f] transition">Antigüedad de Saldos Proveedores</h3>
-                      <p className="text-xs text-slate-500 mt-1">Obligaciones comerciales por vencer y programaciones de pago.</p>
+                      <div className="flex items-center justify-between">
+                        <h3 className="font-semibold text-sm text-slate-900 group-hover:text-[#f6821f] transition">Antigüedad de Saldos Proveedores</h3>
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-rose-100 text-rose-800">Cuentas por Pagar</span>
+                      </div>
+                      <p className="text-xs text-slate-500 mt-1">Estratificación de cuentas por pagar a crédito, facturas de compra y compromisos por vencer.</p>
                     </div>
                     <div className="pt-4 mt-4 border-t border-slate-100 flex items-center justify-between">
                       <span className="text-[11px] font-medium text-slate-400">{vendors.length} proveedores</span>
-                      <button className="text-xs font-semibold text-[#f6821f] hover:underline cursor-pointer">Descargar CSV</button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setCurrentView("antiguedad-saldos-proveedores");
+                        }}
+                        className="text-xs font-bold text-[#f6821f] hover:text-[#e07216] flex items-center gap-1 cursor-pointer"
+                      >
+                        <span>Ver Reporte</span>
+                        <span className="text-sm">→</span>
+                      </button>
                     </div>
                   </div>
 
@@ -9097,6 +9204,20 @@ export default function AdminDashboard() {
             />
           )}
 
+          {/* ================= VIEW: ANTIGÜEDAD DE SALDOS (AGING PROVEEDORES) ================= */}
+          {currentView === "antiguedad-saldos-proveedores" && (
+            <VendorAgingReportModule
+              onBack={() => setCurrentView("proveedores")}
+              onNavigateToPayment={(vendorName) => {
+                openPagarProveedorView(vendorName);
+              }}
+              onNavigateToBill={() => {
+                setCurrentView("factura-compra-lista");
+              }}
+              formatCurrency={formatCurrency}
+            />
+          )}
+
           {/* ================= VIEW: ESTADO DE CUENTA INDIVIDUAL DE CLIENTE ================= */}
           {currentView === "estado-cuenta-cliente" && (
             <CustomerStatementModule
@@ -9121,7 +9242,19 @@ export default function AdminDashboard() {
 
           {/* ================= VIEW: CONFIGURACIÓN ================= */}
           {currentView === "configuracion" && (
-            <div className="bg-white border border-slate-200 rounded-2xl shadow-xs overflow-hidden">
+            <div className="space-y-4">
+              <button
+                type="button"
+                onClick={() => setCurrentView("dashboard")}
+                className="text-xs font-semibold text-slate-600 hover:text-slate-900 transition flex items-center gap-1.5 cursor-pointer w-fit"
+              >
+                <svg className="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
+                </svg>
+                <span>Regresar a Dashboard</span>
+              </button>
+
+              <div className="bg-white border border-slate-200 rounded-2xl shadow-xs overflow-hidden">
               {/* Main Body with Left Nav & Content */}
               <div className="flex flex-col md:flex-row min-h-[720px]">
                 {/* Left Submenu Navigation matching screenshot */}
@@ -13169,27 +13302,57 @@ export default function AdminDashboard() {
                 </div>
               )}
             </div>
+            </div>
           )}
 
           {/* ================= VIEW: LISTA DE FACTURAS ================= */}
           {currentView === "lista-facturas" && (
             <div className="space-y-6 animate-in fade-in duration-150 p-6">
-              {/* Header */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-slate-200 shadow-xs">
-                <div>
-                  <h1 className="font-extrabold text-xl text-slate-900 tracking-tight">Historial de Facturas Emitidas</h1>
-                  <p className="text-xs text-slate-500 mt-1">
-                    Gestiona, consulta, imprime y reenvía las facturas comerciales enviadas a tus clientes.
-                  </p>
+              {/* ================= SCREEN HEADER ================= */}
+              <div className="space-y-4 print:hidden">
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setCurrentView("dashboard")}
+                    className="text-xs font-semibold text-slate-600 hover:text-slate-900 transition flex items-center gap-1.5 cursor-pointer w-fit"
+                  >
+                    <svg className="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
+                    </svg>
+                    <span>Regresar a Dashboard</span>
+                  </button>
+                  <span className="text-slate-300">/</span>
+                  <span className="text-xs font-semibold text-slate-500">Ventas</span>
+                  <span className="text-slate-300">/</span>
+                  <span className="text-xs font-bold text-slate-900">Historial de Facturas</span>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => openInvoiceEditor()}
-                  className="px-5 py-2.5 rounded-xl bg-[#f6821f] hover:bg-[#e07216] text-white text-xs font-bold transition cursor-pointer shadow-md shadow-[#f6821f]/20 flex items-center gap-2 shrink-0"
-                >
-                  <span className="text-base leading-none">+</span>
-                  <span>Crear factura</span>
-                </button>
+
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h2 className="text-xl font-bold text-slate-900">
+                        Historial de Facturas Emitidas
+                      </h2>
+                      <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-[#fff7ed] text-[#f6821f] border border-[#ffedd5]">
+                        Facturación Fiscal (SAR)
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Gestiona, consulta, imprime y reenvía las facturas comerciales enviadas a tus clientes.
+                    </p>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => openInvoiceEditor()}
+                      className="px-4 py-2 rounded-xl bg-[#f6821f] hover:bg-[#e07216] text-white text-xs font-bold transition flex items-center gap-1.5 shadow-md shadow-[#f6821f]/20 cursor-pointer"
+                    >
+                      <span className="text-sm leading-none">+</span>
+                      <span>Crear factura</span>
+                    </button>
+                  </div>
+                </div>
               </div>
 
               {/* Stats Grid (Matching Dashboard Metric Cards) */}
@@ -13335,22 +13498,51 @@ export default function AdminDashboard() {
           {/* ================= VIEW: LISTA DE ÓRDENES DE COMPRA ================= */}
           {currentView === "lista-ordenes-compra" && (
             <div className="space-y-6 animate-in fade-in duration-150 p-6">
-              {/* Header */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-slate-200 shadow-xs">
-                <div>
-                  <h1 className="font-extrabold text-xl text-slate-900 tracking-tight">Órdenes de Compra</h1>
-                  <p className="text-xs text-slate-500 mt-1">
-                    Control y trazabilidad de las compras de materia prima e insumos a proveedores.
-                  </p>
+              {/* ================= SCREEN HEADER ================= */}
+              <div className="space-y-4 print:hidden">
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setCurrentView("dashboard")}
+                    className="text-xs font-semibold text-slate-600 hover:text-slate-900 transition flex items-center gap-1.5 cursor-pointer w-fit"
+                  >
+                    <svg className="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
+                    </svg>
+                    <span>Regresar a Dashboard</span>
+                  </button>
+                  <span className="text-slate-300">/</span>
+                  <span className="text-xs font-semibold text-slate-500">Compras</span>
+                  <span className="text-slate-300">/</span>
+                  <span className="text-xs font-bold text-slate-900">Órdenes de Compra</span>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => openPurchaseOrderEditor()}
-                  className="px-5 py-2.5 rounded-xl bg-[#f6821f] hover:bg-[#e07216] text-white text-xs font-bold transition cursor-pointer shadow-md shadow-[#f6821f]/20 flex items-center gap-2 shrink-0"
-                >
-                  <span className="text-base leading-none">+</span>
-                  <span>Crear orden de compra</span>
-                </button>
+
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h2 className="text-xl font-bold text-slate-900">
+                        Órdenes de Compra
+                      </h2>
+                      <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-[#fff7ed] text-[#f6821f] border border-[#ffedd5]">
+                        Gestión de Compras (PO)
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Control y trazabilidad de las compras de materia prima e insumos a proveedores.
+                    </p>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => openPurchaseOrderEditor()}
+                      className="px-4 py-2 rounded-xl bg-[#f6821f] hover:bg-[#e07216] text-white text-xs font-bold transition flex items-center gap-1.5 shadow-md shadow-[#f6821f]/20 cursor-pointer"
+                    >
+                      <span className="text-sm leading-none">+</span>
+                      <span>Crear orden de compra</span>
+                    </button>
+                  </div>
+                </div>
               </div>
 
               {/* Stats Grid (Matching Dashboard Metric Cards) */}
@@ -13505,22 +13697,51 @@ export default function AdminDashboard() {
           {/* ================= VIEW: LISTA DE FACTURAS DE COMPRA ================= */}
           {currentView === "factura-compra-lista" && (
             <div className="space-y-6 animate-in fade-in duration-150 p-6">
-              {/* Header Bar */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-slate-200 shadow-xs">
-                <div>
-                  <h1 className="font-extrabold text-xl text-slate-900 tracking-tight">Facturas de Compra (Entradas de Inventario)</h1>
-                  <p className="text-xs text-slate-500 mt-1">
-                    Registro de comprobantes fiscales de proveedores con incremento automático de existencias en almacén.
-                  </p>
+              {/* ================= SCREEN HEADER ================= */}
+              <div className="space-y-4 print:hidden">
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setCurrentView("dashboard")}
+                    className="text-xs font-semibold text-slate-600 hover:text-slate-900 transition flex items-center gap-1.5 cursor-pointer w-fit"
+                  >
+                    <svg className="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
+                    </svg>
+                    <span>Regresar a Dashboard</span>
+                  </button>
+                  <span className="text-slate-300">/</span>
+                  <span className="text-xs font-semibold text-slate-500">Compras</span>
+                  <span className="text-slate-300">/</span>
+                  <span className="text-xs font-bold text-slate-900">Facturas de Compra</span>
                 </div>
-                <button
-                  type="button"
-                  onClick={openCreatePurchaseInvoice}
-                  className="px-5 py-2.5 rounded-xl bg-[#f6821f] hover:bg-[#e07216] text-white text-xs font-bold transition cursor-pointer shadow-md shadow-[#f6821f]/20 flex items-center gap-2 shrink-0"
-                >
-                  <span className="text-base leading-none">+</span>
-                  <span>Registrar Factura de Compra</span>
-                </button>
+
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h2 className="text-xl font-bold text-slate-900">
+                        Facturas de Compra (Entradas de Inventario)
+                      </h2>
+                      <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-[#fff7ed] text-[#f6821f] border border-[#ffedd5]">
+                        Entradas de Stock
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Registro de comprobantes fiscales de proveedores con incremento automático de existencias en almacén.
+                    </p>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={openCreatePurchaseInvoice}
+                      className="px-4 py-2 rounded-xl bg-[#f6821f] hover:bg-[#e07216] text-white text-xs font-bold transition flex items-center gap-1.5 shadow-md shadow-[#f6821f]/20 cursor-pointer"
+                    >
+                      <span className="text-sm leading-none">+</span>
+                      <span>Registrar Factura de Compra</span>
+                    </button>
+                  </div>
+                </div>
               </div>
 
               {/* Stats Grid */}
@@ -13719,9 +13940,9 @@ export default function AdminDashboard() {
                   <button
                     type="button"
                     onClick={() => setCurrentView("dashboard")}
-                    className="text-xs font-semibold text-slate-500 hover:text-slate-900 transition flex items-center gap-1.5 cursor-pointer w-fit mb-1"
+                    className="text-xs font-semibold text-slate-600 hover:text-slate-900 transition flex items-center gap-1.5 cursor-pointer w-fit"
                   >
-                    <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
                     </svg>
                     <span>Regresar a Dashboard</span>
@@ -14013,17 +14234,18 @@ export default function AdminDashboard() {
             <div className="fixed inset-0 z-40 flex flex-col bg-slate-100 text-slate-800 animate-in fade-in duration-150 overflow-hidden">
               {/* Header Bar */}
               <div className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between shadow-xs shrink-0">
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-4">
                   <button
                     type="button"
                     onClick={() => setCurrentView("factura-compra-lista")}
-                    className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 transition cursor-pointer"
+                    className="text-xs font-semibold text-slate-600 hover:text-slate-900 transition flex items-center gap-1.5 cursor-pointer w-fit"
                   >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
                     </svg>
+                    <span>Regresar</span>
                   </button>
-                  <div>
+                  <div className="border-l border-slate-200 pl-4">
                     <h1 className="font-bold text-lg text-slate-900">Registrar Factura de Compra (Entrada de Inventario)</h1>
                     <p className="text-xs text-slate-500">Ingreso automático de productos a stock y creación de lotes en base de datos.</p>
                   </div>
@@ -14507,8 +14729,18 @@ export default function AdminDashboard() {
               
               {/* TOP HEADER BAR */}
               <header className="bg-white border-b border-slate-200 px-6 py-3 flex items-center justify-between sticky top-0 z-30 shadow-2xs print:hidden">
-                <div className="flex items-center gap-6">
-                  <h1 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                <div className="flex items-center gap-4">
+                  <button
+                    type="button"
+                    onClick={closeInvoiceEditor}
+                    className="text-xs font-semibold text-slate-600 hover:text-slate-900 transition flex items-center gap-1.5 cursor-pointer w-fit"
+                  >
+                    <svg className="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
+                    </svg>
+                    <span>Regresar</span>
+                  </button>
+                  <h1 className="text-base font-bold text-slate-900 flex items-center gap-2 border-l border-slate-200 pl-4">
                     <span>Factura {invoiceForm.invoiceNumber}</span>
                   </h1>
 
@@ -15899,8 +16131,18 @@ export default function AdminDashboard() {
               
               {/* TOP HEADER BAR */}
               <header className="bg-white border-b border-slate-200 px-6 py-3 flex items-center justify-between sticky top-0 z-30 shadow-2xs print:hidden">
-                <div className="flex items-center gap-6">
-                  <h1 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                <div className="flex items-center gap-4">
+                  <button
+                    type="button"
+                    onClick={closePurchaseOrderEditor}
+                    className="text-xs font-semibold text-slate-600 hover:text-slate-900 transition flex items-center gap-1.5 cursor-pointer w-fit"
+                  >
+                    <svg className="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
+                    </svg>
+                    <span>Regresar</span>
+                  </button>
+                  <h1 className="text-base font-bold text-slate-900 flex items-center gap-2 border-l border-slate-200 pl-4">
                     <span>Orden de compra {poForm.num}</span>
                   </h1>
 
@@ -16661,12 +16903,12 @@ export default function AdminDashboard() {
                   <button
                     type="button"
                     onClick={closeDepositoBancarioView}
-                    className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition cursor-pointer"
-                    title="Regresar"
+                    className="text-xs font-semibold text-slate-600 hover:text-slate-900 transition flex items-center gap-1.5 cursor-pointer w-fit mr-2"
                   >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
                     </svg>
+                    <span>Regresar</span>
                   </button>
                   <h1 className="text-base font-bold text-slate-900 flex items-center gap-2">
                     <svg className="w-5 h-5 text-[#f6821f]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -17061,6 +17303,16 @@ export default function AdminDashboard() {
               {/* TOP HEADER BAR */}
               <header className="bg-white border-b border-slate-200 px-6 py-3.5 flex items-center justify-between sticky top-0 z-30 shadow-2xs">
                 <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={closeGastoView}
+                    className="text-xs font-semibold text-slate-600 hover:text-slate-900 transition flex items-center gap-1.5 cursor-pointer w-fit mr-1"
+                  >
+                    <svg className="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
+                    </svg>
+                    <span>Regresar</span>
+                  </button>
                   <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-600">
                     <svg className="w-4 h-4 text-[#f6821f]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -17409,6 +17661,16 @@ export default function AdminDashboard() {
               {/* TOP HEADER BAR */}
               <header className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between sticky top-0 z-30 shadow-2xs">
                 <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={closePagarProveedorView}
+                    className="text-xs font-semibold text-slate-600 hover:text-slate-900 transition flex items-center gap-1.5 cursor-pointer w-fit mr-1"
+                  >
+                    <svg className="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
+                    </svg>
+                    <span>Regresar</span>
+                  </button>
                   <h1 className="text-xl font-bold text-slate-900 tracking-tight">Pagar facturas de proveedores</h1>
                 </div>
                 <button
@@ -17813,6 +18075,16 @@ export default function AdminDashboard() {
               {/* TOP HEADER BAR */}
               <header className="bg-white border-b border-slate-200 px-6 py-3.5 flex items-center justify-between sticky top-0 z-30 shadow-2xs">
                 <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={closeRecibirPagoView}
+                    className="text-xs font-semibold text-slate-600 hover:text-slate-900 transition flex items-center gap-1.5 cursor-pointer w-fit mr-1"
+                  >
+                    <svg className="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
+                    </svg>
+                    <span>Regresar</span>
+                  </button>
                   <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-600">
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />

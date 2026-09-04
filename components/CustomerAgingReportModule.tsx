@@ -213,16 +213,43 @@ export default function CustomerAgingReportModule({
 
   return (
     <div className="space-y-6 animate-in fade-in duration-150 p-2 sm:p-6 print:p-0 print:m-0">
-      {/* Top Breadcrumb & Action Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 print:hidden">
+      {/* ================= PRINT HEADER (visible only during print) ================= */}
+      <div className="hidden print:block border-b border-slate-300 pb-4 mb-4">
+        <div className="flex justify-between items-start">
+          <div>
+            <h1 className="text-xl font-bold text-slate-900">
+              Wayne Trademark Printing &amp; Packaging de Honduras S. de R.L.
+            </h1>
+            <p className="text-xs text-slate-600">
+              RTN: 05019008183490 • ZIP Búfalo, Villanueva, Cortés
+            </p>
+            <h2 className="text-base font-bold text-slate-800 mt-2">
+              Reporte de Antigüedad de Saldos de Clientes (Cuentas por Cobrar)
+            </h2>
+          </div>
+          <div className="text-right text-xs text-slate-600">
+            <p>
+              <b>Fecha de corte:</b> {asOfDate}
+            </p>
+            <p>
+              <b>Fecha de emisión:</b> {new Date().toLocaleDateString("es-HN")}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* ================= SCREEN HEADER ================= */}
+      <div className="space-y-4 print:hidden">
         <div className="flex items-center gap-3">
           <button
             type="button"
             onClick={onBack}
-            className="text-xs font-semibold text-slate-600 hover:text-slate-900 transition flex items-center gap-1.5 cursor-pointer"
+            className="text-xs font-semibold text-slate-600 hover:text-slate-900 transition flex items-center gap-1.5 cursor-pointer w-fit"
           >
-            <ArrowLeft className="w-4 h-4 text-slate-500" />
-            <span>Regresar</span>
+            <svg className="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
+            </svg>
+            <span>Regresar a Reportes</span>
           </button>
           <span className="text-slate-300">/</span>
           <span className="text-xs font-semibold text-slate-500">Reportes Financieros</span>
@@ -230,205 +257,176 @@ export default function CustomerAgingReportModule({
           <span className="text-xs font-bold text-slate-900">Antigüedad de Saldos Clientes</span>
         </div>
 
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={fetchAgingData}
-            title="Recargar reporte"
-            className="p-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 transition cursor-pointer shadow-xs"
-          >
-            <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin text-[#f6821f]" : ""}`} />
-          </button>
-          <button
-            type="button"
-            onClick={handleExportCSV}
-            className="px-3.5 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer shadow-xs"
-          >
-            <Download className="w-4 h-4 text-slate-500" />
-            <span className="hidden sm:inline">Exportar CSV</span>
-          </button>
-          <button
-            type="button"
-            onClick={handlePrint}
-            className="px-3.5 py-2 rounded-xl bg-white hover:bg-slate-50 text-slate-800 border border-slate-300 text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer shadow-xs"
-          >
-            <Printer className="w-4 h-4 text-slate-600" />
-            <span className="hidden sm:inline">Imprimir / PDF</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Header Banner */}
-      <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
-            <div className="flex items-center gap-2.5">
-              <div className="w-10 h-10 rounded-xl bg-[#fff7ed] text-[#f6821f] flex items-center justify-center font-bold">
-                <Clock className="w-5 h-5" />
-              </div>
-              <div>
-                <h1 className="font-extrabold text-xl text-slate-900 tracking-tight">
-                  Reporte de Antigüedad de Saldos de Clientes
-                </h1>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Wayne Trademark Honduras — Cuentas por Cobrar comerciales clasificadas por vencimiento (30 / 60 / 90+ días)
-                </p>
-              </div>
+            <div className="flex items-center gap-2">
+              <h2 className="text-xl font-bold text-slate-900">
+                Antigüedad de Saldos de Clientes
+              </h2>
+              <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-[#fff7ed] text-[#f6821f] border border-[#ffedd5]">
+                Cuentas por Cobrar (AR)
+              </span>
             </div>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Estratificación cronológica de facturas de venta y saldos pendientes por cobrar de clientes.
+            </p>
           </div>
 
-          {/* Controls: Cutoff Date & Currency */}
-          <div className="flex flex-wrap items-center gap-3 print:hidden">
-            <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5">
-              <Calendar className="w-4 h-4 text-slate-500 shrink-0" />
-              <div className="text-left">
-                <label className="block text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
-                  Fecha de corte
-                </label>
-                <input
-                  type="date"
-                  value={asOfDate}
-                  onChange={(e) => setAsOfDate(e.target.value)}
-                  className="bg-transparent text-xs font-bold text-slate-800 focus:outline-none cursor-pointer"
-                />
-              </div>
-            </div>
+          {/* Global Actions */}
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={fetchAgingData}
+              disabled={loading}
+              className="p-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-semibold text-xs transition flex items-center gap-1.5 shadow-2xs cursor-pointer disabled:opacity-50"
+              title="Actualizar reporte"
+            >
+              <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin text-[#f6821f]" : ""}`} />
+              <span className="hidden sm:inline">Refrescar</span>
+            </button>
 
-            <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5">
-              <DollarSign className="w-4 h-4 text-slate-500 shrink-0" />
-              <div className="text-left">
-                <label className="block text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
-                  Moneda
-                </label>
-                <select
-                  value={currency}
-                  onChange={(e) => setCurrency(e.target.value)}
-                  className="bg-transparent text-xs font-bold text-slate-800 focus:outline-none cursor-pointer"
-                >
-                  <option value="ALL">Todas las monedas</option>
-                  <option value="USD">Dólares (USD)</option>
-                  <option value="HNL">Lempiras (HNL)</option>
-                </select>
-              </div>
-            </div>
-          </div>
-        </div>
+            <button
+              type="button"
+              onClick={handleExportCSV}
+              className="px-3.5 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-semibold text-xs transition flex items-center gap-1.5 shadow-2xs cursor-pointer"
+            >
+              <Download className="w-4 h-4 text-emerald-600" />
+              <span>Exportar CSV</span>
+            </button>
 
-        {/* Print-only Header Info */}
-        <div className="hidden print:block border-t border-slate-200 mt-4 pt-3 text-xs text-slate-600">
-          <div className="flex justify-between">
-            <span><strong>Empresa:</strong> Wayne Trademark Honduras S. de R.L.</span>
-            <span><strong>Fecha de corte:</strong> {asOfDate}</span>
-            <span><strong>Generado:</strong> {new Date().toLocaleString("es-HN")}</span>
+            <button
+              type="button"
+              onClick={handlePrint}
+              className="px-3.5 py-2 rounded-xl bg-[#f6821f] hover:bg-[#e07216] text-white font-bold text-xs transition flex items-center gap-1.5 shadow-md shadow-[#f6821f]/20 cursor-pointer"
+            >
+              <Printer className="w-4 h-4" />
+              <span>Imprimir PDF</span>
+            </button>
           </div>
         </div>
       </div>
 
-      {/* KPI Cards Grid */}
+      {/* ================= EXECUTIVE KPI SUMMARY CARDS ================= */}
       {summary && (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
-          {/* Card 1: Total Receivables */}
-          <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-xs flex flex-col justify-between col-span-2 sm:col-span-1 lg:col-span-1">
-            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-              Total Cartera
-            </span>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3.5">
+          {/* Card 1: Total Cuentas por Cobrar */}
+          <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+                Total Cuentas por Cobrar
+              </span>
+              <span className="w-6 h-6 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center text-xs font-bold">
+                $
+              </span>
+            </div>
             <div className="mt-2">
-              <span className="text-xl sm:text-2xl font-extrabold text-slate-900">
+              <span className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
                 {formatCurrency(summary.totalReceivables)}
               </span>
-              <p className="text-[11px] text-slate-500 mt-1">
-                {summary.totalCustomers} clientes ({summary.totalInvoices} facturas)
-              </p>
+            </div>
+            <div className="mt-2 pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
+              <span>{summary.totalCustomers} clientes</span>
+              <span>{summary.totalInvoices} facturas</span>
             </div>
           </div>
 
-          {/* Card 2: Corriente */}
-          <div className="p-4 rounded-2xl bg-emerald-50/70 border border-emerald-200 shadow-xs flex flex-col justify-between">
+          {/* Card 2: Corriente (Al día) */}
+          <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden">
             <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold text-emerald-800 uppercase tracking-wider">
-                Corriente
+              <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+                Al Día (Corriente)
               </span>
-              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
+              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-700 border border-emerald-200">
                 {summary.currentPct}%
               </span>
             </div>
             <div className="mt-2">
-              <span className="text-xl sm:text-2xl font-extrabold text-emerald-700">
+              <span className="text-2xl sm:text-3xl font-bold text-emerald-700 tracking-tight">
                 {formatCurrency(summary.current)}
               </span>
-              <p className="text-[11px] text-emerald-600 mt-1">Sin vencer</p>
+            </div>
+            <div className="mt-2 pt-2 border-t border-slate-100 text-[11px] text-slate-500">
+              <span>Sin vencer</span>
             </div>
           </div>
 
-          {/* Card 3: 1 a 30 Días */}
-          <div className="p-4 rounded-2xl bg-amber-50/70 border border-amber-200 shadow-xs flex flex-col justify-between">
+          {/* Card 3: 1 a 30 días */}
+          <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden">
             <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold text-amber-800 uppercase tracking-wider">
-                1 - 30 Días
+              <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+                1 a 30 Días
               </span>
-              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-800">
+              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
                 {summary.days1to30Pct}%
               </span>
             </div>
             <div className="mt-2">
-              <span className="text-xl sm:text-2xl font-extrabold text-amber-700">
+              <span className="text-2xl sm:text-3xl font-bold text-amber-700 tracking-tight">
                 {formatCurrency(summary.days1to30)}
               </span>
-              <p className="text-[11px] text-amber-600 mt-1">Vencimiento leve</p>
+            </div>
+            <div className="mt-2 pt-2 border-t border-slate-100 text-[11px] text-slate-500">
+              <span>Mora temprana</span>
             </div>
           </div>
 
-          {/* Card 4: 31 a 60 Días */}
-          <div className="p-4 rounded-2xl bg-orange-50/70 border border-orange-200 shadow-xs flex flex-col justify-between">
+          {/* Card 4: 31 a 60 días */}
+          <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden">
             <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold text-orange-800 uppercase tracking-wider">
-                31 - 60 Días
+              <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+                31 a 60 Días
               </span>
-              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-orange-100 text-orange-800">
+              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-orange-100 text-[#e07216] border border-orange-200">
                 {summary.days31to60Pct}%
               </span>
             </div>
             <div className="mt-2">
-              <span className="text-xl sm:text-2xl font-extrabold text-orange-700">
+              <span className="text-2xl sm:text-3xl font-bold text-[#e07216] tracking-tight">
                 {formatCurrency(summary.days31to60)}
               </span>
-              <p className="text-[11px] text-orange-600 mt-1">Mora moderada</p>
+            </div>
+            <div className="mt-2 pt-2 border-t border-slate-100 text-[11px] text-slate-500">
+              <span>Mora intermedia</span>
             </div>
           </div>
 
-          {/* Card 5: 61 a 90 Días */}
-          <div className="p-4 rounded-2xl bg-rose-50/70 border border-rose-200 shadow-xs flex flex-col justify-between">
+          {/* Card 5: 61 a 90 días */}
+          <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden">
             <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold text-rose-800 uppercase tracking-wider">
-                61 - 90 Días
+              <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+                61 a 90 Días
               </span>
-              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-rose-100 text-rose-800">
+              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-700 border border-rose-200">
                 {summary.days61to90Pct}%
               </span>
             </div>
             <div className="mt-2">
-              <span className="text-xl sm:text-2xl font-extrabold text-rose-700">
+              <span className="text-2xl sm:text-3xl font-bold text-rose-700 tracking-tight">
                 {formatCurrency(summary.days61to90)}
               </span>
-              <p className="text-[11px] text-rose-600 mt-1">Mora alta</p>
+            </div>
+            <div className="mt-2 pt-2 border-t border-slate-100 text-[11px] text-slate-500">
+              <span>Prioridad alta</span>
             </div>
           </div>
 
-          {/* Card 6: Más de 90 Días */}
-          <div className="p-4 rounded-2xl bg-red-100/70 border border-red-300 shadow-xs flex flex-col justify-between">
+          {/* Card 6: Más de 90 días */}
+          <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden">
             <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold text-red-900 uppercase tracking-wider">
-                &gt; 90 Días
+              <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+                Más de 90 Días
               </span>
-              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-red-200 text-red-900">
+              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-200 text-rose-900 border border-rose-300">
                 {summary.daysOver90Pct}%
               </span>
             </div>
             <div className="mt-2">
-              <span className="text-xl sm:text-2xl font-extrabold text-red-800">
+              <span className="text-2xl sm:text-3xl font-bold text-rose-900 tracking-tight">
                 {formatCurrency(summary.daysOver90)}
               </span>
-              <p className="text-[11px] text-red-700 font-semibold mt-1">Crítico</p>
+            </div>
+            <div className="mt-2 pt-2 border-t border-slate-100 text-[11px] text-rose-700 font-bold">
+              <span>Crítico</span>
             </div>
           </div>
         </div>
@@ -508,26 +506,30 @@ export default function CustomerAgingReportModule({
         </div>
       )}
 
-      {/* Filter and Search Bar */}
-      <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3 print:hidden">
-        <div className="relative w-full sm:w-80">
-          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-          <input
-            type="text"
-            placeholder="Buscar por cliente o RTN..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-9 pr-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#f6821f]"
-          />
-        </div>
+      {/* ================= FILTER TOOLBAR ================= */}
+      <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4 print:hidden">
+        <div className="flex flex-wrap items-center gap-3">
+          {/* As Of Date Selector */}
+          <div className="flex items-center gap-2 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-200">
+            <Calendar className="w-4 h-4 text-slate-500" />
+            <span className="text-xs font-semibold text-slate-700">Corte al:</span>
+            <input
+              type="date"
+              value={asOfDate}
+              onChange={(e) => setAsOfDate(e.target.value)}
+              className="text-xs bg-transparent font-bold text-slate-900 focus:outline-none cursor-pointer"
+            />
+          </div>
 
-        <div className="flex items-center gap-2 w-full sm:w-auto overflow-x-auto">
-          <div className="flex items-center p-1 bg-slate-100 rounded-xl text-xs font-semibold text-slate-600 shrink-0">
+          {/* Quick Filter Tabs */}
+          <div className="flex items-center bg-slate-100 p-1 rounded-xl">
             <button
               type="button"
               onClick={() => setFilterType("ALL")}
-              className={`px-3 py-1.5 rounded-lg transition cursor-pointer ${
-                filterType === "ALL" ? "bg-white text-slate-900 shadow-xs font-bold" : "hover:text-slate-900"
+              className={`px-3 py-1 rounded-lg text-xs font-bold transition cursor-pointer ${
+                filterType === "ALL"
+                  ? "bg-white text-slate-900 shadow-xs"
+                  : "text-slate-600 hover:text-slate-900"
               }`}
             >
               Todos ({customers.length})
@@ -535,29 +537,60 @@ export default function CustomerAgingReportModule({
             <button
               type="button"
               onClick={() => setFilterType("OVERDUE_ONLY")}
-              className={`px-3 py-1.5 rounded-lg transition cursor-pointer ${
-                filterType === "OVERDUE_ONLY" ? "bg-white text-amber-700 shadow-xs font-bold" : "hover:text-slate-900"
+              className={`px-3 py-1 rounded-lg text-xs font-bold transition cursor-pointer ${
+                filterType === "OVERDUE_ONLY"
+                  ? "bg-white text-amber-700 shadow-xs"
+                  : "text-slate-600 hover:text-slate-900"
               }`}
             >
-              Con Mora (&gt;0d)
+              Solo con Mora
             </button>
             <button
               type="button"
               onClick={() => setFilterType("CRITICAL_60")}
-              className={`px-3 py-1.5 rounded-lg transition cursor-pointer ${
-                filterType === "CRITICAL_60" ? "bg-white text-red-700 shadow-xs font-bold" : "hover:text-slate-900"
+              className={`px-3 py-1 rounded-lg text-xs font-bold transition cursor-pointer ${
+                filterType === "CRITICAL_60"
+                  ? "bg-white text-rose-700 shadow-xs"
+                  : "text-slate-600 hover:text-slate-900"
               }`}
             >
-              Críticos (&gt;30d)
+              Crítico (&gt;30d)
             </button>
+          </div>
+
+          {/* Currency Filter */}
+          <select
+            value={currency}
+            onChange={(e) => setCurrency(e.target.value)}
+            className="px-3 py-1.5 rounded-xl border border-slate-200 bg-slate-50 text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#f6821f] cursor-pointer"
+          >
+            <option value="ALL">Todas las monedas</option>
+            <option value="USD">USD ($)</option>
+            <option value="HNL">HNL (L)</option>
+          </select>
+        </div>
+
+        {/* Search and Expand All */}
+        <div className="flex items-center gap-2">
+          <div className="relative">
+            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              placeholder="Buscar por cliente o RTN..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-9 pr-3 py-1.5 rounded-xl border border-slate-200 bg-slate-50 text-xs text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#f6821f] w-64"
+            />
           </div>
 
           <button
             type="button"
             onClick={toggleExpandAll}
-            className="px-3 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold transition cursor-pointer shrink-0"
+            className="px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold transition cursor-pointer shadow-2xs shrink-0"
           >
-            {Object.keys(expandedCustomers).length === customers.length ? "Colapsar Todo" : "Expandir Todo"}
+            {Object.keys(expandedCustomers).length === customers.length && customers.length > 0
+              ? "Colapsar todo"
+              : "Expandir todo"}
           </button>
         </div>
       </div>
