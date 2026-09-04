@@ -8,6 +8,7 @@ import AccountingBooksModule from "@/components/AccountingBooksModule";
 import CustomerAgingReportModule from "@/components/CustomerAgingReportModule";
 import CustomerStatementModule from "@/components/CustomerStatementModule";
 import VendorAgingReportModule from "@/components/VendorAgingReportModule";
+import QuotesModule from "@/components/QuotesModule";
 
 
 
@@ -193,7 +194,7 @@ type PurchaseInvoice = {
   createdAt?: string;
 };
 
-type NavItem = "dashboard" | "plan-cuentas" | "transacciones" | "macola-sync" | "caja-chica" | "clientes" | "proveedores" | "vendedores" | "comisiones" | "inventario" | "lotes" | "series" | "notas-credito-debito" | "reportes" | "configuracion" | "factura-editor" | "lista-facturas" | "lista-ordenes-compra" | "orden-compra-editor" | "factura-compra-lista" | "factura-compra-editor" | "deposito-bancario" | "recibir-pago" | "agregar-gasto" | "pagar-proveedor" | "devoluciones-proveedor" | "antiguedad-saldos" | "antiguedad-saldos-proveedores" | "estado-cuenta-cliente";
+type NavItem = "dashboard" | "plan-cuentas" | "transacciones" | "macola-sync" | "caja-chica" | "clientes" | "cotizaciones" | "proveedores" | "vendedores" | "comisiones" | "inventario" | "lotes" | "series" | "notas-credito-debito" | "reportes" | "configuracion" | "factura-editor" | "lista-facturas" | "lista-ordenes-compra" | "orden-compra-editor" | "factura-compra-lista" | "factura-compra-editor" | "deposito-bancario" | "recibir-pago" | "agregar-gasto" | "pagar-proveedor" | "devoluciones-proveedor" | "antiguedad-saldos" | "antiguedad-saldos-proveedores" | "estado-cuenta-cliente";
 
 
 
@@ -2638,9 +2639,11 @@ export default function AdminDashboard() {
   const [alternateRowColor, setAlternateRowColor] = useState(false);
   const [showInactiveAccounts, setShowInactiveAccounts] = useState(true);
   const [showReportBadges, setShowReportBadges] = useState(false);
+  const [quotesAutoOpenCreate, setQuotesAutoOpenCreate] = useState(false);
 
   // Quick Actions Bar State & Config
   const quickActions = [
+    { id: "crear-cotizacion", label: "Crear Cotización" },
     { id: "crear-factura", label: "Crear Factura de Venta" },
     { id: "registrar-pago", label: "Registrar Cobro a Cliente" },
     { id: "crear-factura-compra", label: "Registrar Factura de Compra" },
@@ -2679,6 +2682,11 @@ export default function AdminDashboard() {
     setShowAccionesDropdown(false);
     setModalError("");
     setModalSuccess("");
+    if (id === "crear-cotizacion") {
+      setQuotesAutoOpenCreate(true);
+      setCurrentView("cotizaciones");
+      return;
+    }
     if (id === "crear-producto") {
       setShowNewProductDrawer(true);
       return;
@@ -5543,6 +5551,7 @@ export default function AdminDashboard() {
               title={sidebarCollapsed ? "Ventas" : undefined}
               className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl transition cursor-pointer text-slate-700 hover:bg-slate-100 ${
                 currentView === "clientes" ||
+                currentView === "cotizaciones" ||
                 currentView === "lista-facturas" ||
                 currentView === "factura-editor" ||
                 currentView === "notas-credito-debito" ||
@@ -5588,7 +5597,19 @@ export default function AdminDashboard() {
                   </span>
                 </button>
 
-                {/* 2. Facturas */}
+                {/* 2. Cotizaciones */}
+                <button
+                  onClick={() => setCurrentView("cotizaciones")}
+                  className={`w-full text-left px-2.5 py-1.5 rounded-lg transition cursor-pointer ${
+                    currentView === "cotizaciones"
+                      ? "bg-[#fff7ed] text-[#f6821f] font-semibold"
+                      : "text-slate-500 hover:text-slate-900 hover:bg-slate-50"
+                  }`}
+                >
+                  <span>Cotizaciones</span>
+                </button>
+
+                {/* 3. Facturas */}
                 <button
                   onClick={() => setCurrentView("lista-facturas")}
                   className={`w-full text-left px-2.5 py-1.5 rounded-lg transition cursor-pointer ${
@@ -5903,6 +5924,7 @@ export default function AdminDashboard() {
                   {currentView === "macola-sync" && "Contabilidad / Transacciones de Integración"}
                   {currentView === "caja-chica" && "Contabilidad / Arqueo & Control de Caja Chica"}
                   {currentView === "clientes" && "Directorio de Clientes"}
+                  {currentView === "cotizaciones" && "Ventas / Cotizaciones & Presupuestos"}
                   {currentView === "lista-facturas" && "Gestión de Facturas"}
                   {currentView === "notas-credito-debito" && "Notas de Crédito / Débito"}
                   {currentView === "proveedores" && "Directorio de Proveedores"}
@@ -13302,6 +13324,32 @@ export default function AdminDashboard() {
                 </div>
               )}
             </div>
+            </div>
+          )}
+
+          {/* ================= VIEW: COTIZACIONES ================= */}
+          {currentView === "cotizaciones" && (
+            <div className="animate-in fade-in duration-150 p-6">
+              <QuotesModule
+                customers={customers}
+                inventory={inventory}
+                salesReps={salesReps}
+                autoOpenCreate={quotesAutoOpenCreate}
+                onAutoOpenCreateConsumed={() => setQuotesAutoOpenCreate(false)}
+                onBack={() => setCurrentView("dashboard")}
+                onOpenInvoiceEditor={(prefilled) => {
+                  openInvoiceEditor(prefilled);
+                }}
+                onNavigateToInvoices={() => setCurrentView("lista-facturas")}
+                onNavigateToAccounting={() => {
+                  fetch("/api/accounts")
+                    .then((r) => r.json())
+                    .then((accRes) => {
+                      if (accRes.success) setAccounts(accRes.data || []);
+                    });
+                  setCurrentView("plan-cuentas");
+                }}
+              />
             </div>
           )}
 

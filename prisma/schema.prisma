@@ -430,6 +430,7 @@ model SalesInvoice {
   status              String             @default("Emitida") // "Borrador" | "Emitida" | "Pagada" | "Anulada"
   journalEntryId      String?
   lines               SalesInvoiceLine[]
+  quotes              Quote[]
   createdAt           DateTime           @default(now())
   updatedAt           DateTime           @updatedAt
 }
@@ -446,5 +447,50 @@ model SalesInvoiceLine {
   amount         Float        @default(0)
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
+}
+
+model Quote {
+  id               String       @id @default(cuid())
+  quoteNumber      String       @unique // e.g. "COT-2026-0001"
+  customerId       String?
+  customerName     String       @default("Cliente Contado")
+  customerRtn      String?
+  customerAddress  String?
+  customerEmail    String?
+  customerPhone    String?
+  quoteDate        String       // e.g. "2026-09-04"
+  validUntil       String       // e.g. "2026-10-04"
+  paymentTerms     String       @default("Neto 30 días")
+  currency         String       @default("USD")
+  salesRepId       String?
+  salesRepName     String?
+  notes            String?
+  termsConditions  String?
+  discount         Float        @default(0)
+  subtotal         Float        @default(0)
+  taxRate          Float        @default(15) // ISV % (15% o 18%)
+  tax              Float        @default(0)  // ISV calculado
+  total            Float        @default(0)
+  status           String       @default("Borrador") // "Borrador" | "Enviada" | "Aprobada" | "Facturada" | "Rechazada"
+  invoiceNumber    String?      // Reference to created invoice number
+  salesInvoiceId   String?      // Reference to SalesInvoice ID
+  salesInvoice     SalesInvoice? @relation(fields: [salesInvoiceId], references: [id], onDelete: SetNull)
+  lines            QuoteLine[]
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+}
+
+model QuoteLine {
+  id          String   @id @default(cuid())
+  quoteId     String
+  quote       Quote    @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  productName String
+  sku         String?
+  description String?
+  quantity    Float    @default(1)
+  rate        Float    @default(0)
+  amount      Float    @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 
