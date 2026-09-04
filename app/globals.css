@@ -60,7 +60,23 @@ body {
   }
 
   /* Force display of official printable document templates */
-  #printable-invoice-document,
+  #printable-invoice-document {
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: space-between !important;
+    min-height: calc(100vh - 48px) !important;
+    box-sizing: border-box !important;
+    visibility: visible !important;
+    position: static !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 24px !important;
+    box-shadow: none !important;
+    border: none !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+
   #printable-po-document,
   #printable-note-document,
   #printable-cash-audit-document,

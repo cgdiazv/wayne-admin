@@ -1992,13 +1992,18 @@ export default function AdminDashboard() {
       wrapper.style.top = "0";
       wrapper.style.width = "816px";
       wrapper.style.background = "#ffffff";
+      wrapper.style.minHeight = "1056px";
       wrapper.style.color = "#000000";
       wrapper.style.zIndex = "-9999";
 
       const clone = printableElem.cloneNode(true) as HTMLElement;
       clone.classList.remove("hidden");
       clone.classList.remove("print:block");
-      clone.style.display = "block";
+      clone.classList.remove("print:flex");
+      clone.style.display = "flex";
+      clone.style.flexDirection = "column";
+      clone.style.justifyContent = "space-between";
+      clone.style.minHeight = "1056px";
       clone.style.width = "100%";
       clone.style.background = "#ffffff";
       clone.style.color = "#000000";
@@ -14280,8 +14285,9 @@ export default function AdminDashboard() {
             <div className="fixed inset-0 z-40 flex flex-col bg-slate-100 text-slate-800 animate-in fade-in duration-150 overflow-hidden print:static print:inset-auto print:bg-white print:overflow-visible print:block print:p-0">
               
               {/* OFFICIAL PRINTABLE INVOICE DOCUMENT (Shown exclusively when printing via window.print) */}
-              <div id="printable-invoice-document" className="hidden print:block p-8 bg-white text-slate-900 text-xs">
-                {/* Header */}
+              <div id="printable-invoice-document" className="hidden print:flex min-h-[10.5in] flex-col justify-between p-8 bg-white text-slate-900 text-xs">
+                <div>
+                  {/* Header */}
                 <div className="flex justify-between items-start border-b-2 border-slate-900 pb-6 mb-6">
                   <div>
                     <h1 className="text-2xl font-black text-[#f6821f] tracking-tight">WAYNE TRADEMARK</h1>
@@ -14354,100 +14360,104 @@ export default function AdminDashboard() {
                     ))}
                   </tbody>
                 </table>
-
-                {/* SAR Fiscal Totals & Valor en Letras (Limpio y Moderno) */}
-                <div className="grid grid-cols-12 gap-6 my-6 items-start">
-                  {/* Left: VALOR EN LETRAS */}
-                  <div className="col-span-7 bg-slate-50/80 rounded-2xl p-3.5 border border-slate-200/80 flex flex-col justify-between">
-                    <div>
-                      <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block mb-1.5">
-                        Valor en Letras
-                      </span>
-                      <p className="font-bold text-slate-800 text-xs uppercase leading-relaxed tracking-wide">
-                        {numberToWordsSpanish(invoiceTotal)}
-                      </p>
-                    </div>
-                    <div className="pt-3 border-t border-slate-200/60 mt-3 flex items-center justify-between text-[11px] text-slate-400">
-                      <span className="font-medium">Documento Fiscal Autorizado por SAR</span>
-                      <span className="font-mono font-semibold">{companySettings.cai ? "CAI Válido" : ""}</span>
-                    </div>
-                  </div>
-
-                  {/* Right: Breakdown Table */}
-                  <div className="col-span-5 bg-white rounded-2xl border border-slate-200/80 p-3.5 shadow-sm space-y-0.5 text-xs">
-                    {/* 1. DESCUENTOS */}
-                    <div className="flex justify-between items-center py-[2px] text-slate-600">
-                      <span className="font-semibold text-slate-500 uppercase text-[10px] tracking-wider">Descuentos</span>
-                      <span className="font-mono font-medium text-slate-700">{formatFiscalMoney(invoiceDiscount) || "—"}</span>
-                    </div>
-
-                    {/* 2. IMPORTE EXENTO */}
-                    <div className="flex justify-between items-center py-[2px] text-slate-600">
-                      <span className="font-semibold text-slate-500 uppercase text-[10px] tracking-wider">Importe Exento</span>
-                      <span className="font-mono font-medium text-slate-700">{formatFiscalMoney(invoiceExempt) || "—"}</span>
-                    </div>
-
-                    {/* 3. IMPORTE EXONERADO */}
-                    <div className="flex justify-between items-center py-[2px] text-slate-600">
-                      <span className="font-semibold text-slate-500 uppercase text-[10px] tracking-wider">Importe Exonerado</span>
-                      <span className="font-mono font-medium text-slate-700">{formatFiscalMoney(invoiceExonerated) || "—"}</span>
-                    </div>
-
-                    {/* 4. IMP GRAVADO 15% */}
-                    <div className="flex justify-between items-center py-[2px] text-slate-600">
-                      <span className="font-semibold text-slate-500 uppercase text-[10px] tracking-wider">Imp. Gravado {salesSettings?.tasaIsvGeneral ?? 15}%</span>
-                      <span className="font-mono font-medium text-slate-700">{formatFiscalMoney(invoiceGravado15) || "—"}</span>
-                    </div>
-
-                    {/* IMP GRAVADO 18% */}
-                    {salesSettings.permitirIsv18 && (
-                      <div className="flex justify-between items-center py-[2px] text-slate-600">
-                        <span className="font-semibold text-slate-500 uppercase text-[10px] tracking-wider">Imp. Gravado 18%</span>
-                        <span className="font-mono font-medium text-slate-700">{formatFiscalMoney(invoiceGravado18) || "—"}</span>
-                      </div>
-                    )}
-
-                    <div className="border-t border-slate-100 my-0.5" />
-
-                    {/* 5. SUBTOTAL */}
-                    <div className="flex justify-between items-center py-[2px] text-slate-600">
-                      <span className="font-semibold text-slate-500 uppercase text-[10px] tracking-wider">Subtotal</span>
-                      <span className="font-mono font-bold text-slate-900">{formatFiscalMoney(invoiceSubtotal, true)}</span>
-                    </div>
-
-                    {/* 6. TOTAL I.S.V. 15% */}
-                    <div className="flex justify-between items-center py-[2px] text-slate-600">
-                      <span className="font-semibold text-slate-500 uppercase text-[10px] tracking-wider">Total I.S.V. {salesSettings?.tasaIsvGeneral ?? 15}%</span>
-                      <span className="font-mono font-medium text-slate-700">{formatFiscalMoney(invoiceIsv15, invoiceForm.applyIsv15) || "—"}</span>
-                    </div>
-
-                    {/* TOTAL I.S.V. 18% */}
-                    {salesSettings.permitirIsv18 && (
-                      <div className="flex justify-between items-center py-[2px] text-slate-600">
-                        <span className="font-semibold text-slate-500 uppercase text-[10px] tracking-wider">Total I.S.V. 18%</span>
-                        <span className="font-mono font-medium text-slate-700">{formatFiscalMoney(invoiceIsv18, invoiceForm.applyIsv18) || "—"}</span>
-                      </div>
-                    )}
-
-                    {/* 7. TOTAL A PAGAR */}
-                    <div className="pt-1">
-                      <div className="flex justify-between items-center py-2 px-3 bg-slate-200 border border-slate-300 text-slate-900 rounded-xl shadow-xs">
-                        <span className="font-black text-xs uppercase tracking-wider text-slate-700">Total a Pagar</span>
-                        <span className="font-mono font-black text-base text-slate-900">{formatFiscalMoney(invoiceTotal, true)}</span>
-                      </div>
-                    </div>
-                  </div>
                 </div>
 
-                {/* Fiscal Footer SAR */}
-                <div className="mt-4 pt-3 border-t border-slate-300 flex justify-between items-center text-xs text-slate-700">
-                  <div>
-                    <span className="font-bold text-slate-900">Rango Autorizado: </span>
-                    <span className="font-mono">{companySettings.rangoAutorizado}</span>
+                {/* SAR Fiscal Totals & Valor en Letras + Footer SAR (Pushed to bottom of invoice page) */}
+                <div className="mt-auto pt-6 space-y-4">
+                  {/* SAR Fiscal Totals & Valor en Letras (Limpio y Moderno) */}
+                  <div className="grid grid-cols-12 gap-6 items-start">
+                    {/* Left: VALOR EN LETRAS */}
+                    <div className="col-span-7 bg-slate-50/80 rounded-2xl p-3.5 border border-slate-200/80 flex flex-col justify-between">
+                      <div>
+                        <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block mb-1.5">
+                          Valor en Letras
+                        </span>
+                        <p className="font-bold text-slate-800 text-xs uppercase leading-relaxed tracking-wide">
+                          {numberToWordsSpanish(invoiceTotal)}
+                        </p>
+                      </div>
+                      <div className="pt-3 border-t border-slate-200/60 mt-3 flex items-center justify-between text-[11px] text-slate-400">
+                        <span className="font-medium">Documento Fiscal Autorizado por SAR</span>
+                        <span className="font-mono font-semibold">{companySettings.cai ? "CAI Válido" : ""}</span>
+                      </div>
+                    </div>
+
+                    {/* Right: Breakdown Table */}
+                    <div className="col-span-5 bg-white rounded-2xl border border-slate-200/80 p-3.5 shadow-sm space-y-0.5 text-xs">
+                      {/* 1. DESCUENTOS */}
+                      <div className="flex justify-between items-center py-[2px] text-slate-600">
+                        <span className="font-semibold text-slate-500 uppercase text-[10px] tracking-wider">Descuentos</span>
+                        <span className="font-mono font-medium text-slate-700">{formatFiscalMoney(invoiceDiscount) || "—"}</span>
+                      </div>
+
+                      {/* 2. IMPORTE EXENTO */}
+                      <div className="flex justify-between items-center py-[2px] text-slate-600">
+                        <span className="font-semibold text-slate-500 uppercase text-[10px] tracking-wider">Importe Exento</span>
+                        <span className="font-mono font-medium text-slate-700">{formatFiscalMoney(invoiceExempt) || "—"}</span>
+                      </div>
+
+                      {/* 3. IMPORTE EXONERADO */}
+                      <div className="flex justify-between items-center py-[2px] text-slate-600">
+                        <span className="font-semibold text-slate-500 uppercase text-[10px] tracking-wider">Importe Exonerado</span>
+                        <span className="font-mono font-medium text-slate-700">{formatFiscalMoney(invoiceExonerated) || "—"}</span>
+                      </div>
+
+                      {/* 4. IMP GRAVADO 15% */}
+                      <div className="flex justify-between items-center py-[2px] text-slate-600">
+                        <span className="font-semibold text-slate-500 uppercase text-[10px] tracking-wider">Imp. Gravado {salesSettings?.tasaIsvGeneral ?? 15}%</span>
+                        <span className="font-mono font-medium text-slate-700">{formatFiscalMoney(invoiceGravado15) || "—"}</span>
+                      </div>
+
+                      {/* IMP GRAVADO 18% */}
+                      {salesSettings.permitirIsv18 && (
+                        <div className="flex justify-between items-center py-[2px] text-slate-600">
+                          <span className="font-semibold text-slate-500 uppercase text-[10px] tracking-wider">Imp. Gravado 18%</span>
+                          <span className="font-mono font-medium text-slate-700">{formatFiscalMoney(invoiceGravado18) || "—"}</span>
+                        </div>
+                      )}
+
+                      <div className="border-t border-slate-100 my-0.5" />
+
+                      {/* 5. SUBTOTAL */}
+                      <div className="flex justify-between items-center py-[2px] text-slate-600">
+                        <span className="font-semibold text-slate-500 uppercase text-[10px] tracking-wider">Subtotal</span>
+                        <span className="font-mono font-bold text-slate-900">{formatFiscalMoney(invoiceSubtotal, true)}</span>
+                      </div>
+
+                      {/* 6. TOTAL I.S.V. 15% */}
+                      <div className="flex justify-between items-center py-[2px] text-slate-600">
+                        <span className="font-semibold text-slate-500 uppercase text-[10px] tracking-wider">Total I.S.V. {salesSettings?.tasaIsvGeneral ?? 15}%</span>
+                        <span className="font-mono font-medium text-slate-700">{formatFiscalMoney(invoiceIsv15, invoiceForm.applyIsv15) || "—"}</span>
+                      </div>
+
+                      {/* TOTAL I.S.V. 18% */}
+                      {salesSettings.permitirIsv18 && (
+                        <div className="flex justify-between items-center py-[2px] text-slate-600">
+                          <span className="font-semibold text-slate-500 uppercase text-[10px] tracking-wider">Total I.S.V. 18%</span>
+                          <span className="font-mono font-medium text-slate-700">{formatFiscalMoney(invoiceIsv18, invoiceForm.applyIsv18) || "—"}</span>
+                        </div>
+                      )}
+
+                      {/* 7. TOTAL A PAGAR */}
+                      <div className="pt-1">
+                        <div className="flex justify-between items-center py-2 px-3 bg-slate-200 border border-slate-300 text-slate-900 rounded-xl shadow-xs">
+                          <span className="font-black text-xs uppercase tracking-wider text-slate-700">Total a Pagar</span>
+                          <span className="font-mono font-black text-base text-slate-900">{formatFiscalMoney(invoiceTotal, true)}</span>
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <span className="font-bold text-slate-900">Fecha Límite de Emisión: </span>
-                    <span className="font-mono">{formatFechaLimite(companySettings.fechaLimiteEmision)}</span>
+
+                  {/* Fiscal Footer SAR */}
+                  <div className="pt-3 border-t border-slate-300 flex justify-between items-center text-xs text-slate-700">
+                    <div>
+                      <span className="font-bold text-slate-900">Rango Autorizado: </span>
+                      <span className="font-mono">{companySettings.rangoAutorizado}</span>
+                    </div>
+                    <div className="text-right">
+                      <span className="font-bold text-slate-900">Fecha Límite de Emisión: </span>
+                      <span className="font-mono">{formatFechaLimite(companySettings.fechaLimiteEmision)}</span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -15112,9 +15122,12 @@ export default function AdminDashboard() {
                               ))}
                             </tbody>
                           </table>
+                        </div>
 
+                        {/* SAR Fiscal Totals & Valor en Letras + Footer SAR (Pushed to bottom of invoice page) */}
+                        <div className="mt-auto pt-6 space-y-4">
                           {/* SAR Fiscal Totals & Valor en Letras (Limpio y Moderno) */}
-                          <div className="grid grid-cols-12 gap-6 my-6 items-start">
+                          <div className="grid grid-cols-12 gap-6 items-start">
                             {/* Left: VALOR EN LETRAS */}
                             <div className="col-span-7 bg-slate-50/80 rounded-2xl p-3.5 border border-slate-200/80 flex flex-col justify-between">
                               <div>
@@ -15196,17 +15209,17 @@ export default function AdminDashboard() {
                               </div>
                             </div>
                           </div>
-                        </div>
 
-                        {/* Fiscal Footer SAR */}
-                        <div className="pt-4 mt-8 border-t border-slate-200 flex justify-between items-center text-xs text-slate-700">
-                          <div>
-                            <span className="font-bold text-slate-900">Rango Autorizado: </span>
-                            <span className="font-mono">{companySettings.rangoAutorizado}</span>
-                          </div>
-                          <div className="text-right">
-                            <span className="font-bold text-slate-900">Fecha Límite de Emisión: </span>
-                            <span className="font-mono">{formatFechaLimite(companySettings.fechaLimiteEmision)}</span>
+                          {/* Fiscal Footer SAR */}
+                          <div className="pt-4 border-t border-slate-200 flex justify-between items-center text-xs text-slate-700">
+                            <div>
+                              <span className="font-bold text-slate-900">Rango Autorizado: </span>
+                              <span className="font-mono">{companySettings.rangoAutorizado}</span>
+                            </div>
+                            <div className="text-right">
+                              <span className="font-bold text-slate-900">Fecha Límite de Emisión: </span>
+                              <span className="font-mono">{formatFechaLimite(companySettings.fechaLimiteEmision)}</span>
+                            </div>
                           </div>
                         </div>
                       </div>
