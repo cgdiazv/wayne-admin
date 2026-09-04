@@ -2,6 +2,7 @@
 
 import React, { useState, useMemo } from "react";
 import { numberToSpanishWords } from "@/lib/numberToWords";
+import { ArrowLeft, RefreshCw, Plus } from "lucide-react";
 
 // ==========================================
 // DENOMINATIONS CONFIGURATION
@@ -667,45 +668,24 @@ export default function CajaChicaModule({
   }
 
   return (
-    <div className="space-y-6">
-      {/* ================= TOP HEADER & FUND SELECTOR ================= */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-        <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <button
-              onClick={onBackToDashboard}
-              className="text-xs font-semibold text-slate-500 hover:text-slate-800 transition flex items-center gap-1 cursor-pointer"
-            >
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
-              </svg>
-              Dashboard
-            </button>
-            <span className="text-slate-300">/</span>
-            <span className="text-xs font-medium text-slate-500">Contabilidad</span>
-            <span className="text-slate-300">/</span>
-            <span className="text-xs font-semibold text-[#f6821f]">Caja Chica & Arqueos</span>
-          </div>
-          <div className="flex items-center gap-3">
-            <h1 className="text-xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2">
-              <span className="w-8 h-8 rounded-xl bg-[#f6821f]/10 text-[#f6821f] flex items-center justify-center shrink-0">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
-                </svg>
-              </span>
-              Arqueo & Control de Caja Chica
-            </h1>
-            <span className="px-2.5 py-0.5 text-[11px] font-bold rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
-              Wayne Trademark Honduras
-            </span>
-          </div>
-          <p className="text-xs text-slate-500">
-            Control de fondo fijo, registro pormenorizado de gastos menores, vales provisionales y actas de arqueo físico.
-          </p>
+    <div className="space-y-4 animate-in fade-in duration-150">
+      {/* Top Breadcrumb & Action Bar */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={onBackToDashboard}
+            className="text-xs font-semibold text-slate-600 hover:text-slate-900 transition flex items-center gap-1.5 cursor-pointer"
+          >
+            <ArrowLeft className="w-3.5 h-3.5 text-slate-500" />
+            <span>Dashboard</span>
+          </button>
+          <span className="text-slate-300">/</span>
+          <span className="text-xs font-bold text-slate-900">Caja Chica &amp; Arqueos</span>
         </div>
 
         {/* Fund Selector & Actions */}
-        <div className="flex flex-wrap items-center gap-2.5">
+        <div className="flex items-center gap-2 flex-wrap">
           {funds.length > 0 && (
             <div className="relative">
               <select
@@ -714,7 +694,7 @@ export default function CajaChicaModule({
                   setSelectedFundId(e.target.value);
                   onRefresh(e.target.value);
                 }}
-                className="text-xs font-semibold text-slate-800 bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 pr-8 focus:outline-none focus:ring-2 focus:ring-[#f6821f] cursor-pointer appearance-none"
+                className="text-xs font-semibold text-slate-800 bg-white border border-slate-200 rounded-xl px-3 py-1.5 pr-7 focus:outline-none focus:ring-2 focus:ring-[#f6821f] cursor-pointer shadow-xs appearance-none"
               >
                 {funds.map((f) => (
                   <option key={f.id} value={f.id}>
@@ -723,7 +703,7 @@ export default function CajaChicaModule({
                 ))}
               </select>
               <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-slate-400">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
                 </svg>
               </div>
@@ -731,43 +711,38 @@ export default function CajaChicaModule({
           )}
 
           <button
+            type="button"
             onClick={() => setShowNewFundModal(true)}
             title="Crear nuevo fondo de caja chica"
-            className="p-2 border border-slate-200 hover:border-slate-300 text-slate-600 hover:text-slate-900 rounded-xl text-xs transition cursor-pointer bg-white"
+            className="p-1.5 border border-slate-200 hover:border-slate-300 text-slate-600 hover:text-slate-900 rounded-xl transition cursor-pointer bg-white shadow-xs"
           >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
-            </svg>
+            <Plus className="w-4 h-4" />
           </button>
 
           <button
-            onClick={() => setShowNewExpenseModal(true)}
-            className="px-3 py-2 bg-[#f6821f] hover:bg-[#e07318] text-white font-semibold rounded-xl text-xs transition flex items-center gap-1.5 shadow-sm cursor-pointer"
-          >
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-            </svg>
-            Registrar Gasto
-          </button>
-
-          <button
+            type="button"
             onClick={() => setShowNewVoucherModal(true)}
-            className="px-3 py-2 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 font-semibold rounded-xl text-xs transition flex items-center gap-1.5 cursor-pointer"
+            className="px-3.5 py-1.5 rounded-xl border border-amber-200 bg-amber-50 hover:bg-amber-100 text-amber-900 text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer shadow-xs"
           >
-            <svg className="w-3.5 h-3.5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
-            Nuevo Vale
+            <span>+ Nuevo Vale</span>
           </button>
 
           <button
-            onClick={() => setActiveTab("arqueo")}
-            className="px-3 py-2 bg-slate-900 hover:bg-slate-800 text-white font-semibold rounded-xl text-xs transition flex items-center gap-1.5 cursor-pointer"
+            type="button"
+            onClick={() => setShowNewExpenseModal(true)}
+            className="px-3.5 py-1.5 rounded-xl bg-[#f6821f] hover:bg-[#e07216] text-white text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer shadow-xs"
           >
-            <svg className="w-3.5 h-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
-            </svg>
-            Iniciar Arqueo
+            <span>+ Registrar Gasto</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => onRefresh(selectedFundId || currentFund?.id)}
+            disabled={loading}
+            title="Recargar datos de caja chica"
+            className="p-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 transition cursor-pointer disabled:opacity-50 shadow-xs"
+          >
+            <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin text-[#f6821f]" : ""}`} />
           </button>
         </div>
       </div>
