@@ -172,6 +172,21 @@ export default function QuotesModule({
 
   const [formData, setFormData] = useState(initialFormState);
   const printAreaRef = useRef<HTMLDivElement>(null);
+  const printDropdownRef = useRef<HTMLDivElement>(null);
+  const [showPrintDownloadDropdown, setShowPrintDownloadDropdown] = useState(false);
+  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+
+  // Cerrar el dropdown al hacer clic fuera
+  useEffect(() => {
+    if (!showPrintDownloadDropdown) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (printDropdownRef.current && !printDropdownRef.current.contains(e.target as Node)) {
+        setShowPrintDownloadDropdown(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [showPrintDownloadDropdown]);
 
   // Cargar Cotizaciones desde la API
   const fetchQuotes = async () => {
@@ -599,6 +614,89 @@ export default function QuotesModule({
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+  };
+
+  const downloadQuotePDF = async () => {
+    setShowPrintDownloadDropdown(false);
+    setIsGeneratingPDF(true);
+    try {
+      const printableElem = document.getElementById("printable-quote-editor-document");
+      if (!printableElem) {
+        window.print();
+        return;
+      }
+
+      const wrapper = document.createElement("div");
+      wrapper.style.position = "fixed";
+      wrapper.style.left = "-9999px";
+      wrapper.style.top = "0";
+      wrapper.style.width = "816px";
+      wrapper.style.background = "#ffffff";
+      wrapper.style.minHeight = "1056px";
+      wrapper.style.color = "#000000";
+      wrapper.style.zIndex = "-9999";
+
+      const clone = printableElem.cloneNode(true) as HTMLElement;
+      clone.classList.remove("hidden");
+      clone.classList.remove("print:block");
+      clone.classList.remove("print:flex");
+      clone.style.display = "flex";
+      clone.style.flexDirection = "column";
+      clone.style.justifyContent = "space-between";
+      clone.style.minHeight = "1056px";
+      clone.style.width = "100%";
+      clone.style.background = "#ffffff";
+      clone.style.color = "#000000";
+      clone.style.padding = "32px";
+      clone.style.boxSizing = "border-box";
+
+      wrapper.appendChild(clone);
+      document.body.appendChild(wrapper);
+
+      const html2canvasModule = await import("html2canvas");
+      const html2canvas = html2canvasModule.default || html2canvasModule;
+      const { jsPDF } = await import("jspdf");
+
+      const canvas = await html2canvas(clone, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        backgroundColor: "#ffffff",
+        windowWidth: 816,
+      });
+
+      document.body.removeChild(wrapper);
+
+      const imgData = canvas.toDataURL("image/jpeg", 0.95);
+      const pdf = new jsPDF({
+        orientation: "portrait",
+        unit: "mm",
+        format: "letter",
+      });
+
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = pdf.internal.pageSize.getHeight();
+      const imgHeight = (canvas.height * pdfWidth) / canvas.width;
+
+      let position = 0;
+      pdf.addImage(imgData, "JPEG", 0, position, pdfWidth, imgHeight);
+      let heightLeft = imgHeight - pdfHeight;
+
+      while (heightLeft > 5) {
+        position -= pdfHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, "JPEG", 0, position, pdfWidth, imgHeight);
+        heightLeft -= pdfHeight;
+      }
+
+      const cleanNum = (formData.quoteNumber || "cotizacion").replace(/[^a-zA-Z0-9_-]/g, "_");
+      pdf.save(`Cotizacion_${cleanNum}.pdf`);
+    } catch (error) {
+      console.error("Error al generar PDF de cotización:", error);
+      window.print();
+    } finally {
+      setIsGeneratingPDF(false);
+    }
   };
 
   const getStatusBadge = (status: string) => {
@@ -1105,18 +1203,13 @@ export default function QuotesModule({
                   {/* Fila Superior: Membrete corporativo y Correlativo */}
                   <div className="flex flex-col sm:flex-row justify-between items-start gap-6 border-b border-slate-100 pb-6">
                     <div>
-                      <div className="flex items-center gap-2">
-                        <div className="w-9 h-9 rounded-xl bg-[#fff7ed] flex items-center justify-center text-[#f6821f] font-bold text-base border border-[#ffedd5]">
-                          W
-                        </div>
-                        <div>
-                          <h2 className="text-lg font-black text-slate-900 tracking-tight">
-                            WAYNE TRADEMARK DE HONDURAS
-                          </h2>
-                          <p className="text-xs text-slate-500">
-                            Printing & Packaging • RTN: 05019008183490
-                          </p>
-                        </div>
+                      <div>
+                        <h2 className="text-lg font-black text-slate-900 tracking-tight">
+                          WAYNE TRADEMARK DE HONDURAS
+                        </h2>
+                        <p className="text-xs text-slate-500">
+                          Printing & Packaging • RTN: 05019008183490
+                        </p>
                       </div>
                       <p className="text-xs text-slate-500 mt-2">
                         Zip Búfalo Edificio 1B, Villanueva, Cortés • Tel: +504 9452-2666
@@ -1690,17 +1783,161 @@ export default function QuotesModule({
             </div>
           </div>
 
+          {/* DOCUMENTO IMPRIMIBLE Y PARA EXPORTAR A PDF (Oculto en pantalla, visible al imprimir o al generar PDF) */}
+          <div
+            id="printable-quote-editor-document"
+            className="hidden print:block bg-white p-8 text-slate-800 space-y-6 text-xs print:p-0"
+          >
+            {/* Membrete formal */}
+            <div className="flex justify-between items-start border-b border-slate-200 pb-6">
+              <div>
+                <h1 className="text-lg font-bold text-slate-900 tracking-tight">
+                  WAYNE TRADEMARK PRINTING AND PACKAGING
+                </h1>
+                <p className="text-xs font-semibold text-slate-600">DE HONDURAS S. DE R.L.</p>
+                <p className="text-xs text-slate-500 mt-1">RTN: 05019008183490</p>
+                <p className="text-xs text-slate-500">Parque Industrial Zip Búfalo, Edificio 1B, Villanueva, Cortés</p>
+                <p className="text-xs text-slate-500">Tel: +504 9452-2666 | info@waynetrademarkhn.com</p>
+              </div>
+
+              <div className="text-right">
+                <div className="inline-block px-3 py-1 bg-amber-50 border border-amber-200 text-[#f6821f] font-bold text-sm rounded-lg">
+                  COTIZACIÓN
+                </div>
+                <p className="text-base font-extrabold text-slate-900 mt-2">{formData.quoteNumber}</p>
+                <p className="text-xs text-slate-500 mt-0.5">Fecha: {formData.quoteDate}</p>
+                <p className="text-xs text-slate-500">Válida hasta: {formData.validUntil}</p>
+              </div>
+            </div>
+
+            {/* Datos del Cliente */}
+            <div className="grid grid-cols-2 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200/80 text-xs">
+              <div>
+                <p className="text-slate-400 font-semibold uppercase text-[10px]">Cotizado Para:</p>
+                <p className="text-sm font-bold text-slate-900 mt-0.5">{formData.customerName || "Cliente Contado"}</p>
+                {formData.customerRtn && <p className="text-slate-600 mt-0.5">RTN: {formData.customerRtn}</p>}
+                {formData.customerAddress && <p className="text-slate-500 mt-0.5">{formData.customerAddress}</p>}
+              </div>
+              <div className="text-right">
+                <p className="text-slate-400 font-semibold uppercase text-[10px]">Condiciones:</p>
+                <p className="text-slate-700 mt-0.5"><span className="font-semibold">Términos:</span> {formData.paymentTerms}</p>
+                <p className="text-slate-700 mt-0.5"><span className="font-semibold">Moneda:</span> {formData.currency}</p>
+                <p className="text-slate-700 mt-0.5"><span className="font-semibold">Vendedor:</span> {formData.salesRepName || "Wayne Sales"}</p>
+              </div>
+            </div>
+
+            {/* Tabla de Productos */}
+            <table className="w-full text-left text-xs border-collapse">
+              <thead>
+                <tr className="border-b-2 border-slate-300 text-slate-600 font-bold">
+                  <th className="py-2 px-2 w-12 text-center">Ítem</th>
+                  <th className="py-2 px-2">Descripción</th>
+                  <th className="py-2 px-2 w-20 text-center">Cantidad</th>
+                  <th className="py-2 px-2 w-24 text-right">Precio Unit.</th>
+                  <th className="py-2 px-2 w-28 text-right">Importe</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-200">
+                {formData.lines.map((l, i) => (
+                  <tr key={i}>
+                    <td className="py-2.5 px-2 text-center text-slate-400">{i + 1}</td>
+                    <td className="py-2.5 px-2">
+                      <div className="font-bold text-slate-900">{l.productName || "Artículo"}</div>
+                      {l.description && <div className="text-slate-500 text-[11px]">{l.description}</div>}
+                    </td>
+                    <td className="py-2.5 px-2 text-center font-medium">{l.quantity}</td>
+                    <td className="py-2.5 px-2 text-right">${(Number(l.rate) || 0).toFixed(2)}</td>
+                    <td className="py-2.5 px-2 text-right font-bold text-slate-900">${(Number(l.amount) || 0).toFixed(2)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+
+            {/* Totales */}
+            <div className="flex justify-end pt-2">
+              <div className="w-64 space-y-1.5 text-xs text-slate-700">
+                <div className="flex justify-between">
+                  <span>Subtotal:</span>
+                  <span className="font-semibold">${formCalculations.subtotal.toFixed(2)}</span>
+                </div>
+                {formCalculations.taxableBase < formCalculations.subtotal && (
+                  <div className="flex justify-between text-slate-500">
+                    <span>Descuento:</span>
+                    <span>-${(Number(formData.discount) || 0).toFixed(2)}</span>
+                  </div>
+                )}
+                <div className="flex justify-between">
+                  <span>I.S.V. ({formData.taxRate}%):</span>
+                  <span className="font-semibold">${formCalculations.tax.toFixed(2)}</span>
+                </div>
+                <div className="border-t-2 border-slate-900 pt-2 flex justify-between text-sm font-extrabold text-slate-900">
+                  <span>Total General ({formData.currency}):</span>
+                  <span>${formCalculations.total.toFixed(2)}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Firmas */}
+            <div className="pt-12 grid grid-cols-2 gap-12 text-center text-xs text-slate-600">
+              <div className="border-t border-slate-300 pt-2">
+                <p className="font-semibold text-slate-900">Wayne Trademark Printing & Packaging</p>
+                <p className="text-[11px] text-slate-400">Firma y Sello Autorizado</p>
+              </div>
+              <div className="border-t border-slate-300 pt-2">
+                <p className="font-semibold text-slate-900">{formData.customerName || "Cliente"}</p>
+                <p className="text-[11px] text-slate-400">Aceptación de Cotización</p>
+              </div>
+            </div>
+          </div>
+
           {/* FIXED BOTTOM ACTION BAR */}
           <footer className="bg-white border-t border-slate-200 px-6 py-3 flex items-center justify-between z-30 shadow-md print:hidden">
-            <div className="flex items-center gap-2">
+            <div ref={printDropdownRef} className="relative">
               <button
                 type="button"
-                onClick={() => window.print()}
+                onClick={() => setShowPrintDownloadDropdown(!showPrintDownloadDropdown)}
+                disabled={isGeneratingPDF}
                 className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs transition cursor-pointer flex items-center gap-1.5"
               >
                 <Printer className="w-3.5 h-3.5 text-slate-600" />
-                <span>Imprimir o descargar</span>
+                {isGeneratingPDF ? (
+                  <>
+                    <span className="inline-block w-3 h-3 border-2 border-slate-600 border-t-transparent rounded-full animate-spin"></span>
+                    <span>Generando PDF...</span>
+                  </>
+                ) : (
+                  <span>Imprimir o descargar</span>
+                )}
               </button>
+
+              {showPrintDownloadDropdown && (
+                <div className="absolute bottom-full left-0 mb-2 w-56 bg-white rounded-xl shadow-2xl border border-slate-200 py-1.5 z-40 animate-in fade-in zoom-in-95 duration-150 text-xs font-normal text-slate-800">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowPrintDownloadDropdown(false);
+                      window.print();
+                    }}
+                    className="w-full text-left px-4 py-2.5 hover:bg-slate-50 transition cursor-pointer font-medium text-slate-800 flex items-center justify-between"
+                  >
+                    <span>Imprimir</span>
+                    <Printer className="w-3.5 h-3.5 text-slate-400" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={downloadQuotePDF}
+                    disabled={isGeneratingPDF}
+                    className="w-full text-left px-4 py-2.5 hover:bg-slate-50 transition cursor-pointer font-medium text-slate-800 flex items-center justify-between"
+                  >
+                    <span>Descargar PDF</span>
+                    {isGeneratingPDF ? (
+                      <span className="text-[10px] text-amber-600 font-semibold animate-pulse">Generando...</span>
+                    ) : (
+                      <Download className="w-3.5 h-3.5 text-slate-400" />
+                    )}
+                  </button>
+                </div>
+              )}
             </div>
 
             <div className="flex items-center gap-2.5">

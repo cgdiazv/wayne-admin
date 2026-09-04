@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { Users, Factory, Package, Tag, Boxes, AlertCircle, Clock, CheckCircle2, ShieldAlert, Layers, Hash, BookOpen, Download, Upload, FileSpreadsheet, ArrowRight, ArrowLeft, RefreshCw, X, FileText, Calendar, CreditCard } from "lucide-react";
+import { Users, Factory, Package, Tag, Boxes, AlertCircle, Clock, CheckCircle2, ShieldAlert, Layers, Hash, BookOpen, Download, Upload, FileSpreadsheet, ArrowRight, ArrowLeft, RefreshCw, X, FileText, Calendar, CreditCard, Printer } from "lucide-react";
 import CajaChicaModule from "@/components/CajaChicaModule";
 import AccountingBooksModule from "@/components/AccountingBooksModule";
 import CustomerAgingReportModule from "@/components/CustomerAgingReportModule";
@@ -1899,10 +1899,14 @@ export default function AdminDashboard() {
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
   const [invoiceSuccessMsg, setInvoiceSuccessMsg] = useState("");
   const [invoiceDesign, setInvoiceDesign] = useState({
+    preset: "Estándar Wayne Orange",
     template: "Moderno",
     printerFriendly: false,
-    color: "#79bd58",
+    color: "#f6821f",
     font: "Helvetica Neue",
+    showTotal: true,
+    showBankDeposit: false,
+    showEarlyDiscount: false,
   });
 
   const [invoiceForm, setInvoiceForm] = useState({
@@ -1986,6 +1990,24 @@ export default function AdminDashboard() {
 
   // 7. Total a Pagar
   const invoiceTotal = Number((invoiceSubtotal + invoiceIsv15 + invoiceIsv18).toFixed(2));
+
+  const getInvoiceFontFamily = (fontName: string) => {
+    switch (fontName) {
+      case "Inter":
+        return "'Inter', sans-serif";
+      case "Roboto":
+        return "'Roboto', sans-serif";
+      case "Arial":
+        return "Arial, sans-serif";
+      case "Times New Roman":
+        return "'Times New Roman', Times, serif";
+      case "Helvetica Neue":
+      default:
+        return "'Helvetica Neue', Helvetica, Arial, sans-serif";
+    }
+  };
+
+  const activeInvoiceColor = invoiceDesign.printerFriendly ? "#111827" : (invoiceDesign.color || "#f6821f");
 
   const downloadInvoicePDF = async () => {
     setShowPrintDownloadDropdown(false);
@@ -2888,13 +2910,18 @@ export default function AdminDashboard() {
       wrapper.style.top = "0";
       wrapper.style.width = "816px";
       wrapper.style.background = "#ffffff";
+      wrapper.style.minHeight = "1056px";
       wrapper.style.color = "#000000";
       wrapper.style.zIndex = "-9999";
 
       const clone = printableElem.cloneNode(true) as HTMLElement;
       clone.classList.remove("hidden");
       clone.classList.remove("print:block");
-      clone.style.display = "block";
+      clone.classList.remove("print:flex");
+      clone.style.display = "flex";
+      clone.style.flexDirection = "column";
+      clone.style.justifyContent = "space-between";
+      clone.style.minHeight = "1056px";
       clone.style.width = "100%";
       clone.style.background = "#ffffff";
       clone.style.color = "#000000";
@@ -5354,6 +5381,7 @@ export default function AdminDashboard() {
       showRecibirPagoSaveDropdown ||
       showInvoiceSaveDropdown ||
       showInvoiceSendDropdown ||
+      showPrintDownloadDropdown ||
       showProductSaveDropdown ||
       showCustomerSaveDropdown ||
       showVendorSaveDropdown ||
@@ -5378,6 +5406,7 @@ export default function AdminDashboard() {
         setShowRecibirPagoSaveDropdown(false);
         setShowInvoiceSaveDropdown(false);
         setShowInvoiceSendDropdown(false);
+        setShowPrintDownloadDropdown(false);
         setShowProductSaveDropdown(false);
         setShowCustomerSaveDropdown(false);
         setShowVendorSaveDropdown(false);
@@ -5398,6 +5427,7 @@ export default function AdminDashboard() {
     showRecibirPagoSaveDropdown,
     showInvoiceSaveDropdown,
     showInvoiceSendDropdown,
+    showPrintDownloadDropdown,
     showProductSaveDropdown,
     showCustomerSaveDropdown,
     showVendorSaveDropdown,
@@ -14598,12 +14628,18 @@ export default function AdminDashboard() {
             <div className="fixed inset-0 z-40 flex flex-col bg-slate-100 text-slate-800 animate-in fade-in duration-150 overflow-hidden print:static print:inset-auto print:bg-white print:overflow-visible print:block print:p-0">
               
               {/* OFFICIAL PRINTABLE INVOICE DOCUMENT (Shown exclusively when printing via window.print) */}
-              <div id="printable-invoice-document" className="hidden print:flex min-h-[10.5in] flex-col justify-between p-8 bg-white text-slate-900 text-xs">
+              <div
+                id="printable-invoice-document"
+                className={`hidden print:flex min-h-[10.5in] flex-col justify-between p-8 bg-white text-slate-900 text-xs ${
+                  invoiceDesign.template === "Standard" ? "border-2 border-slate-800" : ""
+                }`}
+                style={{ fontFamily: getInvoiceFontFamily(invoiceDesign.font) }}
+              >
                 <div>
                   {/* Header */}
-                <div className="flex justify-between items-start border-b-2 border-slate-900 pb-6 mb-6">
+                <div className="flex justify-between items-start border-b-2 pb-6 mb-6" style={{ borderColor: activeInvoiceColor }}>
                   <div>
-                    <h1 className="text-2xl font-black text-[#f6821f] tracking-tight">WAYNE TRADEMARK</h1>
+                    <h1 className="text-2xl font-black tracking-tight" style={{ color: activeInvoiceColor }}>WAYNE TRADEMARK</h1>
                     <p className="font-bold text-slate-900 text-sm mt-1">{companySettings.nombre}</p>
                     <p className="text-slate-600 text-xs">{companySettings.direccion}</p>
                     <p className="text-slate-600 text-xs">RTN: {companySettings.taxId} | Tel: {companySettings.telefono}</p>
@@ -14622,7 +14658,11 @@ export default function AdminDashboard() {
                 {/* Customer Details: Facturado a (izq) y Entregado a (der) */}
                 <div className="grid grid-cols-2 gap-4 mb-6 text-xs">
                   {/* Facturado a */}
-                  <div className="bg-slate-50/80 p-4 rounded-2xl border border-slate-200/80 space-y-1">
+                  <div className={`p-4 space-y-1 ${
+                    invoiceDesign.template === "Standard"
+                      ? "rounded-none border border-slate-300 bg-white"
+                      : "rounded-2xl border border-slate-200/80 bg-slate-50/80"
+                  }`}>
                     <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Facturado a:</span>
                     <p className="font-bold text-slate-900 text-sm">{invoiceForm.customerName || "Cliente Contado"}</p>
                     {invoiceForm.customerAddress && (
@@ -14634,7 +14674,11 @@ export default function AdminDashboard() {
                   </div>
 
                   {/* Entregado a */}
-                  <div className="bg-slate-50/80 p-4 rounded-2xl border border-slate-200/80 space-y-1">
+                  <div className={`p-4 space-y-1 ${
+                    invoiceDesign.template === "Standard"
+                      ? "rounded-none border border-slate-300 bg-white"
+                      : "rounded-2xl border border-slate-200/80 bg-slate-50/80"
+                  }`}>
                     <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Entregado a:</span>
                     <p className="font-bold text-slate-900 text-sm">{invoiceForm.deliveredTo || invoiceForm.customerName || "Cliente Contado"}</p>
                     <p className="text-slate-600 text-xs">
@@ -14649,7 +14693,12 @@ export default function AdminDashboard() {
                 {/* Items Table */}
                 <table className="w-full text-left border-collapse mb-6">
                   <thead>
-                    <tr className="border-b border-slate-200 text-slate-400 font-semibold text-[11px] uppercase tracking-wider">
+                    <tr
+                      className={`border-b-2 text-slate-500 font-semibold text-[11px] uppercase tracking-wider ${
+                        invoiceDesign.template === "Standard" ? "bg-slate-100 text-slate-800 font-bold border-y border-slate-400" : ""
+                      }`}
+                      style={invoiceDesign.template === "Moderno" ? { borderBottomColor: activeInvoiceColor } : undefined}
+                    >
                       <th className="py-2.5 px-3">#</th>
                       <th className="py-2.5 px-3">Producto / Servicio</th>
                       <th className="py-2.5 px-3">SKU</th>
@@ -14752,14 +14801,56 @@ export default function AdminDashboard() {
                       )}
 
                       {/* 7. TOTAL A PAGAR */}
-                      <div className="pt-1">
-                        <div className="flex justify-between items-center py-2 px-3 bg-slate-200 border border-slate-300 text-slate-900 rounded-xl shadow-xs">
-                          <span className="font-black text-xs uppercase tracking-wider text-slate-700">Total a Pagar</span>
-                          <span className="font-mono font-black text-base text-slate-900">{formatFiscalMoney(invoiceTotal, true)}</span>
+                      {invoiceDesign.showTotal && (
+                        <div className="pt-1">
+                          <div
+                            className={`flex justify-between items-center py-2.5 px-3.5 shadow-xs ${
+                              invoiceDesign.template === "Standard" ? "rounded-none" : "rounded-xl"
+                            } ${
+                              invoiceDesign.printerFriendly
+                                ? "bg-slate-100 border-2 border-slate-900 text-slate-900"
+                                : "text-white"
+                            }`}
+                            style={!invoiceDesign.printerFriendly ? { backgroundColor: activeInvoiceColor } : undefined}
+                          >
+                            <span className="font-black text-xs uppercase tracking-wider">Total a Pagar</span>
+                            <span className="font-mono font-black text-base">{formatFiscalMoney(invoiceTotal, true)}</span>
+                          </div>
                         </div>
-                      </div>
+                      )}
                     </div>
                   </div>
+
+                  {/* Opciones de Pago Renderizadas (Depósito y Pronto Pago) */}
+                  {invoiceDesign.showBankDeposit && (
+                    <div className={`p-3 text-xs mt-3 border ${
+                      invoiceDesign.template === "Standard" ? "rounded-none border-slate-400 bg-slate-50" : "rounded-xl border-slate-200/80 bg-slate-50/80"
+                    }`}>
+                      <span className="font-bold text-slate-800 flex items-center gap-1.5 text-[11px] uppercase tracking-wider mb-1">
+                        <CreditCard className="w-3.5 h-3.5 text-slate-600" />
+                        Instrucciones de Pago / Depósito Bancario
+                      </span>
+                      <p className="text-slate-600 text-[11px]">
+                        <strong>Banco Ficohsa (USD):</strong> Cta. 001-201-12345678 • <strong>BAC Credomatic (HNL):</strong> Cta. 741-258-9630
+                      </p>
+                      <p className="text-slate-500 text-[10px] mt-0.5">
+                        Beneficiario: WAYNE TRADEMARK DE HONDURAS S. DE R.L. • RTN: {companySettings.taxId || "05019008183490"}
+                      </p>
+                    </div>
+                  )}
+
+                  {invoiceDesign.showEarlyDiscount && (
+                    <div className={`p-2.5 text-xs flex items-center gap-2 mt-2 border ${
+                      invoiceDesign.template === "Standard"
+                        ? "rounded-none border-slate-400 bg-slate-50 text-slate-800"
+                        : "rounded-xl border-amber-200 bg-amber-50/70 text-amber-900"
+                    }`}>
+                      <Clock className="w-3.5 h-3.5 text-amber-700 shrink-0" />
+                      <span className="text-[11px] font-medium">
+                        <strong>Incentivo por pronto pago:</strong> 2% de descuento sobre el subtotal si se cancela dentro de los primeros 10 días calendario.
+                      </span>
+                    </div>
+                  )}
 
                   {/* Fiscal Footer SAR */}
                   <div className="pt-3 border-t border-slate-300 flex justify-between items-center text-xs text-slate-700">
@@ -15378,11 +15469,16 @@ export default function AdminDashboard() {
                         </div>
                       </div>
 
-                      <div className="w-[8.5in] min-h-[11in] bg-white border border-slate-300 rounded-xs shadow-2xl p-12 flex flex-col justify-between animate-in fade-in duration-150 text-xs text-slate-800 shrink-0">
+                      <div
+                        className={`w-[8.5in] min-h-[11in] bg-white border rounded-xs shadow-2xl p-12 flex flex-col justify-between animate-in fade-in duration-150 text-xs text-slate-800 shrink-0 ${
+                          invoiceDesign.template === "Standard" ? "border-2 border-slate-800" : "border-slate-300"
+                        }`}
+                        style={{ fontFamily: getInvoiceFontFamily(invoiceDesign.font) }}
+                      >
                         <div className="space-y-6">
-                          <div className="flex justify-between items-start border-b border-slate-300 pb-6">
+                          <div className="flex justify-between items-start border-b-2 pb-6" style={{ borderColor: activeInvoiceColor }}>
                             <div>
-                              <h1 className="text-2xl font-black text-[#f6821f]">WAYNE TRADEMARK</h1>
+                              <h1 className="text-2xl font-black tracking-tight" style={{ color: activeInvoiceColor }}>WAYNE TRADEMARK</h1>
                               <p className="font-bold text-slate-900 mt-1">{companySettings.nombre}</p>
                               <p className="text-slate-500">{companySettings.direccion}</p>
                               <p className="text-slate-500">RTN: {companySettings.taxId}</p>
@@ -15392,7 +15488,7 @@ export default function AdminDashboard() {
                               <h2 className="text-xl font-bold text-slate-900">FACTURA</h2>
                               <p className="font-mono font-bold text-slate-700 text-sm">N.º {formatFiscalInvoiceNumber(invoiceForm.invoiceNumber)}</p>
                               <p className="text-slate-500 mt-1">Fecha: {invoiceForm.invoiceDate}</p>
-                              <p className="text-slate-500">Vencimiento: {invoiceForm.dueDate}</p>
+                              <p className="text-slate-500">Vencimiento: {invoiceForm.dueDate || "A la vista"}</p>
                               <p className="text-slate-500">Términos: {invoiceForm.paymentTerms}</p>
                             </div>
                           </div>
@@ -15400,7 +15496,11 @@ export default function AdminDashboard() {
                           {/* Facturado a (izq) y Entregado a (der) */}
                           <div className="grid grid-cols-2 gap-4 text-xs mb-6">
                             {/* Facturado a */}
-                            <div className="bg-slate-50/80 p-4 rounded-2xl border border-slate-200/80 space-y-1">
+                            <div className={`p-4 space-y-1 ${
+                              invoiceDesign.template === "Standard"
+                                ? "rounded-none border border-slate-300 bg-white"
+                                : "rounded-2xl border border-slate-200/80 bg-slate-50/80"
+                            }`}>
                               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Facturado a:</span>
                               <p className="font-bold text-slate-900 text-sm">{invoiceForm.customerName || "Cliente Contado"}</p>
                               {invoiceForm.customerAddress && (
@@ -15412,7 +15512,11 @@ export default function AdminDashboard() {
                             </div>
 
                             {/* Entregado a */}
-                            <div className="bg-slate-50/80 p-4 rounded-2xl border border-slate-200/80 space-y-1">
+                            <div className={`p-4 space-y-1 ${
+                              invoiceDesign.template === "Standard"
+                                ? "rounded-none border border-slate-300 bg-white"
+                                : "rounded-2xl border border-slate-200/80 bg-slate-50/80"
+                            }`}>
                               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Entregado a:</span>
                               <p className="font-bold text-slate-900 text-sm">{invoiceForm.deliveredTo || invoiceForm.customerName || "Cliente Contado"}</p>
                               <p className="text-slate-500 text-xs">
@@ -15427,7 +15531,12 @@ export default function AdminDashboard() {
                           {/* PDF Table */}
                           <table className="w-full text-left border-collapse mb-6">
                             <thead>
-                              <tr className="border-b border-slate-200 text-slate-400 font-semibold text-[11px] uppercase tracking-wider">
+                              <tr
+                                className={`border-b-2 text-slate-500 font-semibold text-[11px] uppercase tracking-wider ${
+                                  invoiceDesign.template === "Standard" ? "bg-slate-100 text-slate-800 font-bold border-y border-slate-400" : ""
+                                }`}
+                                style={invoiceDesign.template === "Moderno" ? { borderBottomColor: activeInvoiceColor } : undefined}
+                              >
                                 <th className="py-2.5">Descripción</th>
                                 <th className="py-2.5 text-right">Cant.</th>
                                 <th className="py-2.5 text-right">Precio</th>
@@ -15524,14 +15633,56 @@ export default function AdminDashboard() {
                               )}
 
                               {/* 7. TOTAL A PAGAR */}
-                              <div className="pt-1">
-                                <div className="flex justify-between items-center py-2 px-3 bg-slate-200 border border-slate-300 text-slate-900 rounded-xl shadow-xs">
-                                  <span className="font-black text-xs uppercase tracking-wider text-slate-700">Total a Pagar</span>
-                                  <span className="font-mono font-black text-base text-slate-900">{formatFiscalMoney(invoiceTotal, true)}</span>
+                              {invoiceDesign.showTotal && (
+                                <div className="pt-1">
+                                  <div
+                                    className={`flex justify-between items-center py-2.5 px-3.5 shadow-xs ${
+                                      invoiceDesign.template === "Standard" ? "rounded-none" : "rounded-xl"
+                                    } ${
+                                      invoiceDesign.printerFriendly
+                                        ? "bg-slate-100 border-2 border-slate-900 text-slate-900"
+                                        : "text-white"
+                                    }`}
+                                    style={!invoiceDesign.printerFriendly ? { backgroundColor: activeInvoiceColor } : undefined}
+                                  >
+                                    <span className="font-black text-xs uppercase tracking-wider">Total a Pagar</span>
+                                    <span className="font-mono font-black text-base">{formatFiscalMoney(invoiceTotal, true)}</span>
+                                  </div>
                                 </div>
-                              </div>
+                              )}
                             </div>
                           </div>
+
+                          {/* Opciones de Pago Renderizadas (Depósito y Pronto Pago) */}
+                          {invoiceDesign.showBankDeposit && (
+                            <div className={`p-3 text-xs mt-3 border ${
+                              invoiceDesign.template === "Standard" ? "rounded-none border-slate-400 bg-slate-50" : "rounded-xl border-slate-200/80 bg-slate-50/80"
+                            }`}>
+                              <span className="font-bold text-slate-800 flex items-center gap-1.5 text-[11px] uppercase tracking-wider mb-1">
+                                <CreditCard className="w-3.5 h-3.5 text-slate-600" />
+                                Instrucciones de Pago / Depósito Bancario
+                              </span>
+                              <p className="text-slate-600 text-[11px]">
+                                <strong>Banco Ficohsa (USD):</strong> Cta. 001-201-12345678 • <strong>BAC Credomatic (HNL):</strong> Cta. 741-258-9630
+                              </p>
+                              <p className="text-slate-500 text-[10px] mt-0.5">
+                                Beneficiario: WAYNE TRADEMARK DE HONDURAS S. DE R.L. • RTN: {companySettings.taxId || "05019008183490"}
+                              </p>
+                            </div>
+                          )}
+
+                          {invoiceDesign.showEarlyDiscount && (
+                            <div className={`p-2.5 text-xs flex items-center gap-2 mt-2 border ${
+                              invoiceDesign.template === "Standard"
+                                ? "rounded-none border-slate-400 bg-slate-50 text-slate-800"
+                                : "rounded-xl border-amber-200 bg-amber-50/70 text-amber-900"
+                            }`}>
+                              <Clock className="w-3.5 h-3.5 text-amber-700 shrink-0" />
+                              <span className="text-[11px] font-medium">
+                                <strong>Incentivo por pronto pago:</strong> 2% de descuento sobre el subtotal si se cancela dentro de los primeros 10 días calendario.
+                              </span>
+                            </div>
+                          )}
 
                           {/* Fiscal Footer SAR */}
                           <div className="pt-4 border-t border-slate-200 flex justify-between items-center text-xs text-slate-700">
@@ -15599,11 +15750,26 @@ export default function AdminDashboard() {
                           {activeInvoiceOptionSection === "personalizacion" && (
                             <div className="pt-3 space-y-3 text-xs text-slate-600 animate-in fade-in duration-150">
                               <label className="block">
-                                <span className="font-semibold block mb-1">Plantilla de factura</span>
-                                <select className="w-full px-3 py-1.5 text-xs rounded-xl bg-slate-50 border border-slate-300 text-slate-900">
-                                  <option>Estándar Wayne Orange</option>
-                                  <option>Minimalista</option>
-                                  <option>Corporativo Industrial</option>
+                                <span className="font-semibold block mb-1 text-slate-800">Plantilla de factura</span>
+                                <select
+                                  value={invoiceDesign.preset}
+                                  onChange={(e) => {
+                                    const p = e.target.value;
+                                    if (p === "Estándar Wayne Orange") {
+                                      setInvoiceDesign({ ...invoiceDesign, preset: p, template: "Moderno", color: "#f6821f", font: "Helvetica Neue" });
+                                    } else if (p === "Minimalista") {
+                                      setInvoiceDesign({ ...invoiceDesign, preset: p, template: "Standard", color: "#555555", font: "Inter" });
+                                    } else if (p === "Corporativo Industrial") {
+                                      setInvoiceDesign({ ...invoiceDesign, preset: p, template: "Moderno", color: "#148c96", font: "Roboto" });
+                                    } else {
+                                      setInvoiceDesign({ ...invoiceDesign, preset: p });
+                                    }
+                                  }}
+                                  className="w-full px-3 py-2 text-xs rounded-xl bg-slate-50 border border-slate-300 text-slate-900 focus:outline-none focus:border-[#f6821f] cursor-pointer font-medium"
+                                >
+                                  <option value="Estándar Wayne Orange">Estándar Wayne Orange</option>
+                                  <option value="Minimalista">Minimalista</option>
+                                  <option value="Corporativo Industrial">Corporativo Industrial</option>
                                 </select>
                               </label>
                             </div>
@@ -15628,18 +15794,33 @@ export default function AdminDashboard() {
                           </button>
                           {activeInvoiceOptionSection === "pago" && (
                             <div className="pt-3 space-y-3 text-xs text-slate-600 animate-in fade-in duration-150">
-                              <div className="flex items-center justify-between">
+                              <label className="flex items-center justify-between cursor-pointer">
                                 <span className="font-semibold text-slate-800">Total de la factura</span>
-                                <input type="checkbox" defaultChecked className="w-4 h-4 accent-[#f6821f]" />
-                              </div>
-                              <div className="flex items-center justify-between">
+                                <input
+                                  type="checkbox"
+                                  checked={invoiceDesign.showTotal}
+                                  onChange={(e) => setInvoiceDesign({ ...invoiceDesign, showTotal: e.target.checked })}
+                                  className="w-4 h-4 accent-[#f6821f] cursor-pointer"
+                                />
+                              </label>
+                              <label className="flex items-center justify-between cursor-pointer">
                                 <span className="font-semibold text-slate-800">Depósito bancario</span>
-                                <input type="checkbox" className="w-4 h-4 accent-[#f6821f]" />
-                              </div>
-                              <div className="flex items-center justify-between">
+                                <input
+                                  type="checkbox"
+                                  checked={invoiceDesign.showBankDeposit}
+                                  onChange={(e) => setInvoiceDesign({ ...invoiceDesign, showBankDeposit: e.target.checked })}
+                                  className="w-4 h-4 accent-[#f6821f] cursor-pointer"
+                                />
+                              </label>
+                              <label className="flex items-center justify-between cursor-pointer">
                                 <span className="font-semibold text-slate-800">Descuento pronto pago</span>
-                                <input type="checkbox" className="w-4 h-4 accent-[#f6821f]" />
-                              </div>
+                                <input
+                                  type="checkbox"
+                                  checked={invoiceDesign.showEarlyDiscount}
+                                  onChange={(e) => setInvoiceDesign({ ...invoiceDesign, showEarlyDiscount: e.target.checked })}
+                                  className="w-4 h-4 accent-[#f6821f] cursor-pointer"
+                                />
+                              </label>
                             </div>
                           )}
                         </div>
@@ -15670,10 +15851,10 @@ export default function AdminDashboard() {
                                   <span className="font-bold text-slate-900">Plantilla modernizada</span>
                                   <button
                                     type="button"
-                                    onClick={() => setInvoiceDesign({ ...invoiceDesign, template: "Standard" })}
-                                    className="text-[11px] text-[#0066cc] hover:underline font-normal cursor-pointer"
+                                    onClick={() => setInvoiceDesign({ ...invoiceDesign, template: "Moderno", color: "#f6821f", font: "Helvetica Neue", printerFriendly: false })}
+                                    className="text-[11px] text-[#f6821f] hover:underline font-medium cursor-pointer"
                                   >
-                                    Eliminar predeterminado
+                                    Restablecer
                                   </button>
                                 </div>
 
@@ -15683,7 +15864,7 @@ export default function AdminDashboard() {
                                     name="invoiceTemplate"
                                     checked={invoiceDesign.template === "Moderno"}
                                     onChange={() => setInvoiceDesign({ ...invoiceDesign, template: "Moderno" })}
-                                    className="w-4 h-4 accent-[#004d40] cursor-pointer"
+                                    className="w-4 h-4 accent-[#f6821f] cursor-pointer"
                                   />
                                   <span className="font-medium text-slate-800">Moderno</span>
                                 </label>
@@ -15701,7 +15882,7 @@ export default function AdminDashboard() {
                                     name="invoiceTemplate"
                                     checked={invoiceDesign.template === "Standard"}
                                     onChange={() => setInvoiceDesign({ ...invoiceDesign, template: "Standard" })}
-                                    className="w-4 h-4 accent-[#004d40] cursor-pointer"
+                                    className="w-4 h-4 accent-[#f6821f] cursor-pointer"
                                   />
                                   <span className="font-medium text-slate-800">Standard</span>
                                 </label>
@@ -15720,7 +15901,7 @@ export default function AdminDashboard() {
                                     type="button"
                                     onClick={() => setInvoiceDesign({ ...invoiceDesign, printerFriendly: !invoiceDesign.printerFriendly })}
                                     className={`w-9 h-5 rounded-full p-0.5 transition-colors duration-200 cursor-pointer ${
-                                      invoiceDesign.printerFriendly ? "bg-[#79bd58]" : "bg-slate-300"
+                                      invoiceDesign.printerFriendly ? "bg-[#f6821f]" : "bg-slate-300"
                                     }`}
                                   >
                                     <div
@@ -15741,7 +15922,7 @@ export default function AdminDashboard() {
                                     type="text"
                                     value={invoiceDesign.color}
                                     onChange={(e) => setInvoiceDesign({ ...invoiceDesign, color: e.target.value })}
-                                    className="w-full px-3 py-1.5 text-xs rounded-xl bg-white border border-slate-300 font-mono text-slate-900 focus:outline-none focus:border-[#79bd58]"
+                                    className="w-full px-3 py-1.5 text-xs rounded-xl bg-white border border-slate-300 font-mono text-slate-900 focus:outline-none focus:border-[#f6821f]"
                                   />
                                 </div>
 
@@ -15757,7 +15938,7 @@ export default function AdminDashboard() {
                                       type="button"
                                       onClick={() => setInvoiceDesign({ ...invoiceDesign, color: c })}
                                       className={`w-7 h-7 rounded-full cursor-pointer transition-transform hover:scale-110 flex items-center justify-center ${
-                                        invoiceDesign.color.toLowerCase() === c.toLowerCase() ? "ring-2 ring-offset-2 ring-[#79bd58]" : ""
+                                        invoiceDesign.color.toLowerCase() === c.toLowerCase() ? "ring-2 ring-offset-2 ring-[#f6821f]" : ""
                                       }`}
                                       style={{ backgroundColor: c }}
                                     />
@@ -15773,7 +15954,7 @@ export default function AdminDashboard() {
                                 <select
                                   value={invoiceDesign.font}
                                   onChange={(e) => setInvoiceDesign({ ...invoiceDesign, font: e.target.value })}
-                                  className="w-full px-3.5 py-2 text-xs rounded-xl bg-white border border-slate-300 text-slate-900 focus:outline-none focus:border-[#79bd58] font-medium cursor-pointer"
+                                  className="w-full px-3.5 py-2 text-xs rounded-xl bg-white border border-slate-300 text-slate-900 focus:outline-none focus:border-[#f6821f] font-medium cursor-pointer"
                                 >
                                   <option value="Helvetica Neue">Helvetica Neue</option>
                                   <option value="Inter">Inter</option>
@@ -15807,16 +15988,17 @@ export default function AdminDashboard() {
               {/* FIXED BOTTOM ACTION BAR (Full width matching user screenshot) */}
               <footer className="bg-white border-t border-slate-200 px-6 py-3.5 flex items-center justify-between z-30 shadow-lg shrink-0 print:hidden">
                 {/* Left Links Dropup (Matches user screenshot) */}
-                <div className="relative">
+                <div data-dropdown="true" className="relative">
                   <button
                     type="button"
                     onClick={() => setShowPrintDownloadDropdown(!showPrintDownloadDropdown)}
                     disabled={isGeneratingPDF}
-                    className="px-4 py-2 rounded-xl bg-slate-100/90 hover:bg-slate-200/80 text-[#004d40] font-bold text-xs transition cursor-pointer flex items-center gap-1.5"
+                    className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs transition cursor-pointer flex items-center gap-1.5"
                   >
+                    <Printer className="w-3.5 h-3.5 text-slate-600" />
                     {isGeneratingPDF ? (
                       <>
-                        <span className="inline-block w-3 h-3 border-2 border-[#004d40] border-t-transparent rounded-full animate-spin"></span>
+                        <span className="inline-block w-3 h-3 border-2 border-slate-600 border-t-transparent rounded-full animate-spin"></span>
                         <span>Generando PDF...</span>
                       </>
                     ) : (
@@ -15832,13 +16014,17 @@ export default function AdminDashboard() {
                           setShowPrintDownloadDropdown(false);
                           window.print();
                         }}
-                        className="w-full text-left px-4 py-2.5 hover:bg-slate-50 transition cursor-pointer font-medium text-slate-800"
+                        className="w-full text-left px-4 py-2.5 hover:bg-slate-50 transition cursor-pointer font-medium text-slate-800 flex items-center justify-between"
                       >
-                        Imprimir
+                        <span>Imprimir</span>
+                        <Printer className="w-3.5 h-3.5 text-slate-400" />
                       </button>
                       <button
                         type="button"
-                        onClick={downloadInvoicePDF}
+                        onClick={() => {
+                          setShowPrintDownloadDropdown(false);
+                          downloadInvoicePDF();
+                        }}
                         disabled={isGeneratingPDF}
                         className="w-full text-left px-4 py-2.5 hover:bg-slate-50 transition cursor-pointer font-medium text-slate-800 flex items-center justify-between"
                       >
@@ -15856,9 +16042,10 @@ export default function AdminDashboard() {
                           alert("Generando recibo de entrega para la orden de empaque flexográfico...");
                           window.print();
                         }}
-                        className="w-full text-left px-4 py-2.5 hover:bg-slate-50 transition cursor-pointer font-medium text-slate-800 border-t border-slate-100 mt-1 pt-2.5"
+                        className="w-full text-left px-4 py-2.5 hover:bg-slate-50 transition cursor-pointer font-medium text-slate-800 border-t border-slate-100 mt-1 pt-2.5 flex items-center justify-between"
                       >
-                        Imprimir recibo de entrega
+                        <span>Imprimir recibo de entrega</span>
+                        <Printer className="w-3.5 h-3.5 text-slate-400" />
                       </button>
                     </div>
                   )}
@@ -16110,69 +16297,127 @@ export default function AdminDashboard() {
 
               
               {/* OFFICIAL PRINTABLE PURCHASE ORDER DOCUMENT */}
-              <div id="printable-po-document" className="hidden print:block p-8 bg-white text-slate-900 text-xs">
-                <div className="flex justify-between items-start border-b-2 border-slate-900 pb-6 mb-6">
-                  <div>
-                    <h1 className="text-2xl font-black text-[#f6821f] tracking-tight">WAYNE TRADEMARK</h1>
-                    <p className="font-bold text-slate-900 text-sm mt-1">{companySettings.nombre}</p>
-                    <p className="text-slate-600 text-xs">{companySettings.direccion}</p>
-                    <p className="text-slate-600 text-xs">RTN: {companySettings.taxId} | Tel: {companySettings.telefono}</p>
-                  </div>
-                  <div className="text-right">
-                    <h2 className="text-2xl font-black text-slate-900">ORDEN DE COMPRA</h2>
-                    <p className="font-mono font-bold text-slate-800 text-base">N.º {poForm.num}</p>
-                    <p className="text-slate-600 text-xs mt-1"><strong>Fecha emisión:</strong> {poForm.date}</p>
-                    <p className="text-slate-600 text-xs"><strong>Entrega esperada:</strong> {poForm.expectedDate}</p>
-                    <p className="text-slate-600 text-xs"><strong>Estado:</strong> {poForm.status}</p>
-                  </div>
-                </div>
-
-                <div className="bg-slate-50 p-4 rounded-xl border border-slate-300 mb-6 flex justify-between items-center">
-                  <div>
-                    <span className="text-[10px] font-bold text-slate-500 uppercase block">Proveedor:</span>
-                    <span className="font-bold text-slate-900 text-sm">{poForm.vendorName}</span>
-                    <p className="text-slate-600 text-xs">{poForm.vendorEmail}</p>
-                    <p className="text-slate-600 text-xs">{poForm.vendorAddress}</p>
-                  </div>
-                  <div className="text-right font-mono">
-                    <span className="text-xs text-slate-500 block">Categoría de insumos:</span>
-                    <span className="font-bold text-slate-900 text-sm">{poForm.category}</span>
-                  </div>
-                </div>
-
-                <table className="w-full text-left border-collapse mb-6">
-                  <thead>
-                    <tr className="border-b-2 border-slate-900 bg-slate-100 text-slate-900 font-bold">
-                      <th className="py-2.5 px-3">#</th>
-                      <th className="py-2.5 px-3">Insumo / Producto</th>
-                      <th className="py-2.5 px-3">SKU</th>
-                      <th className="py-2.5 px-3">Descripción</th>
-                      <th className="py-2.5 px-3 text-right">Cant.</th>
-                      <th className="py-2.5 px-3 text-right">Precio Unit.</th>
-                      <th className="py-2.5 px-3 text-right">Total</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-200">
-                    {poForm.lines.map((l, idx) => (
-                      <tr key={l.id}>
-                        <td className="py-2.5 px-3 font-mono text-slate-500">{idx + 1}</td>
-                        <td className="py-2.5 px-3 font-bold text-slate-900">{l.productName || "Material"}</td>
-                        <td className="py-2.5 px-3 font-mono text-slate-600">{l.sku || "—"}</td>
-                        <td className="py-2.5 px-3 text-slate-700">{l.description || "—"}</td>
-                        <td className="py-2.5 px-3 text-right font-mono">{l.quantity}</td>
-                        <td className="py-2.5 px-3 text-right font-mono">${l.rate.toFixed(2)}</td>
-                        <td className="py-2.5 px-3 text-right font-mono font-bold">${l.total.toFixed(2)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-
-                <div className="flex justify-end pt-4 border-t-2 border-slate-900">
-                  <div className="w-64 space-y-1 text-right font-mono">
-                    <div className="flex justify-between font-black text-lg text-slate-900">
-                      <span>TOTAL USD:</span>
-                      <span>${poTotal.toFixed(2)}</span>
+              <div
+                id="printable-po-document"
+                className="hidden print:flex min-h-[10.5in] flex-col justify-between p-8 bg-white text-slate-900 text-xs"
+              >
+                <div>
+                  {/* Header */}
+                  <div className="flex justify-between items-start border-b-2 border-[#f6821f] pb-6 mb-6">
+                    <div>
+                      <h1 className="text-2xl font-black tracking-tight text-[#f6821f]">WAYNE TRADEMARK</h1>
+                      <p className="font-bold text-slate-900 text-sm mt-1">{companySettings.nombre}</p>
+                      <p className="text-slate-600 text-xs">{companySettings.direccion}</p>
+                      <p className="text-slate-600 text-xs">RTN: {companySettings.taxId} | Tel: {companySettings.telefono}</p>
+                      <p className="text-slate-600 text-xs">Correo: {companySettings.email}</p>
                     </div>
+                    <div className="text-right">
+                      <h2 className="text-2xl font-black text-slate-900">ORDEN DE COMPRA</h2>
+                      <p className="font-mono font-bold text-slate-800 text-base">N.º {poForm.num}</p>
+                      <p className="text-slate-600 text-xs mt-1"><strong>Fecha de emisión:</strong> {poForm.date}</p>
+                      <p className="text-slate-600 text-xs"><strong>Entrega esperada:</strong> {poForm.expectedDate}</p>
+                      <p className="text-slate-600 text-xs"><strong>Estado:</strong> {poForm.status}</p>
+                    </div>
+                  </div>
+
+                  {/* 2-column info cards: Proveedor / Suplidor (izq) y Lugar de Entrega / Facturar a (der) */}
+                  <div className="grid grid-cols-2 gap-4 mb-6 text-xs">
+                    {/* Proveedor */}
+                    <div className="p-4 space-y-1 rounded-2xl border border-slate-200/80 bg-slate-50/80">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Proveedor / Suplidor:</span>
+                      <p className="font-bold text-slate-900 text-sm">{poForm.vendorName || "Proveedor General"}</p>
+                      {poForm.vendorAddress && (
+                        <p className="text-slate-600 text-xs">{poForm.vendorAddress}</p>
+                      )}
+                      {poForm.vendorEmail && (
+                        <p className="text-slate-600 text-xs">{poForm.vendorEmail}</p>
+                      )}
+                      <p className="text-slate-600 text-xs font-medium">Categoría: {poForm.category}</p>
+                    </div>
+
+                    {/* Entrega a */}
+                    <div className="p-4 space-y-1 rounded-2xl border border-slate-200/80 bg-slate-50/80">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Lugar de Entrega / Facturar a:</span>
+                      <p className="font-bold text-slate-900 text-sm">{companySettings.nombre}</p>
+                      <p className="text-slate-600 text-xs">{companySettings.direccion}</p>
+                      <p className="text-slate-600 text-xs">Atención: Almacén de Insumos & Materia Prima</p>
+                      <p className="text-slate-600 text-xs">Tel: {companySettings.telefono} • compras@waynetrademark.com</p>
+                    </div>
+                  </div>
+
+                  {/* Items Table */}
+                  <table className="w-full text-left border-collapse mb-6">
+                    <thead>
+                      <tr className="border-b-2 border-[#f6821f] text-slate-500 font-semibold text-[11px] uppercase tracking-wider">
+                        <th className="py-2.5 px-3">#</th>
+                        <th className="py-2.5 px-3">Insumo / Descripción</th>
+                        <th className="py-2.5 px-3">SKU</th>
+                        <th className="py-2.5 px-3 text-right">Cant.</th>
+                        <th className="py-2.5 px-3 text-right">Precio Unit.</th>
+                        <th className="py-2.5 px-3 text-right">Total (USD)</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {poForm.lines.map((l, idx) => (
+                        <tr key={l.id}>
+                          <td className="py-3 px-3 font-mono text-slate-400 text-xs">{idx + 1}</td>
+                          <td className="py-3 px-3 font-semibold text-slate-900">
+                            <div>{l.productName || "Insumo"}</div>
+                            {l.description && <div className="text-[11px] text-slate-500 font-normal">{l.description}</div>}
+                          </td>
+                          <td className="py-3 px-3 font-mono text-slate-500 text-xs">{l.sku || "—"}</td>
+                          <td className="py-3 px-3 text-right font-mono text-slate-700">{l.quantity}</td>
+                          <td className="py-3 px-3 text-right font-mono text-slate-700">${l.rate.toLocaleString("es-HN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                          <td className="py-3 px-3 text-right font-mono font-bold text-slate-900">${l.total.toLocaleString("es-HN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Footer Totals & Signatures */}
+                <div className="mt-auto pt-6 space-y-6">
+                  <div className="grid grid-cols-12 gap-6 items-start">
+                    {/* Left: Notes & Valor en letras */}
+                    <div className="col-span-7 bg-slate-50/80 rounded-2xl p-3.5 border border-slate-200/80 flex flex-col justify-between">
+                      <div>
+                        <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block mb-1.5">
+                          Valor en Letras (Dólares USD)
+                        </span>
+                        <p className="font-bold text-slate-800 text-xs uppercase leading-relaxed tracking-wide">
+                          {numberToWordsSpanish(poTotal)} DÓLARES CON {Math.round((poTotal % 1) * 100).toString().padStart(2, "0")}/100 USD
+                        </p>
+                      </div>
+                      <div className="pt-3 border-t border-slate-200/60 mt-3 flex items-center justify-between text-[11px] text-slate-400">
+                        <span className="font-medium">Documento Comercial de Compra</span>
+                        <span className="font-mono font-semibold">Wayne Trademark</span>
+                      </div>
+                    </div>
+
+                    {/* Right: Breakdown Table */}
+                    <div className="col-span-5 bg-white rounded-2xl border border-slate-200/80 p-3.5 shadow-sm space-y-1 text-xs">
+                      <div className="flex justify-between items-center py-[2px] text-slate-600">
+                        <span className="font-semibold text-slate-500 uppercase text-[10px] tracking-wider">Subtotal Insumos</span>
+                        <span className="font-mono font-bold text-slate-900">${poSubtotal.toLocaleString("es-HN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                      </div>
+                      <div className="flex justify-between items-center py-[2px] text-slate-600">
+                        <span className="font-semibold text-slate-500 uppercase text-[10px] tracking-wider">Impuestos / Retenciones</span>
+                        <span className="font-mono font-medium text-slate-700">$0.00</span>
+                      </div>
+                      <div className="border-t border-slate-100 my-0.5" />
+                      <div className="pt-1">
+                        <div className="flex justify-between items-center py-2.5 px-3.5 shadow-xs rounded-xl bg-[#f6821f] text-white">
+                          <span className="font-black text-xs uppercase tracking-wider">Total Orden USD</span>
+                          <span className="font-mono font-black text-base">${poTotal.toLocaleString("es-HN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Línea con las notas */}
+                  <div className="pt-4 border-t border-slate-200 text-xs text-slate-700 flex items-start gap-2">
+                    <span className="font-bold text-slate-900 shrink-0">Notas:</span>
+                    <span className="text-slate-600 leading-relaxed">{poForm.notes || "Sin notas adicionales."}</span>
                   </div>
                 </div>
               </div>
@@ -16524,9 +16769,12 @@ export default function AdminDashboard() {
 
                   {/* VISTA DE PDF */}
                   {activePOTab === "Vista de PDF" && (
-                    <div className="bg-white border border-slate-200 rounded-2xl p-8 shadow-xs max-w-4xl mx-auto space-y-6 animate-in fade-in duration-150 text-xs">
-                      <div className="flex justify-between items-center border-b border-slate-200 pb-4">
-                        <h3 className="font-bold text-base text-slate-900">Vista Previa de Documento PDF</h3>
+                    <div className="overflow-x-auto pb-12 flex flex-col items-center">
+                      <div className="w-[8.5in] mb-4 flex items-center justify-between bg-white px-5 py-3 rounded-2xl border border-slate-200 shadow-xs">
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-xs text-slate-800">Vista Previa de Orden de Compra</span>
+                          <span className="text-[11px] text-slate-400 font-mono">N.º {poForm.num}</span>
+                        </div>
                         <div className="flex items-center gap-2">
                           <button
                             type="button"
@@ -16547,37 +16795,126 @@ export default function AdminDashboard() {
                         </div>
                       </div>
 
-                      <div className="p-8 border border-slate-200 rounded-xl bg-slate-50 space-y-6">
-                        <div className="flex justify-between">
-                          <div>
-                            <h2 className="text-xl font-black text-[#f6821f]">WAYNE TRADEMARK</h2>
-                            <p className="font-bold">{companySettings.nombre}</p>
+                      <div className="w-[8.5in] min-h-[11in] bg-white border border-slate-300 rounded-xs shadow-2xl p-12 flex flex-col justify-between animate-in fade-in duration-150 text-xs text-slate-800 shrink-0">
+                        <div className="space-y-6">
+                          {/* Header */}
+                          <div className="flex justify-between items-start border-b-2 border-[#f6821f] pb-6">
+                            <div>
+                              <h1 className="text-2xl font-black tracking-tight text-[#f6821f]">WAYNE TRADEMARK</h1>
+                              <p className="font-bold text-slate-900 mt-1">{companySettings.nombre}</p>
+                              <p className="text-slate-500">{companySettings.direccion}</p>
+                              <p className="text-slate-500">RTN: {companySettings.taxId}</p>
+                              <p className="text-slate-500">Tel: {companySettings.telefono} • {companySettings.email}</p>
+                            </div>
+                            <div className="text-right">
+                              <h2 className="text-xl font-bold text-slate-900">ORDEN DE COMPRA</h2>
+                              <p className="font-mono font-bold text-slate-700 text-sm">N.º {poForm.num}</p>
+                              <p className="text-slate-500 mt-1">Fecha de emisión: {poForm.date}</p>
+                              <p className="text-slate-500">Entrega esperada: {poForm.expectedDate}</p>
+                              <p className="text-slate-500">Estado: <span className="font-semibold text-emerald-700">{poForm.status}</span></p>
+                            </div>
                           </div>
-                          <div className="text-right font-mono">
-                            <p className="font-bold text-base">ORDEN DE COMPRA #{poForm.num}</p>
-                            <p className="text-slate-500">Fecha: {poForm.date}</p>
+
+                          {/* Proveedor / Suplidor (izq) y Lugar de Entrega / Facturar a (der) */}
+                          <div className="grid grid-cols-2 gap-4 text-xs mb-6">
+                            {/* Proveedor */}
+                            <div className="p-4 space-y-1 rounded-2xl border border-slate-200/80 bg-slate-50/80">
+                              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Proveedor / Suplidor:</span>
+                              <p className="font-bold text-slate-900 text-sm">{poForm.vendorName || "Proveedor General"}</p>
+                              {poForm.vendorAddress && (
+                                <p className="text-slate-500 text-xs">{poForm.vendorAddress}</p>
+                              )}
+                              {poForm.vendorEmail && (
+                                <p className="text-slate-500 text-xs">{poForm.vendorEmail}</p>
+                              )}
+                              <p className="text-slate-500 text-xs font-medium">Categoría: {poForm.category}</p>
+                            </div>
+
+                            {/* Entrega a */}
+                            <div className="p-4 space-y-1 rounded-2xl border border-slate-200/80 bg-slate-50/80">
+                              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Lugar de Entrega / Facturar a:</span>
+                              <p className="font-bold text-slate-900 text-sm">{companySettings.nombre}</p>
+                              <p className="text-slate-500 text-xs">{companySettings.direccion}</p>
+                              <p className="text-slate-500 text-xs">Atención: Almacén de Insumos & Materia Prima</p>
+                              <p className="text-slate-500 text-xs">Tel: {companySettings.telefono} • compras@waynetrademark.com</p>
+                            </div>
+                          </div>
+
+                          {/* Items Table */}
+                          <table className="w-full text-left border-collapse mb-6">
+                            <thead>
+                              <tr className="border-b-2 border-[#f6821f] text-slate-500 font-semibold text-[11px] uppercase tracking-wider">
+                                <th className="py-2.5 px-3">#</th>
+                                <th className="py-2.5 px-3">Insumo / Descripción</th>
+                                <th className="py-2.5 px-3">SKU</th>
+                                <th className="py-2.5 px-3 text-right">Cant.</th>
+                                <th className="py-2.5 px-3 text-right">Precio Unit.</th>
+                                <th className="py-2.5 px-3 text-right">Total (USD)</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                              {poForm.lines.map((l, idx) => (
+                                <tr key={l.id}>
+                                  <td className="py-3 px-3 font-mono text-slate-400 text-xs">{idx + 1}</td>
+                                  <td className="py-3 px-3 font-semibold text-slate-900">
+                                    <div>{l.productName || "Insumo"}</div>
+                                    {l.description && <div className="text-[11px] text-slate-500 font-normal">{l.description}</div>}
+                                  </td>
+                                  <td className="py-3 px-3 font-mono text-slate-500 text-xs">{l.sku || "—"}</td>
+                                  <td className="py-3 px-3 text-right font-mono text-slate-700">{l.quantity}</td>
+                                  <td className="py-3 px-3 text-right font-mono text-slate-700">${l.rate.toLocaleString("es-HN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                                  <td className="py-3 px-3 text-right font-mono font-bold text-slate-900">${l.total.toLocaleString("es-HN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+
+                        {/* Totals & Notes + Signatures */}
+                        <div className="mt-auto pt-6 space-y-6">
+                          <div className="grid grid-cols-12 gap-6 items-start">
+                            {/* Left: VALOR EN LETRAS & NOTAS */}
+                            <div className="col-span-7 bg-slate-50/80 rounded-2xl p-3.5 border border-slate-200/80 flex flex-col justify-between">
+                              <div>
+                                <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block mb-1.5">
+                                  Valor en Letras (Dólares USD)
+                                </span>
+                                <p className="font-bold text-slate-800 text-xs uppercase leading-relaxed tracking-wide">
+                                  {numberToWordsSpanish(poTotal)} DÓLARES CON {Math.round((poTotal % 1) * 100).toString().padStart(2, "0")}/100 USD
+                                </p>
+                              </div>
+                              <div className="pt-3 border-t border-slate-200/60 mt-3 flex items-center justify-between text-[11px] text-slate-400">
+                                <span className="font-medium">Documento Comercial de Compra</span>
+                                <span className="font-mono font-semibold">Wayne Trademark</span>
+                              </div>
+                            </div>
+
+                            {/* Right: Breakdown Table */}
+                            <div className="col-span-5 bg-white rounded-2xl border border-slate-200/80 p-3.5 shadow-sm space-y-1 text-xs">
+                              <div className="flex justify-between items-center py-[2px] text-slate-600">
+                                <span className="font-semibold text-slate-500 uppercase text-[10px] tracking-wider">Subtotal Insumos</span>
+                                <span className="font-mono font-bold text-slate-900">${poSubtotal.toLocaleString("es-HN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                              </div>
+                              <div className="flex justify-between items-center py-[2px] text-slate-600">
+                                <span className="font-semibold text-slate-500 uppercase text-[10px] tracking-wider">Impuestos / Retenciones</span>
+                                <span className="font-mono font-medium text-slate-700">$0.00</span>
+                              </div>
+                              <div className="border-t border-slate-100 my-0.5" />
+                              <div className="pt-1">
+                                <div className="flex justify-between items-center py-2.5 px-3.5 shadow-xs rounded-xl bg-[#f6821f] text-white">
+                                  <span className="font-black text-xs uppercase tracking-wider">Total Orden USD</span>
+                                  <span className="font-mono font-black text-base">${poTotal.toLocaleString("es-HN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Línea con las notas */}
+                          <div className="pt-4 border-t border-slate-200 text-xs text-slate-700 flex items-start gap-2">
+                            <span className="font-bold text-slate-900 shrink-0">Notas:</span>
+                            <span className="text-slate-600 leading-relaxed">{poForm.notes || "Sin notas adicionales."}</span>
                           </div>
                         </div>
-                        <table className="w-full text-left bg-white border border-slate-200 rounded-lg overflow-hidden">
-                          <thead className="bg-slate-100 font-bold border-b border-slate-200">
-                            <tr>
-                              <th className="p-2.5">Insumo</th>
-                              <th className="p-2.5 text-right">Cant.</th>
-                              <th className="p-2.5 text-right">Precio</th>
-                              <th className="p-2.5 text-right">Total</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {poForm.lines.map((l) => (
-                              <tr key={l.id} className="border-b border-slate-100">
-                                <td className="p-2.5 font-medium">{l.productName}</td>
-                                <td className="p-2.5 text-right font-mono">{l.quantity}</td>
-                                <td className="p-2.5 text-right font-mono">${l.rate.toFixed(2)}</td>
-                                <td className="p-2.5 text-right font-mono font-bold">${l.total.toFixed(2)}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
                       </div>
                     </div>
                   )}
@@ -16587,16 +16924,17 @@ export default function AdminDashboard() {
 
               {/* FIXED BOTTOM ACTION BAR */}
               <footer className="bg-white border-t border-slate-200 px-6 py-3.5 flex items-center justify-between z-30 shadow-lg shrink-0 print:hidden">
-                <div className="relative">
+                <div data-dropdown="true" className="relative">
                   <button
                     type="button"
                     onClick={() => setShowPOPrintDropdown(!showPOPrintDropdown)}
                     disabled={isGeneratingPDF}
-                    className="px-4 py-2 rounded-xl bg-slate-100/90 hover:bg-slate-200/80 text-[#004d40] font-bold text-xs transition cursor-pointer flex items-center gap-1.5"
+                    className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs transition cursor-pointer flex items-center gap-1.5"
                   >
+                    <Printer className="w-3.5 h-3.5 text-slate-600" />
                     {isGeneratingPDF ? (
                       <>
-                        <span className="inline-block w-3 h-3 border-2 border-[#004d40] border-t-transparent rounded-full animate-spin"></span>
+                        <span className="inline-block w-3 h-3 border-2 border-slate-600 border-t-transparent rounded-full animate-spin"></span>
                         <span>Generando PDF...</span>
                       </>
                     ) : (
@@ -16612,13 +16950,17 @@ export default function AdminDashboard() {
                           setShowPOPrintDropdown(false);
                           window.print();
                         }}
-                        className="w-full text-left px-4 py-2.5 hover:bg-slate-50 transition cursor-pointer font-medium text-slate-800"
+                        className="w-full text-left px-4 py-2.5 hover:bg-slate-50 transition cursor-pointer font-medium text-slate-800 flex items-center justify-between"
                       >
-                        Imprimir Documento
+                        <span>Imprimir Documento</span>
+                        <Printer className="w-3.5 h-3.5 text-slate-400" />
                       </button>
                       <button
                         type="button"
-                        onClick={downloadPOPDF}
+                        onClick={() => {
+                          setShowPOPrintDropdown(false);
+                          downloadPOPDF();
+                        }}
                         disabled={isGeneratingPDF}
                         className="w-full text-left px-4 py-2.5 hover:bg-slate-50 transition cursor-pointer font-medium text-slate-800 flex items-center justify-between"
                       >
