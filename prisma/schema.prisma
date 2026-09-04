@@ -9,16 +9,17 @@ generator client {
 }
 
 model Account {
-  id          String       @id @default(cuid())
-  code        String       @unique // e.g., 1000-6000 standard numbering
-  name        String
-  type        String       // Asset, Liability, Equity, Income, Expense
-  currency    String       @default("USD")
-  balance     Float        @default(0)
-  isActive    Boolean      @default(true)
-  bankAccount BankAccount?
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
+  id           String             @id @default(cuid())
+  code         String             @unique // e.g., 1000-6000 standard numbering
+  name         String
+  type         String             // Asset, Liability, Equity, Income, Expense
+  currency     String             @default("USD")
+  balance      Float              @default(0)
+  isActive     Boolean            @default(true)
+  bankAccount  BankAccount?
+  journalLines JournalEntryLine[]
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
 }
 
 model Customer {
@@ -374,3 +375,76 @@ model PettyCashVoucher {
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
 }
+
+model JournalEntry {
+  id            String             @id @default(cuid())
+  entryNumber   String             @unique // e.g. "AS-2026-0001"
+  date          String             // e.g. "2026-09-04"
+  concept       String
+  referenceType String             // "INVOICE" | "PURCHASE_INVOICE" | "PAYMENT_CUSTOMER" | "PAYMENT_VENDOR" | "BANK_TX" | "PETTY_CASH" | "MANUAL"
+  referenceId   String?            // ID or Number of linked document
+  currency      String             @default("USD")
+  status        String             @default("POSTED") // "POSTED" | "DRAFT" | "ANULADA"
+  lines         JournalEntryLine[]
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+}
+
+model JournalEntryLine {
+  id             String       @id @default(cuid())
+  journalEntryId String
+  journalEntry   JournalEntry @relation(fields: [journalEntryId], references: [id], onDelete: Cascade)
+  accountId      String
+  account        Account      @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  accountCode    String
+  accountName    String
+  description    String?
+  debit          Float        @default(0)
+  credit         Float        @default(0)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+}
+
+model SalesInvoice {
+  id                  String             @id @default(cuid())
+  invoiceNumber       String             @unique // e.g. "000-001-01-00036801" or "1001"
+  customerId          String?
+  customerName        String             @default("Cliente Contado")
+  customerRtn         String?
+  customerAddress     String?
+  customerEmail       String?
+  invoiceDate         String
+  dueDate             String?
+  paymentTerms        String             @default("Neto 30 días")
+  currency            String             @default("USD")
+  cai                 String?
+  discount            Float              @default(0)
+  importeExento       Float              @default(0)
+  importeExonerado    Float              @default(0)
+  impGravado15        Float              @default(0)
+  impGravado18        Float              @default(0)
+  subtotal            Float              @default(0)
+  isv15               Float              @default(0)
+  isv18               Float              @default(0)
+  total               Float              @default(0)
+  status              String             @default("Emitida") // "Borrador" | "Emitida" | "Pagada" | "Anulada"
+  journalEntryId      String?
+  lines               SalesInvoiceLine[]
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+}
+
+model SalesInvoiceLine {
+  id             String       @id @default(cuid())
+  salesInvoiceId String
+  salesInvoice   SalesInvoice @relation(fields: [salesInvoiceId], references: [id], onDelete: Cascade)
+  productName    String
+  sku            String?
+  description    String?
+  quantity       Float        @default(1)
+  rate           Float        @default(0)
+  amount         Float        @default(0)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+}
+

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { postCustomerPaymentEntry } from "@/lib/accounting";
 
 export async function GET() {
   try {
@@ -52,7 +53,23 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    return NextResponse.json({ success: true, data: newPayment });
+    // Automatic accounting posting
+    let journalEntry = null;
+    try {
+      journalEntry = await postCustomerPaymentEntry({
+        id: newPayment.id,
+        paymentDate: newPayment.paymentDate,
+        customerName: newPayment.customerName,
+        amount: newPayment.amount,
+        paymentMethod: newPayment.paymentMethod,
+        referenceNumber: newPayment.referenceNumber || undefined,
+        depositAccount: newPayment.depositAccount,
+      });
+    } catch (accountingErr) {
+      console.error("Error creating accounting entry for payment:", accountingErr);
+    }
+
+    return NextResponse.json({ success: true, data: newPayment, journalEntry });
   } catch (error: unknown) {
     console.error("POST /api/payments error:", error);
     const message = error instanceof Error ? error.message : "Internal Server Error";

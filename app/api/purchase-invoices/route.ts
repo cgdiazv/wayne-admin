@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { postPurchaseInvoiceEntry } from "@/lib/accounting";
 
 const seedPurchaseInvoices = [
   {
@@ -198,7 +199,24 @@ export async function POST(req: Request) {
       }
     }
 
-    return NextResponse.json({ success: true, data: newInvoice });
+    // 3. AUTOMATIC DOUBLE-ENTRY ACCOUNTING POSTING
+    let journalEntry = null;
+    try {
+      journalEntry = await postPurchaseInvoiceEntry({
+        id: newInvoice.id,
+        invoiceNumber: newInvoice.invoiceNumber,
+        vendorName: newInvoice.vendorName,
+        issueDate: newInvoice.issueDate,
+        subtotal: newInvoice.subtotal,
+        tax: newInvoice.tax,
+        total: newInvoice.total,
+        currency: newInvoice.currency,
+      });
+    } catch (accountingErr) {
+      console.error("Error creating accounting entry for purchase invoice:", accountingErr);
+    }
+
+    return NextResponse.json({ success: true, data: newInvoice, journalEntry });
   } catch (error: any) {
     console.error("POST /api/purchase-invoices error:", error);
     return NextResponse.json(

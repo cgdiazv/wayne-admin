@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Users, Factory, Package, Tag, Boxes, AlertCircle, Clock, CheckCircle2, ShieldAlert, Layers, Hash, BookOpen, Download, Upload, FileSpreadsheet, ArrowRight, X, FileText, Calendar, CreditCard } from "lucide-react";
 import CajaChicaModule from "@/components/CajaChicaModule";
+import AccountingBooksModule from "@/components/AccountingBooksModule";
 
 
 
@@ -2171,7 +2172,7 @@ export default function AdminDashboard() {
     setCurrentView("factura-editor");
   };
 
-  const handleSaveInvoiceRecord = (closeAfter = false) => {
+  const handleSaveInvoiceRecord = async (closeAfter = false) => {
     const finalTotal = invoiceTotal;
     setInvoicesList((prev) => {
       const exists = prev.some((i) => i.num === invoiceForm.invoiceNumber);
@@ -2207,13 +2208,56 @@ export default function AdminDashboard() {
       }
     });
 
-    setInvoiceSuccessMsg("¡Factura guardada correctamente!");
+    // Post to API for database persistence and automatic accounting posting
+    try {
+      const res = await fetch("/api/invoices", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          invoiceNumber: invoiceForm.invoiceNumber,
+          customerName: invoiceForm.customerName || "Cliente Contado",
+          customerRtn: "",
+          customerAddress: invoiceForm.customerAddress || "",
+          customerEmail: invoiceForm.customerEmail || "",
+          invoiceDate: invoiceForm.invoiceDate || new Date().toISOString().split("T")[0],
+          dueDate: invoiceForm.dueDate || "",
+          paymentTerms: invoiceForm.paymentTerms,
+          currency: invoiceForm.currency || "USD",
+          cai: companySettings.cai,
+          discount: invoiceDiscount,
+          importeExento: invoiceExempt,
+          importeExonerado: invoiceExonerated,
+          impGravado15: invoiceGravado15,
+          impGravado18: invoiceGravado18,
+          subtotal: invoiceSubtotal,
+          isv15: invoiceIsv15,
+          isv18: invoiceIsv18,
+          total: finalTotal,
+          status: invoiceForm.status || "Emitida",
+          lines: invoiceForm.lines,
+        }),
+      });
+      const data = await res.json();
+      if (data.success && data.journalEntry) {
+        setInvoiceSuccessMsg(`¡Factura guardada y contabilizada automáticamente en el Libro Diario (${data.journalEntry.entryNumber})!`);
+        // Refresh accounts so Plan de Cuentas shows the new balance immediately
+        fetch("/api/accounts").then((r) => r.json()).then((accRes) => {
+          if (accRes.success) setAccounts(accRes.data || []);
+        });
+      } else {
+        setInvoiceSuccessMsg("¡Factura guardada correctamente!");
+      }
+    } catch (apiErr) {
+      console.error("Error saving invoice to API:", apiErr);
+      setInvoiceSuccessMsg("¡Factura guardada correctamente!");
+    }
+
     setTimeout(() => {
       setInvoiceSuccessMsg("");
       if (closeAfter) {
         closeInvoiceEditor();
       }
-    }, 1000);
+    }, 1500);
   };
 
   const numberToWordsSpanish = (amount: number): string => {
@@ -3698,7 +3742,7 @@ export default function AdminDashboard() {
   const loadDashboardData = async () => {
     setLoading(true);
     try {
-      const [accRes, cusRes, venRes, invRes, bankRes, txRes, ruleRes, noteRes] = await Promise.all([
+      const [accRes, cusRes, venRes, invRes, bankRes, txRes, ruleRes, noteRes, invcRes] = await Promise.all([
         fetch("/api/accounts").then((r) => r.json()),
         fetch("/api/customers").then((r) => r.json()),
         fetch("/api/vendors").then((r) => r.json()),
@@ -3707,6 +3751,7 @@ export default function AdminDashboard() {
         fetch("/api/bank-transactions").then((r) => r.json()),
         fetch("/api/bank-rules").then((r) => r.json()),
         fetch("/api/credit-debit-notes").then((r) => r.json()).catch(() => ({ success: false })),
+        fetch("/api/invoices").then((r) => r.json()).catch(() => ({ success: false })),
       ]);
 
       if (accRes.success) setAccounts(accRes.data || []);
@@ -3724,6 +3769,20 @@ export default function AdminDashboard() {
       if (txRes.success) setBankTransactions(txRes.data || []);
       if (ruleRes.success) setAutomationRules(ruleRes.data || []);
       if (noteRes && noteRes.success) setCreditDebitNotes(noteRes.data || []);
+      if (invcRes && invcRes.success && Array.isArray(invcRes.data) && invcRes.data.length > 0) {
+        setInvoicesList(
+          invcRes.data.map((inv: any) => ({
+            num: inv.invoiceNumber,
+            date: inv.invoiceDate,
+            customer: inv.customerName,
+            due: inv.dueDate || "",
+            total: inv.total,
+            status: inv.status,
+            paymentTerms: inv.paymentTerms,
+            lines: inv.lines || [],
+          }))
+        );
+      }
 
     } catch (err) {
       console.error("Error loading dashboard data:", err);
@@ -6067,347 +6126,37 @@ export default function AdminDashboard() {
             </>
           )}
 
-          {/* ================= VIEW: PLAN DE CUENTAS ================= */}
+          {/* ================= VIEW: PLAN DE CUENTAS & LIBROS CONTABLES ================= */}
           {currentView === "plan-cuentas" && (
-            <div className="space-y-4">
-              {/* Header Action Bar (Matching screenshot) */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <button
-                  onClick={() => setCurrentView("dashboard")}
-                  className="text-xs font-semibold text-slate-600 hover:text-slate-900 transition flex items-center gap-1.5 cursor-pointer w-fit"
-                >
-                  <svg className="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
-                  </svg>
-                  <span>Regresar a Dashboard</span>
-                </button>
-
-                <div className="flex items-center gap-3 self-end sm:self-auto">
-                  <button
-                    onClick={handleExportAccounts}
-                    className="px-4 py-2 rounded-xl border border-[#f6821f] text-[#f6821f] hover:bg-[#fff7ed] text-xs font-semibold transition cursor-pointer shadow-xs"
-                  >
-                    Generar reporte
-                  </button>
-
-                  <button
-                    onClick={() => {
-                      setEditingAccountId(null);
-                      setNewAccountForm({
-                        code: "",
-                        name: "",
-                        type: "Efectivo y equivalentes de efectivo",
-                        detailType: "Banco",
-                        isSubAccount: false,
-                        parentAccountId: "",
-                        description: "",
-                        isLocked: false,
-                        currency: "USD",
-                        balance: 0,
-                        isActive: true,
-                      });
-                      setAccountModalError("");
-                      setAccountModalSuccess("");
-                      setShowNewAccountModal(true);
-                    }}
-                    className="px-4 py-2 rounded-xl bg-[#f6821f] hover:bg-[#e07216] text-white text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer shadow-md shadow-[#f6821f]/20"
-                  >
-                    <span>Nueva cuenta</span>
-                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
-                    </svg>
-                  </button>
-                </div>
-              </div>
-
-              {/* Toolbar Row (Filters, search, print, export - Matching screenshot) */}
-              <div className="bg-white border border-slate-200 rounded-2xl p-3.5 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-3">
-                <div className="flex flex-wrap items-center gap-3">
-                  {/* Search Input */}
-                  <div className="relative min-w-[240px]">
-                    <input
-                      type="text"
-                      placeholder="Filtrar por nombre o número"
-                      value={accountsSearch}
-                      onChange={(e) => setAccountsSearch(e.target.value)}
-                      className="w-full pl-8 pr-3 py-1.5 text-xs rounded-xl bg-slate-50 border border-slate-200 text-slate-900 placeholder-slate-400 focus:outline-none focus:border-[#f6821f] focus:ring-1 focus:ring-[#f6821f]"
-                    />
-                    <svg className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                    </svg>
-                  </div>
-
-                  {/* Type Filter Select */}
-                  <div className="relative">
-                    <select
-                      value={accountsTypeFilter}
-                      onChange={(e) => setAccountsTypeFilter(e.target.value)}
-                      className="pl-3 pr-8 py-1.5 text-xs rounded-xl bg-slate-50 border border-slate-200 text-slate-700 font-medium appearance-none focus:outline-none focus:border-[#f6821f] cursor-pointer"
-                    >
-                      <option value="Todo">Todos los tipos</option>
-                      <optgroup label="Categorías Principales">
-                        <option value="ACTIVO">ACTIVO (Todo)</option>
-                        <option value="RESPONSABILIDAD">RESPONSABILIDAD (Todo)</option>
-                        <option value="FONDOS PROPIOS">FONDOS PROPIOS (Todo)</option>
-                        <option value="INGRESOS">INGRESOS (Todo)</option>
-                        <option value="GASTO">GASTO (Todo)</option>
-                      </optgroup>
-                      {Object.entries(ACCOUNT_CATEGORIES).map(([cat, types]) => (
-                        <optgroup key={cat} label={cat}>
-                          {types.map((t) => (
-                            <option key={t} value={t}>
-                              {t}
-                            </option>
-                          ))}
-                        </optgroup>
-                      ))}
-                    </select>
-                    <svg className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-2.5 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
-                    </svg>
-                  </div>
-
-                  {(accountsSearch || accountsTypeFilter !== "Todo") && (
-                    <button
-                      onClick={() => {
-                        setAccountsSearch("");
-                        setAccountsTypeFilter("Todo");
-                      }}
-                      className="text-xs text-[#f6821f] hover:underline font-medium cursor-pointer"
-                    >
-                      Limpiar filtros
-                    </button>
-                  )}
-                </div>
-
-                <div className="flex items-center gap-3 text-xs text-slate-600">
-
-                  <button
-                    onClick={handleExportAccounts}
-                    title="Exportar a Excel / CSV"
-                    className="p-1.5 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition cursor-pointer"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                  </button>
-
-                  <button
-                    onClick={handlePrintAccounts}
-                    title="Imprimir plan de cuentas"
-                    className="p-1.5 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition cursor-pointer"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
-                    </svg>
-                  </button>
-
-                  <button
-                    onClick={() => setShowConfigSidebar(true)}
-                    title="Personalizar tabla"
-                    className={`p-1.5 rounded-lg transition cursor-pointer ${
-                      showConfigSidebar ? "text-[#f6821f] bg-[#fff7ed]" : "text-slate-500 hover:text-slate-900 hover:bg-slate-100"
-                    }`}
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                    </svg>
-                  </button>
-                </div>
-              </div>
-
-              {/* Accounts Table */}
-              <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xs">
-                <div className="p-4 border-b border-slate-100 flex items-center justify-between">
-                  <div>
-                    <h2 className="font-semibold text-sm text-slate-900">
-                      Catálogo Contable ({displayedAccounts.length} de {filteredAccounts.length})
-                    </h2>
-                    <p className="text-xs text-slate-500">
-                      Plan estándar con cuentas activas en Wayne Trademark Honduras. Haz clic en el número de cuenta para editarla.
-                    </p>
-                  </div>
-                  {filteredAccounts.length > pageSize && (
-                    <span className="text-[11px] text-slate-500 font-medium">
-                      Página de {pageSize} registros
-                    </span>
-                  )}
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs text-slate-600">
-                    <thead className="bg-slate-50 text-slate-700 font-semibold border-b border-slate-200">
-                      <tr>
-                        {columnOrder.map((colKey) => {
-                          if (!visibleColumns[colKey]) return null;
-                          const cellPadding =
-                            rowDensity === "espacioso"
-                              ? "py-4 px-4"
-                              : rowDensity === "compacto"
-                              ? "py-2 px-3"
-                              : "py-3 px-3.5";
-                          switch (colKey) {
-                            case "code":
-                              return <th key="code" className={cellPadding}>N.º</th>;
-                            case "type":
-                              return <th key="type" className={cellPadding}>Tipo de cuenta</th>;
-                            case "detailType":
-                              return <th key="detailType" className={cellPadding}>Tipo de detalles</th>;
-                            case "description":
-                              return <th key="description" className={cellPadding}>Descripción</th>;
-                            case "currency":
-                              return <th key="currency" className={cellPadding}>Moneda</th>;
-                            case "bookBalance":
-                              return <th key="bookBalance" className={cellPadding}>Saldo contable</th>;
-                            case "bankBalance":
-                              return <th key="bankBalance" className={cellPadding}>Saldo bancario</th>;
-                            default:
-                              return null;
-                          }
-                        })}
-                        <th
-                          className={
-                            rowDensity === "espacioso"
-                              ? "py-4 px-4"
-                              : rowDensity === "compacto"
-                              ? "py-2 px-3"
-                              : "py-3 px-3.5"
-                          }
-                        >
-                          Estado
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {displayedAccounts.map((acc, idx) => {
-                        const cellPadding =
-                          rowDensity === "espacioso"
-                            ? "py-4 px-4"
-                            : rowDensity === "compacto"
-                            ? "py-1.5 px-3"
-                            : "py-2.5 px-3.5";
-                        const rowBg = alternateRowColor && idx % 2 === 1 ? "bg-slate-50/70" : "bg-white";
-                        return (
-                          <tr key={acc.id} className={`${rowBg} hover:bg-[#fff7ed]/50 transition`}>
-                            {columnOrder.map((colKey) => {
-                              if (!visibleColumns[colKey]) return null;
-                              switch (colKey) {
-                                case "code":
-                                  return (
-                                    <td key="code" className={`${cellPadding} font-mono font-semibold`}>
-                                      <button
-                                        type="button"
-                                        onClick={() => handleOpenEditAccount(acc)}
-                                        className="text-[#f6821f] hover:text-[#e07216] hover:underline font-mono font-bold text-left inline-flex items-center gap-1.5 group cursor-pointer"
-                                        title="Clic para editar cuenta contable"
-                                      >
-                                        <span>{activateAccountNumbers ? acc.code : (acc.code || "—")}</span>
-                                        <svg
-                                          className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity text-[#f6821f] shrink-0"
-                                          fill="none"
-                                          stroke="currentColor"
-                                          viewBox="0 0 24 24"
-                                        >
-                                          <path
-                                             strokeLinecap="round"
-                                             strokeLinejoin="round"
-                                             strokeWidth="2"
-                                             d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"
-                                          />
-                                        </svg>
-                                      </button>
-                                    </td>
-                                  );
-                                case "type": {
-                                  const { category, accountType } = getAccountClassification(acc.type, acc.name);
-                                  const isER = category === "INGRESOS" || category === "GASTO";
-                                  return (
-                                    <td key="type" className={cellPadding}>
-                                      <div className="flex items-center gap-1.5 flex-wrap">
-                                        <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-slate-100 border border-slate-200 text-slate-700">
-                                          {accountType}
-                                        </span>
-                                        {showReportBadges && (
-                                          <span className="px-1.5 py-0.5 text-[9px] rounded font-bold bg-amber-50 text-amber-700 border border-amber-200">
-                                            {isER ? "ER" : "BG"}
-                                          </span>
-                                        )}
-                                      </div>
-                                    </td>
-                                  );
-                                }
-                                case "detailType":
-                                  return (
-                                    <td key="detailType" className={`${cellPadding} text-slate-600 font-medium`}>
-                                      {getDetailType(acc.type, acc.name)}
-                                    </td>
-                                  );
-                                case "description":
-                                  return (
-                                    <td key="description" className={`${cellPadding} font-medium text-slate-900`}>
-                                      <button
-                                        type="button"
-                                        onClick={() => handleOpenEditAccount(acc)}
-                                        className="text-left font-medium text-slate-900 hover:text-[#f6821f] transition cursor-pointer"
-                                        title="Clic para editar cuenta contable"
-                                      >
-                                        {acc.name}
-                                      </button>
-                                    </td>
-                                  );
-                                case "currency":
-                                  return (
-                                    <td key="currency" className={`${cellPadding} font-medium text-slate-700`}>
-                                      {acc.currency}
-                                    </td>
-                                  );
-                                case "bookBalance":
-                                  return (
-                                    <td key="bookBalance" className={`${cellPadding} font-mono font-medium text-slate-800`}>
-                                      {formatCurrency(acc.balance || 0)}
-                                    </td>
-                                  );
-                                case "bankBalance":
-                                  return (
-                                    <td key="bankBalance" className={`${cellPadding} font-mono font-medium text-slate-500`}>
-                                      {acc.name.toLowerCase().includes("banco") ||
-                                      acc.name.toLowerCase().includes("caja") ||
-                                      acc.name.toLowerCase().includes("checking") ||
-                                      acc.name.toLowerCase().includes("cash")
-                                        ? formatCurrency(acc.balance || 0)
-                                        : "—"}
-                                    </td>
-                                  );
-                                default:
-                                  return null;
-                              }
-                            })}
-                            <td className={cellPadding}>
-                              <span
-                                className={`px-2.5 py-0.5 rounded-full text-[10px] font-semibold ${
-                                  acc.isActive
-                                    ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                                    : "bg-slate-100 text-slate-500"
-                                }`}
-                              >
-                                {acc.isActive ? "Activa" : "Inactiva"}
-                              </span>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                      {displayedAccounts.length === 0 && (
-                        <tr>
-                          <td colSpan={columnOrder.filter((k) => visibleColumns[k]).length + 1} className="p-8 text-center text-slate-400">
-                            No se encontraron cuentas contables
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
+            <AccountingBooksModule
+              accounts={accounts}
+              onRefreshAccounts={async () => {
+                const res = await fetch("/api/accounts").then((r) => r.json());
+                if (res.success) setAccounts(res.data || []);
+              }}
+              onOpenNewAccount={() => {
+                setEditingAccountId(null);
+                setNewAccountForm({
+                  code: "",
+                  name: "",
+                  type: "Efectivo y equivalentes de efectivo",
+                  detailType: "Banco",
+                  isSubAccount: false,
+                  parentAccountId: "",
+                  description: "",
+                  isLocked: false,
+                  currency: "USD",
+                  balance: 0,
+                  isActive: true,
+                });
+                setAccountModalError("");
+                setAccountModalSuccess("");
+                setShowNewAccountModal(true);
+              }}
+              onOpenEditAccount={(acc) => handleOpenEditAccount(acc)}
+              onBackToDashboard={() => setCurrentView("dashboard")}
+              formatCurrency={formatCurrency}
+            />
           )}
 
           {/* ================= VIEW: TRANSACCIONES BANCARIAS & FEEDS ================= */}
