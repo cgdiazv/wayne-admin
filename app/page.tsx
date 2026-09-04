@@ -1927,20 +1927,45 @@ export default function AdminDashboard() {
   });
 
   const invoiceCurrencySymbol = invoiceForm.currency || defaultCurrencySymbol;
-  const invoiceSubtotal = invoiceForm.lines.reduce((sum, line) => sum + (line.amount || 0), 0);
-  const invoiceDiscount = invoiceForm.discount || 0;
-  const invoiceExonerated = invoiceForm.importeExonerado || 0;
-  const invoiceExempt = invoiceForm.importeExento || 0;
-  const invoiceGravado15 = (invoiceForm.impGravado15 && invoiceForm.impGravado15 > 0)
-    ? invoiceForm.impGravado15
-    : (invoiceForm.applyIsv15 && !invoiceExempt && !invoiceExonerated ? Math.max(0, invoiceSubtotal - invoiceDiscount) : 0);
-  const invoiceGravado18 = (salesSettings.permitirIsv18 && invoiceForm.impGravado18 && invoiceForm.impGravado18 > 0)
-    ? invoiceForm.impGravado18
-    : (salesSettings.permitirIsv18 && invoiceForm.applyIsv18 ? Math.max(0, invoiceSubtotal - invoiceDiscount) : 0);
+  const invoiceGrossSubtotal = invoiceForm.lines.reduce((sum, line) => sum + (line.amount || 0), 0);
+  const invoiceDiscount = Number(invoiceForm.discount || 0);
+  const invoiceNetBase = Math.max(0, invoiceGrossSubtotal - invoiceDiscount);
+
+  // 1. Importe Exento (ventas de bienes/servicios exentos de ISV por ley)
+  const invoiceExempt = invoiceForm.isExempt
+    ? invoiceNetBase
+    : Number(invoiceForm.importeExento || 0);
+
+  // 2. Importe Exonerado (ventas con constancia de registro de exonerados / orden de compra exenta)
+  const invoiceExonerated = invoiceForm.isExonerated
+    ? Math.max(0, invoiceNetBase - invoiceExempt)
+    : Number(invoiceForm.importeExonerado || 0);
+
+  // Base gravable disponible después de exenciones y exoneraciones
+  const remainingTaxableBase = Math.max(0, invoiceNetBase - invoiceExempt - invoiceExonerated);
+
+  // 3. Imp. Gravado 18% (solo si está habilitado en configuración y activo en factura)
+  const invoiceGravado18 = (salesSettings.permitirIsv18 && invoiceForm.applyIsv18)
+    ? (invoiceForm.impGravado18 && invoiceForm.impGravado18 > 0 ? invoiceForm.impGravado18 : remainingTaxableBase)
+    : 0;
+
+  // 4. Imp. Gravado 15% (base gravable sujeta a la tasa general del 15%)
+  const invoiceGravado15 = invoiceForm.applyIsv15
+    ? (invoiceForm.impGravado15 && invoiceForm.impGravado15 > 0
+        ? invoiceForm.impGravado15
+        : Math.max(0, remainingTaxableBase - invoiceGravado18))
+    : 0;
+
+  // 5. Subtotal (Base neta total: Exento + Exonerado + Gravado 15% + Gravado 18%)
+  const invoiceSubtotal = Number((invoiceExempt + invoiceExonerated + invoiceGravado15 + invoiceGravado18).toFixed(2)) || invoiceNetBase;
+
+  // 6. Impuestos I.S.V.
   const configuredIsvRate = (salesSettings?.tasaIsvGeneral ?? 15) / 100;
   const invoiceIsv15 = invoiceForm.applyIsv15 ? Number((invoiceGravado15 * configuredIsvRate).toFixed(2)) : 0;
   const invoiceIsv18 = (salesSettings.permitirIsv18 && invoiceForm.applyIsv18) ? Number((invoiceGravado18 * 0.18).toFixed(2)) : 0;
-  const invoiceTotal = Number((invoiceSubtotal - invoiceDiscount + invoiceIsv15 + invoiceIsv18).toFixed(2));
+
+  // 7. Total a Pagar
+  const invoiceTotal = Number((invoiceSubtotal + invoiceIsv15 + invoiceIsv18).toFixed(2));
 
   const downloadInvoicePDF = async () => {
     setShowPrintDownloadDropdown(false);
@@ -14340,36 +14365,28 @@ export default function AdminDashboard() {
 
                   {/* Right: Breakdown Table */}
                   <div className="col-span-5 bg-white rounded-2xl border border-slate-200/80 p-3.5 shadow-sm space-y-0.5 text-xs">
-                    {/* SUBTOTAL */}
-                    <div className="flex justify-between items-center py-[2px] text-slate-600">
-                      <span className="font-semibold text-slate-500 uppercase text-[10px] tracking-wider">Subtotal</span>
-                      <span className="font-mono font-bold text-slate-900">{formatFiscalMoney(invoiceSubtotal, true)}</span>
-                    </div>
-
-                    {/* DESCUENTOS */}
+                    {/* 1. DESCUENTOS */}
                     <div className="flex justify-between items-center py-[2px] text-slate-600">
                       <span className="font-semibold text-slate-500 uppercase text-[10px] tracking-wider">Descuentos</span>
                       <span className="font-mono font-medium text-slate-700">{formatFiscalMoney(invoiceDiscount) || "—"}</span>
                     </div>
 
-                    {/* IMPORTE EXONERADO */}
-                    <div className="flex justify-between items-center py-[2px] text-slate-600">
-                      <span className="font-semibold text-slate-500 uppercase text-[10px] tracking-wider">Importe Exonerado</span>
-                      <span className="font-mono font-medium text-slate-700">{formatFiscalMoney(invoiceExonerated) || "—"}</span>
-                    </div>
-
-                    {/* IMPORTE EXENTO */}
+                    {/* 2. IMPORTE EXENTO */}
                     <div className="flex justify-between items-center py-[2px] text-slate-600">
                       <span className="font-semibold text-slate-500 uppercase text-[10px] tracking-wider">Importe Exento</span>
                       <span className="font-mono font-medium text-slate-700">{formatFiscalMoney(invoiceExempt) || "—"}</span>
                     </div>
 
-                    <div className="border-t border-slate-100 my-0.5" />
+                    {/* 3. IMPORTE EXONERADO */}
+                    <div className="flex justify-between items-center py-[2px] text-slate-600">
+                      <span className="font-semibold text-slate-500 uppercase text-[10px] tracking-wider">Importe Exonerado</span>
+                      <span className="font-mono font-medium text-slate-700">{formatFiscalMoney(invoiceExonerated) || "—"}</span>
+                    </div>
 
-                    {/* IMP GRAVADO GENERAL */}
+                    {/* 4. IMP GRAVADO 15% */}
                     <div className="flex justify-between items-center py-[2px] text-slate-600">
                       <span className="font-semibold text-slate-500 uppercase text-[10px] tracking-wider">Imp. Gravado {salesSettings?.tasaIsvGeneral ?? 15}%</span>
-                      <span className="font-mono font-medium text-slate-700">{formatFiscalMoney(invoiceForm.showImpGravado15 ? invoiceGravado15 : 0) || "—"}</span>
+                      <span className="font-mono font-medium text-slate-700">{formatFiscalMoney(invoiceGravado15) || "—"}</span>
                     </div>
 
                     {/* IMP GRAVADO 18% */}
@@ -14380,21 +14397,29 @@ export default function AdminDashboard() {
                       </div>
                     )}
 
-                    {/* I.S.V. GENERAL */}
+                    <div className="border-t border-slate-100 my-0.5" />
+
+                    {/* 5. SUBTOTAL */}
                     <div className="flex justify-between items-center py-[2px] text-slate-600">
-                      <span className="font-semibold text-slate-500 uppercase text-[10px] tracking-wider">I.S.V. {salesSettings?.tasaIsvGeneral ?? 15}%</span>
+                      <span className="font-semibold text-slate-500 uppercase text-[10px] tracking-wider">Subtotal</span>
+                      <span className="font-mono font-bold text-slate-900">{formatFiscalMoney(invoiceSubtotal, true)}</span>
+                    </div>
+
+                    {/* 6. TOTAL I.S.V. 15% */}
+                    <div className="flex justify-between items-center py-[2px] text-slate-600">
+                      <span className="font-semibold text-slate-500 uppercase text-[10px] tracking-wider">Total I.S.V. {salesSettings?.tasaIsvGeneral ?? 15}%</span>
                       <span className="font-mono font-medium text-slate-700">{formatFiscalMoney(invoiceIsv15, invoiceForm.applyIsv15) || "—"}</span>
                     </div>
 
-                    {/* I.S.V. 18% */}
+                    {/* TOTAL I.S.V. 18% */}
                     {salesSettings.permitirIsv18 && (
                       <div className="flex justify-between items-center py-[2px] text-slate-600">
-                        <span className="font-semibold text-slate-500 uppercase text-[10px] tracking-wider">I.S.V. 18%</span>
+                        <span className="font-semibold text-slate-500 uppercase text-[10px] tracking-wider">Total I.S.V. 18%</span>
                         <span className="font-mono font-medium text-slate-700">{formatFiscalMoney(invoiceIsv18, invoiceForm.applyIsv18) || "—"}</span>
                       </div>
                     )}
 
-                    {/* TOTAL A PAGAR */}
+                    {/* 7. TOTAL A PAGAR */}
                     <div className="pt-1">
                       <div className="flex justify-between items-center py-2 px-3 bg-slate-200 border border-slate-300 text-slate-900 rounded-xl shadow-xs">
                         <span className="font-black text-xs uppercase tracking-wider text-slate-700">Total a Pagar</span>
@@ -14891,29 +14916,62 @@ export default function AdminDashboard() {
                           </div>
 
                           {/* Fiscal Summary Preview */}
-                          <div className="space-y-1.5 pt-1 text-right">
+                          <div className="space-y-1.5 pt-1 text-right text-xs">
+                            {/* 1. DESCUENTOS */}
                             <div className="flex justify-between items-center text-slate-600">
-                              <span>SUBTOTAL:</span>
+                              <span className="text-[11px] uppercase font-semibold text-slate-500">DESCUENTOS:</span>
+                              <span className="font-mono text-slate-900">{invoiceDiscount > 0 ? `-${invoiceCurrencySymbol} ${invoiceDiscount.toLocaleString("es-HN", { minimumFractionDigits: 2 })}` : "—"}</span>
+                            </div>
+
+                            {/* 2. IMPORTE EXENTO */}
+                            <div className="flex justify-between items-center text-slate-600">
+                              <span className="text-[11px] uppercase font-semibold text-slate-500">IMPORTE EXENTO:</span>
+                              <span className="font-mono text-slate-900">{invoiceExempt > 0 ? `${invoiceCurrencySymbol} ${invoiceExempt.toLocaleString("es-HN", { minimumFractionDigits: 2 })}` : "—"}</span>
+                            </div>
+
+                            {/* 3. IMPORTE EXONERADO */}
+                            <div className="flex justify-between items-center text-slate-600">
+                              <span className="text-[11px] uppercase font-semibold text-slate-500">IMPORTE EXONERADO:</span>
+                              <span className="font-mono text-slate-900">{invoiceExonerated > 0 ? `${invoiceCurrencySymbol} ${invoiceExonerated.toLocaleString("es-HN", { minimumFractionDigits: 2 })}` : "—"}</span>
+                            </div>
+
+                            {/* 4. IMP. GRAVADO 15% */}
+                            <div className="flex justify-between items-center text-slate-600">
+                              <span className="text-[11px] uppercase font-semibold text-slate-500">IMP. GRAVADO {salesSettings?.tasaIsvGeneral ?? 15}%:</span>
+                              <span className="font-mono text-slate-900">{invoiceGravado15 > 0 ? `${invoiceCurrencySymbol} ${invoiceGravado15.toLocaleString("es-HN", { minimumFractionDigits: 2 })}` : "—"}</span>
+                            </div>
+
+                            {/* IMP. GRAVADO 18% */}
+                            {salesSettings.permitirIsv18 && (
+                              <div className="flex justify-between items-center text-slate-600">
+                                <span className="text-[11px] uppercase font-semibold text-slate-500">IMP. GRAVADO 18%:</span>
+                                <span className="font-mono text-slate-900">{invoiceGravado18 > 0 ? `${invoiceCurrencySymbol} ${invoiceGravado18.toLocaleString("es-HN", { minimumFractionDigits: 2 })}` : "—"}</span>
+                              </div>
+                            )}
+
+                            <div className="border-t border-slate-200 my-1" />
+
+                            {/* 5. SUBTOTAL */}
+                            <div className="flex justify-between items-center text-slate-600">
+                              <span className="text-[11px] uppercase font-bold text-slate-700">SUBTOTAL:</span>
                               <span className="font-mono font-bold text-slate-900">{invoiceCurrencySymbol} {invoiceSubtotal.toLocaleString("es-HN", { minimumFractionDigits: 2 })}</span>
                             </div>
-                            {invoiceDiscount > 0 && (
+
+                            {/* 6. TOTAL I.S.V. 15% */}
+                            <div className="flex justify-between items-center text-slate-600">
+                              <span className="text-[11px] uppercase font-semibold text-slate-500">TOTAL I.S.V. {salesSettings?.tasaIsvGeneral ?? 15}%:</span>
+                              <span className="font-mono font-bold text-slate-900">{invoiceIsv15 > 0 ? `${invoiceCurrencySymbol} ${invoiceIsv15.toLocaleString("es-HN", { minimumFractionDigits: 2 })}` : "—"}</span>
+                            </div>
+
+                            {/* TOTAL I.S.V. 18% */}
+                            {salesSettings.permitirIsv18 && (
                               <div className="flex justify-between items-center text-slate-600">
-                                <span>DESCUENTOS:</span>
-                                <span className="font-mono text-slate-900">-{invoiceCurrencySymbol} {invoiceDiscount.toLocaleString("es-HN", { minimumFractionDigits: 2 })}</span>
+                                <span className="text-[11px] uppercase font-semibold text-slate-500">TOTAL I.S.V. 18%:</span>
+                                <span className="font-mono font-bold text-slate-900">{invoiceIsv18 > 0 ? `${invoiceCurrencySymbol} ${invoiceIsv18.toLocaleString("es-HN", { minimumFractionDigits: 2 })}` : "—"}</span>
                               </div>
                             )}
-                            {invoiceIsv15 > 0 && (
-                              <div className="flex justify-between items-center text-slate-600">
-                                <span>I.S.V. {salesSettings?.tasaIsvGeneral ?? 15}%:</span>
-                                <span className="font-mono font-bold text-slate-900">{invoiceCurrencySymbol} {invoiceIsv15.toLocaleString("es-HN", { minimumFractionDigits: 2 })}</span>
-                              </div>
-                            )}
-                            {salesSettings.permitirIsv18 && invoiceIsv18 > 0 && (
-                              <div className="flex justify-between items-center text-slate-600">
-                                <span>I.S.V. 18%:</span>
-                                <span className="font-mono font-bold text-slate-900">{invoiceCurrencySymbol} {invoiceIsv18.toLocaleString("es-HN", { minimumFractionDigits: 2 })}</span>
-                              </div>
-                            )}
+
+                            {/* 7. TOTAL A PAGAR */}
                             <div className="border-t border-slate-300 pt-2 flex justify-between items-center text-sm font-bold text-slate-900">
                               <span className="text-xs uppercase">TOTAL A PAGAR:</span>
                               <span className="text-2xl font-bold text-slate-900 font-mono">{invoiceCurrencySymbol} {invoiceTotal.toLocaleString("es-HN", { minimumFractionDigits: 2 })}</span>
@@ -15077,36 +15135,28 @@ export default function AdminDashboard() {
 
                             {/* Right: Breakdown Table */}
                             <div className="col-span-5 bg-white rounded-2xl border border-slate-200/80 p-3.5 shadow-sm space-y-0.5 text-xs">
-                              {/* SUBTOTAL */}
-                              <div className="flex justify-between items-center py-[2px] text-slate-600">
-                                <span className="font-semibold text-slate-500 uppercase text-[10px] tracking-wider">Subtotal</span>
-                                <span className="font-mono font-bold text-slate-900">{formatFiscalMoney(invoiceSubtotal, true)}</span>
-                              </div>
-
-                              {/* DESCUENTOS */}
+                              {/* 1. DESCUENTOS */}
                               <div className="flex justify-between items-center py-[2px] text-slate-600">
                                 <span className="font-semibold text-slate-500 uppercase text-[10px] tracking-wider">Descuentos</span>
                                 <span className="font-mono font-medium text-slate-700">{formatFiscalMoney(invoiceDiscount) || "—"}</span>
                               </div>
 
-                              {/* IMPORTE EXONERADO */}
-                              <div className="flex justify-between items-center py-[2px] text-slate-600">
-                                <span className="font-semibold text-slate-500 uppercase text-[10px] tracking-wider">Importe Exonerado</span>
-                                <span className="font-mono font-medium text-slate-700">{formatFiscalMoney(invoiceExonerated) || "—"}</span>
-                              </div>
-
-                              {/* IMPORTE EXENTO */}
+                              {/* 2. IMPORTE EXENTO */}
                               <div className="flex justify-between items-center py-[2px] text-slate-600">
                                 <span className="font-semibold text-slate-500 uppercase text-[10px] tracking-wider">Importe Exento</span>
                                 <span className="font-mono font-medium text-slate-700">{formatFiscalMoney(invoiceExempt) || "—"}</span>
                               </div>
 
-                              <div className="border-t border-slate-100 my-0.5" />
+                              {/* 3. IMPORTE EXONERADO */}
+                              <div className="flex justify-between items-center py-[2px] text-slate-600">
+                                <span className="font-semibold text-slate-500 uppercase text-[10px] tracking-wider">Importe Exonerado</span>
+                                <span className="font-mono font-medium text-slate-700">{formatFiscalMoney(invoiceExonerated) || "—"}</span>
+                              </div>
 
-                              {/* IMP GRAVADO GENERAL */}
+                              {/* 4. IMP GRAVADO 15% */}
                               <div className="flex justify-between items-center py-[2px] text-slate-600">
                                 <span className="font-semibold text-slate-500 uppercase text-[10px] tracking-wider">Imp. Gravado {salesSettings?.tasaIsvGeneral ?? 15}%</span>
-                                <span className="font-mono font-medium text-slate-700">{formatFiscalMoney(invoiceForm.showImpGravado15 ? invoiceGravado15 : 0) || "—"}</span>
+                                <span className="font-mono font-medium text-slate-700">{formatFiscalMoney(invoiceGravado15) || "—"}</span>
                               </div>
 
                               {/* IMP GRAVADO 18% */}
@@ -15117,21 +15167,29 @@ export default function AdminDashboard() {
                                 </div>
                               )}
 
-                              {/* I.S.V. GENERAL */}
+                              <div className="border-t border-slate-100 my-0.5" />
+
+                              {/* 5. SUBTOTAL */}
                               <div className="flex justify-between items-center py-[2px] text-slate-600">
-                                <span className="font-semibold text-slate-500 uppercase text-[10px] tracking-wider">I.S.V. {salesSettings?.tasaIsvGeneral ?? 15}%</span>
+                                <span className="font-semibold text-slate-500 uppercase text-[10px] tracking-wider">Subtotal</span>
+                                <span className="font-mono font-bold text-slate-900">{formatFiscalMoney(invoiceSubtotal, true)}</span>
+                              </div>
+
+                              {/* 6. TOTAL I.S.V. 15% */}
+                              <div className="flex justify-between items-center py-[2px] text-slate-600">
+                                <span className="font-semibold text-slate-500 uppercase text-[10px] tracking-wider">Total I.S.V. {salesSettings?.tasaIsvGeneral ?? 15}%</span>
                                 <span className="font-mono font-medium text-slate-700">{formatFiscalMoney(invoiceIsv15, invoiceForm.applyIsv15) || "—"}</span>
                               </div>
 
-                              {/* I.S.V. 18% */}
+                              {/* TOTAL I.S.V. 18% */}
                               {salesSettings.permitirIsv18 && (
                                 <div className="flex justify-between items-center py-[2px] text-slate-600">
-                                  <span className="font-semibold text-slate-500 uppercase text-[10px] tracking-wider">I.S.V. 18%</span>
+                                  <span className="font-semibold text-slate-500 uppercase text-[10px] tracking-wider">Total I.S.V. 18%</span>
                                   <span className="font-mono font-medium text-slate-700">{formatFiscalMoney(invoiceIsv18, invoiceForm.applyIsv18) || "—"}</span>
                                 </div>
                               )}
 
-                              {/* TOTAL A PAGAR */}
+                              {/* 7. TOTAL A PAGAR */}
                               <div className="pt-1">
                                 <div className="flex justify-between items-center py-2 px-3 bg-slate-200 border border-slate-300 text-slate-900 rounded-xl shadow-xs">
                                   <span className="font-black text-xs uppercase tracking-wider text-slate-700">Total a Pagar</span>
