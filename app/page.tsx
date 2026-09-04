@@ -202,6 +202,7 @@ export default function AdminDashboard() {
   const [previousInvoiceView, setPreviousInvoiceView] = useState<NavItem>("dashboard");
 
   const closeInvoiceEditor = () => {
+    setSelectedPrintNote(null);
     setCurrentView(previousInvoiceView || "dashboard");
   };
 
@@ -807,6 +808,14 @@ export default function AdminDashboard() {
   const [selectedPrintNote, setSelectedPrintNote] = useState<CreditDebitNote | null>(null);
   const [notasFilter, setNotasFilter] = useState<"TODAS" | "CREDITO" | "DEBITO" | "APLICADAS" | "ANULADAS">("TODAS");
   const [notasSearch, setNotasSearch] = useState("");
+
+  useEffect(() => {
+    const handleAfterPrint = () => {
+      setSelectedPrintNote(null);
+    };
+    window.addEventListener("afterprint", handleAfterPrint);
+    return () => window.removeEventListener("afterprint", handleAfterPrint);
+  }, []);
 
   // Vendedores & Comisiones State
   const [salesReps, setSalesReps] = useState<SalesRep[]>([]);
@@ -2046,6 +2055,7 @@ export default function AdminDashboard() {
   };
 
   const openInvoiceEditor = (invoiceToEdit?: any) => {
+    setSelectedPrintNote(null);
     if (currentView !== "factura-editor") {
       setPreviousInvoiceView(currentView);
     }
@@ -14267,7 +14277,7 @@ export default function AdminDashboard() {
 
           {/* ================= VIEW: CREAR FACTURA (Match screenshot) ================= */}
           {currentView === "factura-editor" && (
-            <div className="fixed inset-0 z-40 flex flex-col bg-slate-100 text-slate-800 animate-in fade-in duration-150 overflow-hidden">
+            <div className="fixed inset-0 z-40 flex flex-col bg-slate-100 text-slate-800 animate-in fade-in duration-150 overflow-hidden print:static print:inset-auto print:bg-white print:overflow-visible print:block print:p-0">
               
               {/* OFFICIAL PRINTABLE INVOICE DOCUMENT (Shown exclusively when printing via window.print) */}
               <div id="printable-invoice-document" className="hidden print:block p-8 bg-white text-slate-900 text-xs">
@@ -14455,7 +14465,7 @@ export default function AdminDashboard() {
               </div>
               
               {/* TOP HEADER BAR */}
-              <header className="bg-white border-b border-slate-200 px-6 py-3 flex items-center justify-between sticky top-0 z-30 shadow-2xs">
+              <header className="bg-white border-b border-slate-200 px-6 py-3 flex items-center justify-between sticky top-0 z-30 shadow-2xs print:hidden">
                 <div className="flex items-center gap-6">
                   <h1 className="text-base font-bold text-slate-900 flex items-center gap-2">
                     <span>Factura {invoiceForm.invoiceNumber}</span>
@@ -14509,7 +14519,7 @@ export default function AdminDashboard() {
               </header>
 
               {/* MAIN CONTENT WORKSPACE */}
-              <div className="flex-1 flex overflow-hidden">
+              <div className="flex-1 flex overflow-hidden print:hidden">
                 
                 {/* LEFT/CENTER COLUMN: INVOICE SHEET FORM */}
                 <div className="flex-1 overflow-y-auto p-6 lg:p-8 space-y-6">
@@ -15471,7 +15481,7 @@ export default function AdminDashboard() {
               )}
 
               {/* FIXED BOTTOM ACTION BAR (Full width matching user screenshot) */}
-              <footer className="bg-white border-t border-slate-200 px-6 py-3.5 flex items-center justify-between z-30 shadow-lg shrink-0">
+              <footer className="bg-white border-t border-slate-200 px-6 py-3.5 flex items-center justify-between z-30 shadow-lg shrink-0 print:hidden">
                 {/* Left Links Dropup (Matches user screenshot) */}
                 <div className="relative">
                   <button
@@ -15659,7 +15669,8 @@ export default function AdminDashboard() {
 
 
           {/* OFFICIAL PRINTABLE CREDIT / DEBIT NOTE DOCUMENT */}
-          <div id="printable-note-document" className="hidden print:block p-8 bg-white text-slate-900 text-xs">
+          {selectedPrintNote && (
+            <div id="printable-note-document" className="hidden print:block p-8 bg-white text-slate-900 text-xs">
 
                 {/* Header */}
                 <div className="flex justify-between items-start border-b-2 border-slate-900 pb-6 mb-6">
@@ -15767,10 +15778,11 @@ export default function AdminDashboard() {
                   </div>
                 </div>
               </div>
+            )}
 
               {/* ================= VIEW: EDITAR ORDEN DE COMPRA (PÁGINA COMPLETA COMO CREAR FACTURA) ================= */}
               {currentView === "orden-compra-editor" && (
-                <div className="fixed inset-0 z-40 flex flex-col bg-slate-100 text-slate-800 animate-in fade-in duration-150 overflow-hidden">
+                <div className="fixed inset-0 z-40 flex flex-col bg-slate-100 text-slate-800 animate-in fade-in duration-150 overflow-hidden print:static print:inset-auto print:bg-white print:overflow-visible print:block print:p-0">
 
               
               {/* OFFICIAL PRINTABLE PURCHASE ORDER DOCUMENT */}
@@ -15842,7 +15854,7 @@ export default function AdminDashboard() {
               </div>
               
               {/* TOP HEADER BAR */}
-              <header className="bg-white border-b border-slate-200 px-6 py-3 flex items-center justify-between sticky top-0 z-30 shadow-2xs">
+              <header className="bg-white border-b border-slate-200 px-6 py-3 flex items-center justify-between sticky top-0 z-30 shadow-2xs print:hidden">
                 <div className="flex items-center gap-6">
                   <h1 className="text-base font-bold text-slate-900 flex items-center gap-2">
                     <span>Orden de compra {poForm.num}</span>
@@ -15896,7 +15908,7 @@ export default function AdminDashboard() {
               </header>
 
               {/* MAIN CONTENT WORKSPACE */}
-              <div className="flex-1 flex overflow-hidden">
+              <div className="flex-1 flex overflow-hidden print:hidden">
                 <div className="flex-1 overflow-y-auto p-6 lg:p-8 space-y-6">
                   
                   {activePOTab === "Editar" && (
@@ -16240,7 +16252,7 @@ export default function AdminDashboard() {
               </div>
 
               {/* FIXED BOTTOM ACTION BAR */}
-              <footer className="bg-white border-t border-slate-200 px-6 py-3.5 flex items-center justify-between z-30 shadow-lg shrink-0">
+              <footer className="bg-white border-t border-slate-200 px-6 py-3.5 flex items-center justify-between z-30 shadow-lg shrink-0 print:hidden">
                 <div className="relative">
                   <button
                     type="button"

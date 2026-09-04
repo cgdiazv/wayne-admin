@@ -44,8 +44,7 @@ body {
   footer,
   nav,
   button,
-  .no-print,
-  main > div {
+  .no-print {
     display: none !important;
   }
 
@@ -60,7 +59,7 @@ body {
     overflow: visible !important;
   }
 
-  /* Force display of official printable document templates at fixed overlay position */
+  /* Force display of official printable document templates */
   #printable-invoice-document,
   #printable-po-document,
   #printable-note-document,
@@ -69,18 +68,14 @@ body {
   .printable-document {
     display: block !important;
     visibility: visible !important;
-    position: fixed !important;
-    top: 0 !important;
-    left: 0 !important;
+    position: static !important;
     width: 100% !important;
-    height: 100% !important;
     margin: 0 !important;
     padding: 24px !important;
     box-shadow: none !important;
     border: none !important;
     background: #ffffff !important;
     color: #000000 !important;
-    z-index: 999999 !important;
   }
 
   #printable-invoice-document *,
