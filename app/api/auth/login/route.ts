@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
 
     if (!user || !user.isActive) {
       return NextResponse.json(
-        { success: false, error: "Credenciales inválidas" },
+        { success: false, error: "Credenciales inválidas. Verifique su correo o contraseña." },
         { status: 401 }
       );
     }
@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
     const isValid = await bcrypt.compare(password, user.password);
     if (!isValid) {
       return NextResponse.json(
-        { success: false, error: "Credenciales inválidas" },
+        { success: false, error: "Credenciales inválidas. Verifique su correo o contraseña." },
         { status: 401 }
       );
     }
@@ -61,8 +61,27 @@ export async function POST(request: NextRequest) {
 
     return response;
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : "Internal Server Error";
-    return NextResponse.json({ success: false, error: message }, { status: 500 });
+    console.error("[Login API Error]:", error);
+
+    const errorMessage = error instanceof Error ? error.message : String(error);
+
+    // Mensajes amigables según el tipo de error
+    let friendlyMessage = "Error inesperado al intentar iniciar sesión. Por favor intente más tarde.";
+
+    if (errorMessage.includes("DATABASE_URL") || errorMessage.includes("Environment variable not found")) {
+      friendlyMessage = "No se pudo conectar a la base de datos: variable de configuración no encontrada. Por favor contacte al administrador.";
+    } else if (
+      errorMessage.includes("Can't reach database") ||
+      errorMessage.includes("P1001") ||
+      errorMessage.includes("ETIMEDOUT") ||
+      errorMessage.includes("ECONNREFUSED")
+    ) {
+      friendlyMessage = "No se pudo establecer conexión con el servidor de base de datos. Por favor verifique su conexión o intente más tarde.";
+    } else if (errorMessage.includes("P2021") || errorMessage.includes("does not exist in the current database")) {
+      friendlyMessage = "La tabla de usuarios aún no está disponible en la base de datos. Por favor ejecute las migraciones.";
+    }
+
+    return NextResponse.json({ success: false, error: friendlyMessage }, { status: 500 });
   }
 }
 

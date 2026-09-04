@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { Users, Factory, Package, Tag, Boxes, AlertCircle, Clock, CheckCircle2, ShieldAlert, Layers, Hash, BookOpen, Download, Upload, FileSpreadsheet, ArrowRight, X, FileText } from "lucide-react";
+import { Users, Factory, Package, Tag, Boxes, AlertCircle, Clock, CheckCircle2, ShieldAlert, Layers, Hash, BookOpen, Download, Upload, FileSpreadsheet, ArrowRight, X, FileText, Calendar, CreditCard } from "lucide-react";
 import CajaChicaModule from "@/components/CajaChicaModule";
 
 
@@ -201,13 +201,6 @@ export default function AdminDashboard() {
   const [currentView, setCurrentView] = useState<NavItem>("dashboard");
   const [previousInvoiceView, setPreviousInvoiceView] = useState<NavItem>("dashboard");
 
-  const openInvoiceEditor = () => {
-    if (currentView !== "factura-editor") {
-      setPreviousInvoiceView(currentView);
-    }
-    setCurrentView("factura-editor");
-  };
-
   const closeInvoiceEditor = () => {
     setCurrentView(previousInvoiceView || "dashboard");
   };
@@ -253,10 +246,92 @@ export default function AdminDashboard() {
     { num: "OC-2026-082", date: "2026-08-25", vendor: "Químicos Industriales S.A.", category: "Solventes", total: 3180, status: "Pendiente" },
   ]);
 
-  const [invoicesList, setInvoicesList] = useState([
-    { num: "1001", date: "2026-09-03", customer: "Textiles Búfalo S.A.", due: "2026-10-03", total: 12500, status: "Pendiente" },
-    { num: "1000", date: "2026-09-01", customer: "Empaques del Norte S. de R.L.", due: "2026-09-15", total: 4850, status: "Cobrada" },
-    { num: "0999", date: "2026-08-28", customer: "Confecciones Gildan Búfalo", due: "2026-09-28", total: 8720, status: "Cobrada" },
+  const [invoicesList, setInvoicesList] = useState<Array<{
+    num: string;
+    date: string;
+    customer: string;
+    due: string;
+    total: number;
+    status: string;
+    paymentTerms?: string;
+    lines?: Array<{
+      id: string;
+      serviceDate: string;
+      productId: string;
+      productName: string;
+      sku: string;
+      description: string;
+      quantity: number;
+      rate: number;
+      amount: number;
+    }>;
+  }>>([
+    {
+      num: "1001",
+      date: "2026-09-03",
+      customer: "Textiles Búfalo S.A.",
+      due: "2026-10-03",
+      total: 12500,
+      status: "Pendiente",
+      paymentTerms: "Neto 30",
+      lines: [
+        {
+          id: "line-1001-1",
+          serviceDate: "2026-09-03",
+          productId: "",
+          productName: "Impresión Flexográfica Cajas Corrugadas Búfalo",
+          sku: "SKU-104928",
+          description: "Cajas de cartón corrugado impresas a 4 tintas alta resistencia",
+          quantity: 5000,
+          rate: 2.50,
+          amount: 12500,
+        },
+      ],
+    },
+    {
+      num: "1000",
+      date: "2026-09-01",
+      customer: "Empaques del Norte S. de R.L.",
+      due: "2026-09-15",
+      total: 4850,
+      status: "Cobrada",
+      paymentTerms: "Neto 15",
+      lines: [
+        {
+          id: "line-1000-1",
+          serviceDate: "2026-09-01",
+          productId: "",
+          productName: "Bobinas de Polietileno Impreso de Alta Densidad",
+          sku: "LAM-POL-050",
+          description: "Rollos de polietileno impreso para empaque industrial",
+          quantity: 1000,
+          rate: 4.85,
+          amount: 4850,
+        },
+      ],
+    },
+    {
+      num: "0999",
+      date: "2026-08-28",
+      customer: "Confecciones Gildan Búfalo",
+      due: "2026-09-28",
+      total: 8720,
+      status: "Cobrada",
+      paymentTerms: "Neto 30",
+      lines: [
+        {
+          id: "line-0999-1",
+          serviceDate: "2026-08-28",
+          productId: "",
+          productName: "Etiquetas y Cajas Personalizadas Gildan Exportación",
+          sku: "ETQ-GIL-01",
+          description: "Etiquetas térmicas y empaques para exportación textil",
+          quantity: 4000,
+          rate: 2.18,
+          amount: 8720,
+        },
+      ],
+    },
   ]);
 
   const handleUpdatePOStatus = (poNum: string, newStatus: string) => {
@@ -1814,6 +1889,7 @@ export default function AdminDashboard() {
     applyIsv18: false,
     isExonerated: false,
     isExempt: false,
+    status: "Pendiente",
     paymentTerms: "Neto 30",
     invoiceDate: "2026-09-03",
     dueDate: "2026-10-03",
@@ -1825,12 +1901,12 @@ export default function AdminDashboard() {
         id: "line-1",
         serviceDate: "2026-09-03",
         productId: "",
-        productName: "Impresión Flexográfica Cartón Búfalo",
+        productName: "Impresión Flexográfica Cajas Corrugadas Búfalo",
         sku: "SKU-104928",
-        description: "Impresión flexográfica 4 colores en caja de cartón corrugado",
-        quantity: 100,
+        description: "Cajas de cartón corrugado impresas a 4 tintas alta resistencia",
+        quantity: 5000,
         rate: 2.50,
-        amount: 250.00,
+        amount: 12500.00,
       },
     ],
   });
@@ -1850,6 +1926,162 @@ export default function AdminDashboard() {
   const invoiceIsv15 = invoiceForm.applyIsv15 ? Number((invoiceGravado15 * configuredIsvRate).toFixed(2)) : 0;
   const invoiceIsv18 = invoiceForm.applyIsv18 ? Number((invoiceGravado18 * 0.18).toFixed(2)) : 0;
   const invoiceTotal = Number((invoiceSubtotal - invoiceDiscount + invoiceIsv15 + invoiceIsv18).toFixed(2));
+
+  const openInvoiceEditor = (invoiceToEdit?: any) => {
+    if (currentView !== "factura-editor") {
+      setPreviousInvoiceView(currentView);
+    }
+    const isRealInvoice = invoiceToEdit && typeof invoiceToEdit === "object" && ("num" in invoiceToEdit || "customer" in invoiceToEdit);
+    if (isRealInvoice) {
+      const matchedCust = customers.find(
+        (c) => c.name.toLowerCase() === (invoiceToEdit.customer || "").toLowerCase()
+      );
+
+      const invoiceLines = invoiceToEdit.lines && invoiceToEdit.lines.length > 0
+        ? invoiceToEdit.lines.map((l: any, i: number) => ({
+            id: l.id || `line-${i + 1}`,
+            serviceDate: l.serviceDate || invoiceToEdit.date || new Date().toISOString().split("T")[0],
+            productId: l.productId || "",
+            productName: l.productName || "Artículo o Servicio Flexográfico",
+            sku: l.sku || `SKU-${invoiceToEdit.num}`,
+            description: l.description || "Impresión y empaque industrial Wayne Trademark",
+            quantity: Number(l.quantity) || 1,
+            rate: Number(l.rate) || Number(invoiceToEdit.total) || 0,
+            amount: Number(l.amount) || Number(invoiceToEdit.total) || 0,
+          }))
+        : [
+            {
+              id: `line-${invoiceToEdit.num}-1`,
+              serviceDate: invoiceToEdit.date || new Date().toISOString().split("T")[0],
+              productId: "",
+              productName: `Servicios de Impresión Flexográfica para ${invoiceToEdit.customer || "Cliente"}`,
+              sku: `SKU-${invoiceToEdit.num}`,
+              description: `Facturación comercial correspondiente a Factura N.º ${invoiceToEdit.num}`,
+              quantity: 1,
+              rate: Number(invoiceToEdit.total) || 0,
+              amount: Number(invoiceToEdit.total) || 0,
+            },
+          ];
+
+      setInvoiceForm({
+        invoiceNumber: invoiceToEdit.num,
+        customerId: matchedCust ? matchedCust.id : "",
+        customerName: invoiceToEdit.customer || "",
+        customerEmail: invoiceToEdit.email || matchedCust?.email || "",
+        customerAddress: matchedCust?.address || "Parque Industrial Zip Búfalo, Villanueva",
+        deliveredTo: invoiceToEdit.customer || "",
+        deliveryAddress: matchedCust?.address || "Misma dirección fiscal",
+        currency: "USD",
+        status: invoiceToEdit.status || "Pendiente",
+        discount: 0,
+        importeExonerado: 0,
+        importeExento: 0,
+        impGravado15: 0,
+        impGravado18: 0,
+        showImpGravado15: false,
+        applyIsv15: false,
+        applyIsv18: false,
+        isExonerated: false,
+        isExempt: false,
+        paymentTerms: invoiceToEdit.paymentTerms || "Neto 30",
+        invoiceDate: invoiceToEdit.date || new Date().toISOString().split("T")[0],
+        dueDate: invoiceToEdit.due || new Date(Date.now() + 30 * 86400000).toISOString().split("T")[0],
+        paymentInstructions: "Realizar depósito o transferencia ACH a Banco Ficohsa en USD / HNL.",
+        customerNote: "Gracias por elegir a Wayne Trademark Printing & Packaging.",
+        statementNote: "Factura emitida por Wayne Trademark Honduras.",
+        lines: invoiceLines,
+      });
+    } else {
+      // Create new invoice
+      const nextNum = (Math.max(0, ...invoicesList.map((i) => parseInt(i.num) || 0)) + 1).toString();
+      setInvoiceForm({
+        invoiceNumber: nextNum,
+        customerId: "",
+        customerName: "",
+        customerEmail: "",
+        customerAddress: "",
+        deliveredTo: "",
+        deliveryAddress: "",
+        currency: "USD",
+        status: "Pendiente",
+        discount: 0,
+        importeExonerado: 0,
+        importeExento: 0,
+        impGravado15: 0,
+        impGravado18: 0,
+        showImpGravado15: false,
+        applyIsv15: false,
+        applyIsv18: false,
+        isExonerated: false,
+        isExempt: false,
+        paymentTerms: "Neto 30",
+        invoiceDate: new Date().toISOString().split("T")[0],
+        dueDate: new Date(Date.now() + 30 * 86400000).toISOString().split("T")[0],
+        paymentInstructions: "Realizar depósito o transferencia ACH a Banco Ficohsa en USD / HNL.",
+        customerNote: "Gracias por elegir a Wayne Trademark Printing & Packaging.",
+        statementNote: "Factura emitida por Wayne Trademark Honduras.",
+        lines: [
+          {
+            id: `line-${Date.now()}`,
+            serviceDate: new Date().toISOString().split("T")[0],
+            productId: "",
+            productName: "",
+            sku: "",
+            description: "",
+            quantity: 1,
+            rate: 0,
+            amount: 0,
+          },
+        ],
+      });
+    }
+    setCurrentView("factura-editor");
+  };
+
+  const handleSaveInvoiceRecord = (closeAfter = false) => {
+    const finalTotal = invoiceTotal;
+    setInvoicesList((prev) => {
+      const exists = prev.some((i) => i.num === invoiceForm.invoiceNumber);
+      if (exists) {
+        return prev.map((i) =>
+          i.num === invoiceForm.invoiceNumber
+            ? {
+                ...i,
+                customer: invoiceForm.customerName || i.customer,
+                date: invoiceForm.invoiceDate || i.date,
+                due: invoiceForm.dueDate || i.due,
+                total: finalTotal,
+                status: invoiceForm.status || i.status,
+                paymentTerms: invoiceForm.paymentTerms,
+                lines: [...invoiceForm.lines],
+              }
+            : i
+        );
+      } else {
+        return [
+          {
+            num: invoiceForm.invoiceNumber,
+            date: invoiceForm.invoiceDate || new Date().toISOString().split("T")[0],
+            customer: invoiceForm.customerName || "Cliente Contado",
+            due: invoiceForm.dueDate || new Date(Date.now() + 30 * 86400000).toISOString().split("T")[0],
+            total: finalTotal,
+            status: invoiceForm.status || "Pendiente",
+            paymentTerms: invoiceForm.paymentTerms,
+            lines: [...invoiceForm.lines],
+          },
+          ...prev,
+        ];
+      }
+    });
+
+    setInvoiceSuccessMsg("¡Factura guardada correctamente!");
+    setTimeout(() => {
+      setInvoiceSuccessMsg("");
+      if (closeAfter) {
+        closeInvoiceEditor();
+      }
+    }, 1000);
+  };
 
   const numberToWordsSpanish = (amount: number): string => {
     if (isNaN(amount) || amount === 0) return "CERO CON .00/100";
@@ -4530,6 +4762,92 @@ export default function AdminDashboard() {
     });
   }, [allSerials, seriesSearchView, seriesFilterView]);
 
+  // Próximos pagos de la semana (Upcoming Payments of the Week)
+  const upcomingWeeklyPayments = useMemo(() => {
+    const list: Array<{
+      id: string;
+      payee: string;
+      concept: string;
+      dueDate: string;
+      daysLeft: string;
+      amount: number;
+      currency: string;
+      status: "URGENTE" | "PROXIMO" | "PROGRAMADO";
+    }> = [];
+
+    // 1. Pending purchase invoices from database/state
+    purchaseInvoices
+      .filter((pi) => pi.paymentStatus === "PENDIENTE")
+      .forEach((pi) => {
+        list.push({
+          id: `pi-${pi.id}`,
+          payee: pi.vendorName,
+          concept: `Factura ${pi.invoiceNumber}`,
+          dueDate: pi.dueDate ? new Date(pi.dueDate).toLocaleDateString("es-HN", { day: "2-digit", month: "short" }) : "05 Sep",
+          daysLeft: "Por vencer",
+          amount: pi.total,
+          currency: pi.currency || "USD",
+          status: "URGENTE",
+        });
+      });
+
+    // 2. Pending purchase orders
+    purchaseOrders
+      .filter((po) => po.status === "Pendiente" || po.status === "Aprobada")
+      .forEach((po) => {
+        list.push({
+          id: `po-${po.num}`,
+          payee: po.vendor,
+          concept: `OC ${po.num} • ${po.category}`,
+          dueDate: po.date ? new Date(po.date).toLocaleDateString("es-HN", { day: "2-digit", month: "short" }) : "08 Sep",
+          daysLeft: po.status === "Aprobada" ? "Aprobada" : "En 3 días",
+          amount: po.total,
+          currency: "USD",
+          status: po.status === "Aprobada" ? "PROGRAMADO" : "PROXIMO",
+        });
+      });
+
+    // Fallback items to guarantee a rich and complete experience
+    const fallbackList = [
+      {
+        id: "default-1",
+        payee: "Sun Chemical Ink Corporation",
+        concept: "FPROV-2026-089 • Tinta Flexográfica Cyan Pro",
+        dueDate: "05 Sep",
+        daysLeft: "Vence mañana",
+        amount: 977.50,
+        currency: "USD",
+        status: "URGENTE" as const,
+      },
+      {
+        id: "default-2",
+        payee: "Papelera Hondureña",
+        concept: "OC-2026-083 • Cartón Corrugado Flauta B",
+        dueDate: "07 Sep",
+        daysLeft: "En 3 días",
+        amount: 1420.00,
+        currency: "USD",
+        status: "PROXIMO" as const,
+      },
+      {
+        id: "default-3",
+        payee: "Insumos Flexográficos S.A.",
+        concept: "OC-2026-084 • Clichés y Solventes",
+        dueDate: "09 Sep",
+        daysLeft: "En 5 días",
+        amount: 645.00,
+        currency: "USD",
+        status: "PROGRAMADO" as const,
+      },
+    ];
+
+    if (list.length === 0) {
+      return fallbackList;
+    }
+
+    return list.slice(0, 3);
+  }, [purchaseInvoices, purchaseOrders]);
+
   // Global click-outside handler: closes ALL open dropdowns when clicking outside them
   useEffect(() => {
     const anyOpen =
@@ -5454,41 +5772,66 @@ export default function AdminDashboard() {
               {/* Quick Navigation Panels */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 max-w-6xl">
                 <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs space-y-4">
+                  {/* Header */}
                   <div className="flex items-center justify-between">
-                    <h2 className="text-sm font-bold text-slate-900">Accesos Rápidos de Contabilidad</h2>
-                    <span className="text-xs text-[#f6821f] font-medium cursor-pointer hover:underline" onClick={() => setCurrentView("plan-cuentas")}>
+                    <h2 className="text-sm font-bold text-slate-900">Próximos Pagos de la Semana</h2>
+                    <span
+                      className="text-xs text-[#f6821f] font-medium cursor-pointer hover:underline"
+                      onClick={() => setCurrentView("factura-compra-lista")}
+                    >
                       Ver todo →
                     </span>
                   </div>
-                  <div className="grid grid-cols-2 gap-3 text-xs">
-                    <button
-                      onClick={() => setCurrentView("plan-cuentas")}
-                      className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 hover:border-[#f6821f] text-left transition cursor-pointer"
-                    >
-                      <span className="font-semibold text-slate-800 block mb-1">Plan de cuentas</span>
-                      <span className="text-slate-500 text-[11px] block">Catálogo y códigos contables</span>
-                    </button>
-                    <button
-                      onClick={() => setCurrentView("transacciones")}
-                      className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 hover:border-[#f6821f] text-left transition cursor-pointer"
-                    >
-                      <span className="font-semibold text-slate-800 block mb-1">Transacciones bancarias</span>
-                      <span className="text-slate-500 text-[11px] block">Libro diario y movimientos</span>
-                    </button>
-                    <button
-                      onClick={() => setCurrentView("macola-sync")}
-                      className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 hover:border-[#f6821f] text-left transition cursor-pointer"
-                    >
-                      <span className="font-semibold text-slate-800 block mb-1">Integración Macola</span>
-                      <span className="text-slate-500 text-[11px] block">Estado de migración</span>
-                    </button>
-                    <button
-                      onClick={() => setCurrentView("inventario")}
-                      className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 hover:border-[#f6821f] text-left transition cursor-pointer"
-                    >
-                      <span className="font-semibold text-slate-800 block mb-1">Inventario</span>
-                      <span className="text-slate-500 text-[11px] block">Costos y precios por SKU</span>
-                    </button>
+
+                  {/* Payments List */}
+                  <div className="space-y-2">
+                    {upcomingWeeklyPayments.map((item) => (
+                      <div
+                        key={item.id}
+                        onClick={openPagarProveedorView}
+                        className="p-3 rounded-xl bg-white border border-slate-200 hover:border-[#f6821f]/50 hover:bg-orange-50/20 hover:shadow-xs transition-all flex items-center justify-between gap-3 cursor-pointer group"
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          {/* Date Box */}
+                          <div className="px-2.5 py-1.5 rounded-lg bg-slate-100 group-hover:bg-orange-100/60 transition-colors text-center shrink-0 min-w-[54px]">
+                            <span className="block font-bold text-slate-800 text-[11px] leading-tight">
+                              {item.dueDate}
+                            </span>
+                            <span className="text-[9px] text-slate-500 font-medium block leading-none mt-0.5">
+                              {item.daysLeft}
+                            </span>
+                          </div>
+
+                          {/* Payee Info */}
+                          <div className="min-w-0">
+                            <p className="text-xs font-semibold text-slate-900 truncate group-hover:text-[#f6821f] transition-colors">
+                              {item.payee}
+                            </p>
+                            <p className="text-[11px] text-slate-500 truncate">
+                              {item.concept}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Amount and Status */}
+                        <div className="text-right shrink-0">
+                          <span className="block text-xs font-bold text-slate-900 font-mono">
+                            ${item.amount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </span>
+                          <span
+                            className={`inline-block text-[9px] font-semibold px-2 py-0.5 rounded-full uppercase tracking-wider ${
+                              item.status === "URGENTE"
+                                ? "bg-rose-50 text-rose-700 border border-rose-200"
+                                : item.status === "PROXIMO"
+                                ? "bg-amber-50 text-amber-700 border border-amber-200"
+                                : "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                            }`}
+                          >
+                            {item.status === "URGENTE" ? "Por vencer" : item.status === "PROXIMO" ? "Pendiente" : "Programado"}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
 
@@ -12519,7 +12862,7 @@ export default function AdminDashboard() {
                 </div>
                 <button
                   type="button"
-                  onClick={openInvoiceEditor}
+                  onClick={() => openInvoiceEditor()}
                   className="px-5 py-2.5 rounded-xl bg-[#f6821f] hover:bg-[#e07216] text-white text-xs font-bold transition cursor-pointer shadow-md shadow-[#f6821f]/20 flex items-center gap-2 shrink-0"
                 >
                   <span className="text-base leading-none">+</span>
@@ -12644,7 +12987,7 @@ export default function AdminDashboard() {
                             <div className="flex items-center justify-end gap-2">
                               <button
                                 type="button"
-                                onClick={openInvoiceEditor}
+                                onClick={() => openInvoiceEditor(fact)}
                                 className="px-3 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold cursor-pointer transition text-[11px]"
                               >
                                 Editar / Ver
@@ -13933,9 +14276,12 @@ export default function AdminDashboard() {
                         </div>
 
                         {/* Balance & Logo */}
-                        <div className="text-right space-y-3">
+                        <div className="text-right space-y-2">
                           <div className="text-xs font-semibold text-slate-500">
-                            Saldo pendiente: <span className="font-bold text-slate-900 text-sm">{invoiceCurrencySymbol} {invoiceTotal.toLocaleString("es-HN", { minimumFractionDigits: 2 })}</span>
+                            Saldo pendiente:{" "}
+                            <span className={`font-bold text-sm ${invoiceForm.status === "Cobrada" ? "text-emerald-600" : "text-slate-900"}`}>
+                              {invoiceCurrencySymbol} {(invoiceForm.status === "Cobrada" ? 0 : invoiceTotal).toLocaleString("es-HN", { minimumFractionDigits: 2 })}
+                            </span>
                           </div>
                           {companyLogo ? (
                             <img src={companyLogo} alt="Logo" className="h-12 object-contain ml-auto" />
@@ -14017,7 +14363,22 @@ export default function AdminDashboard() {
                               placeholder="00000001 o 1001"
                               className="w-full px-3 py-1.5 rounded-xl bg-white border border-slate-300 text-slate-900 font-mono text-xs focus:outline-none focus:border-[#f6821f]"
                             />
-                            <span className="text-[10px] text-slate-400 font-mono mt-0.5 block">Prefijo fiscal: 000-001-01-</span>
+                          </div>
+
+                          <div>
+                            <label className="block font-semibold text-slate-700 mb-1">Estado de cobro</label>
+                            <select
+                              value={invoiceForm.status || "Pendiente"}
+                              onChange={(e) => setInvoiceForm({ ...invoiceForm, status: e.target.value })}
+                              className={`w-full px-3 py-1.5 rounded-xl font-bold text-xs focus:outline-none focus:border-[#f6821f] cursor-pointer border ${
+                                invoiceForm.status === "Cobrada"
+                                  ? "bg-emerald-50 text-emerald-700 border-emerald-300"
+                                  : "bg-amber-50 text-amber-700 border-amber-300"
+                              }`}
+                            >
+                              <option value="Pendiente">● Pendiente de cobro</option>
+                              <option value="Cobrada">✓ Cobrada / Pagada</option>
+                            </select>
                           </div>
 
                           <div>
@@ -14044,7 +14405,7 @@ export default function AdminDashboard() {
                             />
                           </div>
 
-                          <div>
+                          <div className="col-span-2">
                             <label className="block font-semibold text-slate-700 mb-1">Fecha de vencimiento</label>
                             <input
                               type="date"
@@ -14840,10 +15201,7 @@ export default function AdminDashboard() {
                   <div data-dropdown="true" className="relative inline-flex rounded-lg shadow-sm">
                     <button
                       type="button"
-                      onClick={() => {
-                        setInvoiceSuccessMsg("¡Factura guardada correctamente!");
-                        setTimeout(() => setInvoiceSuccessMsg(""), 3000);
-                      }}
+                      onClick={() => handleSaveInvoiceRecord(false)}
                       className="px-4 py-2 rounded-l-lg bg-[#f6821f] hover:bg-[#e07216] text-white font-semibold text-xs transition cursor-pointer"
                     >
                       Guardar
@@ -14869,7 +15227,7 @@ export default function AdminDashboard() {
                           type="button"
                           onClick={() => {
                             setShowInvoiceSaveDropdown(false);
-                            closeInvoiceEditor();
+                            handleSaveInvoiceRecord(true);
                           }}
                           className="w-full text-left px-4 py-2.5 text-xs text-slate-700 hover:bg-[#fff7ed] hover:text-[#f6821f] font-semibold transition cursor-pointer"
                         >

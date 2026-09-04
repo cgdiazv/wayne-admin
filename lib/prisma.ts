@@ -9,6 +9,17 @@ if (globalForPrisma.prisma && (!(globalForPrisma.prisma as any).user || !(global
   globalForPrisma.prisma = undefined;
 }
 
+// Ensure environment variables are loaded if not already present in the current process
+if (!process.env.DATABASE_URL) {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { loadEnvConfig } = require("@next/env");
+    loadEnvConfig(process.cwd());
+  } catch {
+    // Ignore error if not in Next.js environment
+  }
+}
+
 export const prisma =
   globalForPrisma.prisma ??
   new PrismaClient({
