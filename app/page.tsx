@@ -10,6 +10,7 @@ import CustomerStatementModule from "@/components/CustomerStatementModule";
 import VendorAgingReportModule from "@/components/VendorAgingReportModule";
 import QuotesModule from "@/components/QuotesModule";
 import TaxRetentionsModule from "@/components/TaxRetentionsModule";
+import VendorPaymentsModule from "@/components/VendorPaymentsModule";
 
 
 
@@ -195,7 +196,7 @@ type PurchaseInvoice = {
   createdAt?: string;
 };
 
-type NavItem = "dashboard" | "plan-cuentas" | "transacciones" | "macola-sync" | "caja-chica" | "clientes" | "cotizaciones" | "proveedores" | "vendedores" | "comisiones" | "inventario" | "lotes" | "series" | "notas-credito-debito" | "reportes" | "configuracion" | "factura-editor" | "lista-facturas" | "lista-ordenes-compra" | "orden-compra-editor" | "factura-compra-lista" | "factura-compra-editor" | "deposito-bancario" | "recibir-pago" | "agregar-gasto" | "pagar-proveedor" | "devoluciones-proveedor" | "antiguedad-saldos" | "antiguedad-saldos-proveedores" | "estado-cuenta-cliente" | "retenciones-isv";
+type NavItem = "dashboard" | "plan-cuentas" | "transacciones" | "macola-sync" | "caja-chica" | "clientes" | "cotizaciones" | "proveedores" | "vendedores" | "comisiones" | "inventario" | "lotes" | "series" | "notas-credito-debito" | "reportes" | "configuracion" | "factura-editor" | "lista-facturas" | "lista-ordenes-compra" | "orden-compra-editor" | "factura-compra-lista" | "factura-compra-editor" | "deposito-bancario" | "recibir-pago" | "agregar-gasto" | "pagar-proveedor" | "pagos-proveedores" | "devoluciones-proveedor" | "antiguedad-saldos" | "antiguedad-saldos-proveedores" | "estado-cuenta-cliente" | "retenciones-isv";
 
 
 
@@ -207,6 +208,7 @@ export default function AdminDashboard() {
   const [currentView, setCurrentView] = useState<NavItem>("dashboard");
   const [previousInvoiceView, setPreviousInvoiceView] = useState<NavItem>("dashboard");
   const [selectedStatementCustomerId, setSelectedStatementCustomerId] = useState<string>("");
+  const [selectedPaymentVendor, setSelectedPaymentVendor] = useState<string>("");
 
   const openCustomerStatement = (customerIdOrName: string) => {
     setSelectedStatementCustomerId(customerIdOrName);
@@ -246,18 +248,43 @@ export default function AdminDashboard() {
   const [showCancelPaymentConfirmModal, setShowCancelPaymentConfirmModal] = useState(false);
   const [searchInvoiceNumber, setSearchInvoiceNumber] = useState("");
   const [selectedPurchaseOrder, setSelectedPurchaseOrder] = useState<{
+    id?: string;
     num: string;
     date: string;
     vendor: string;
+    vendorId?: string;
+    vendorEmail?: string;
+    vendorAddress?: string;
     category: string;
     total: number;
+    subtotal?: number;
+    tax?: number;
+    currency?: string;
+    expectedDate?: string;
+    paymentTerms?: string;
     status: string;
+    notes?: string;
+    items?: any[];
   } | null>(null);
-  const [purchaseOrders, setPurchaseOrders] = useState([
-    { num: "OC-2026-084", date: "2026-09-02", vendor: "Insumos Flexográficos S.A.", category: "Tintas Flexo", total: 6450, status: "Aprobada" },
-    { num: "OC-2026-083", date: "2026-08-30", vendor: "Papelera Hondureña", category: "Cartón Corrugado", total: 14200, status: "Recibida" },
-    { num: "OC-2026-082", date: "2026-08-25", vendor: "Químicos Industriales S.A.", category: "Solventes", total: 3180, status: "Pendiente" },
-  ]);
+  const [purchaseOrders, setPurchaseOrders] = useState<Array<{
+    id?: string;
+    num: string;
+    date: string;
+    vendor: string;
+    vendorId?: string;
+    vendorEmail?: string;
+    vendorAddress?: string;
+    category: string;
+    total: number;
+    subtotal?: number;
+    tax?: number;
+    currency?: string;
+    expectedDate?: string;
+    paymentTerms?: string;
+    status: string;
+    notes?: string;
+    items?: any[];
+  }>>([]);
 
   const [invoicesList, setInvoicesList] = useState<Array<{
     num: string;
@@ -347,12 +374,61 @@ export default function AdminDashboard() {
     },
   ]);
 
-  const handleUpdatePOStatus = (poNum: string, newStatus: string) => {
+  const loadPurchaseOrders = async () => {
+    try {
+      const res = await fetch("/api/purchase-orders");
+      const json = await res.json();
+      if (json.success && Array.isArray(json.data)) {
+        setPurchaseOrders(
+          json.data.map((po: any) => ({
+            id: po.id,
+            num: po.orderNumber,
+            date: po.issueDate,
+            vendor: po.vendorName,
+            vendorId: po.vendorId,
+            vendorEmail: po.vendorEmail,
+            vendorAddress: po.vendorAddress,
+            category: po.category,
+            total: Number(po.total) || 0,
+            subtotal: Number(po.subtotal) || 0,
+            tax: Number(po.tax) || 0,
+            currency: po.currency || "USD",
+            expectedDate: po.expectedDate,
+            paymentTerms: po.paymentTerms,
+            status: po.status,
+            notes: po.notes,
+            items: po.items || [],
+          }))
+        );
+      }
+    } catch (err) {
+      console.error("Error loading purchase orders:", err);
+    }
+  };
+
+  const handleUpdatePOStatus = async (poNum: string, newStatus: string) => {
+    // Optimistic UI update
     setPurchaseOrders((prev) =>
       prev.map((po) => (po.num === poNum ? { ...po, status: newStatus } : po))
     );
     if (selectedPurchaseOrder && selectedPurchaseOrder.num === poNum) {
       setSelectedPurchaseOrder((prev) => (prev ? { ...prev, status: newStatus } : null));
+    }
+
+    try {
+      const res = await fetch(`/api/purchase-orders/${encodeURIComponent(poNum)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: newStatus }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        console.error("Error al actualizar estado de orden en BD:", data.error);
+        await loadPurchaseOrders();
+      }
+    } catch (err) {
+      console.error("Error al sincronizar estado de orden con el servidor:", err);
+      await loadPurchaseOrders();
     }
   };
 
@@ -2977,21 +3053,33 @@ export default function AdminDashboard() {
   const openPurchaseOrderEditor = (poToEdit?: any) => {
     if (poToEdit) {
       setSelectedPurchaseOrder(poToEdit);
+      const lines = Array.isArray(poToEdit.items) && poToEdit.items.length > 0
+        ? poToEdit.items.map((it: any, idx: number) => ({
+            id: it.id || String(idx + 1),
+            productName: it.productName || "Insumo",
+            sku: it.sku || "",
+            description: it.description || "",
+            quantity: Number(it.quantity) || 1,
+            rate: Number(it.unitCost ?? it.rate) || 0,
+            total: Number(it.totalCost ?? it.total) || 0,
+          }))
+        : [
+            { id: "1", productName: `${poToEdit.category} - Lote de Insumos`, sku: "INS-001", description: `Suministro de insumos categoría ${poToEdit.category}`, quantity: 1, rate: poToEdit.total, total: poToEdit.total }
+          ];
+
       setPOForm({
         num: poToEdit.num,
         vendorName: poToEdit.vendor,
-        vendorEmail: "compras@insumosflexo.hn",
-        vendorAddress: "Zona Industrial San José, San Pedro Sula",
+        vendorEmail: poToEdit.vendorEmail || "compras@insumosflexo.hn",
+        vendorAddress: poToEdit.vendorAddress || "Zona Industrial San José, San Pedro Sula",
         category: poToEdit.category || "Tintas Flexo",
-        currency: "USD",
+        currency: poToEdit.currency || "USD",
         date: poToEdit.date,
-        expectedDate: "2026-09-20",
-        paymentTerms: "Crédito 30 días",
+        expectedDate: poToEdit.expectedDate || "2026-09-20",
+        paymentTerms: poToEdit.paymentTerms || "Crédito 30 días",
         status: poToEdit.status,
-        notes: "Entregar en almacén central de materias primas con certificado de calidad del lote.",
-        lines: [
-          { id: "1", productName: `${poToEdit.category} - Lote de Insumos`, sku: "INS-001", description: `Suministro de insumos categoría ${poToEdit.category}`, quantity: 1, rate: poToEdit.total, total: poToEdit.total }
-        ],
+        notes: poToEdit.notes || "Entregar en almacén central de materias primas con certificado de calidad del lote.",
+        lines,
       });
     } else {
       const nextNum = `OC-2026-${Math.floor(100 + Math.random() * 900)}`;
@@ -3061,10 +3149,15 @@ export default function AdminDashboard() {
     }));
   };
 
-  const handleSavePOEditor = (statusOverride?: string) => {
+  const handleSavePOEditor = async (statusOverride?: string) => {
     const finalStatus = statusOverride || poForm.status;
     const poTotalVal = poForm.lines.reduce((acc, l) => acc + l.total, 0);
     const existing = purchaseOrders.find((p) => p.num === poForm.num);
+    const matchingVendor = vendors.find(
+      (v) => v.name.toLowerCase().trim() === poForm.vendorName.toLowerCase().trim()
+    );
+
+    // Optimistic UI update
     if (existing) {
       setPurchaseOrders((prev) =>
         prev.map((p) =>
@@ -3072,10 +3165,15 @@ export default function AdminDashboard() {
             ? {
                 ...p,
                 vendor: poForm.vendorName,
+                vendorEmail: poForm.vendorEmail,
+                vendorAddress: poForm.vendorAddress,
                 category: poForm.category,
                 total: poTotalVal,
                 status: finalStatus,
                 date: poForm.date,
+                expectedDate: poForm.expectedDate,
+                paymentTerms: poForm.paymentTerms,
+                notes: poForm.notes,
               }
             : p
         )
@@ -3086,22 +3184,77 @@ export default function AdminDashboard() {
           num: poForm.num,
           date: poForm.date,
           vendor: poForm.vendorName,
+          vendorEmail: poForm.vendorEmail,
+          vendorAddress: poForm.vendorAddress,
           category: poForm.category,
           total: poTotalVal,
           status: finalStatus,
+          expectedDate: poForm.expectedDate,
+          paymentTerms: poForm.paymentTerms,
+          notes: poForm.notes,
         },
         ...prev,
       ]);
     }
-    setPOSuccessMsg("¡Orden de compra guardada exitosamente!");
-    setTimeout(() => setPOSuccessMsg(""), 3500);
+
+    const payload = {
+      orderNumber: poForm.num,
+      vendorId: matchingVendor?.id || null,
+      vendorName: poForm.vendorName,
+      vendorEmail: poForm.vendorEmail,
+      vendorAddress: poForm.vendorAddress,
+      category: poForm.category,
+      issueDate: poForm.date,
+      expectedDate: poForm.expectedDate,
+      paymentTerms: poForm.paymentTerms,
+      currency: poForm.currency,
+      status: finalStatus,
+      notes: poForm.notes,
+      items: poForm.lines.map((l) => ({
+        productName: l.productName || "Material o Insumo",
+        sku: l.sku || null,
+        description: l.description || null,
+        quantity: Number(l.quantity) || 1,
+        unitCost: Number(l.rate) || 0,
+      })),
+    };
+
+    try {
+      let res;
+      if (existing) {
+        res = await fetch(`/api/purchase-orders/${encodeURIComponent(existing.id || existing.num)}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+      } else {
+        res = await fetch("/api/purchase-orders", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+      }
+
+      const json = await res.json();
+      if (json.success) {
+        await loadPurchaseOrders();
+        setPOSuccessMsg(`¡Orden de compra ${poForm.num} guardada exitosamente!`);
+        setTimeout(() => setPOSuccessMsg(""), 3500);
+      } else {
+        console.error("Error al guardar orden de compra:", json.error);
+        alert(`Error al guardar orden: ${json.error}`);
+      }
+    } catch (err: any) {
+      console.error("Error connecting to purchase orders API:", err);
+      alert("Error al conectar con el servidor para guardar la orden.");
+    }
   };
 
   const handleSendPOEmail = async () => {
     setSendingPOEmail(true);
     try {
       await new Promise((resolve) => setTimeout(resolve, 800));
-      handleSavePOEditor("Aprobada");
+      await handleSavePOEditor("Aprobada");
       setPOSuccessMsg(`¡Orden de compra ${poForm.num} enviada con éxito por correo a ${poForm.vendorName} (${poForm.vendorEmail})!`);
       setTimeout(() => setPOSuccessMsg(""), 4500);
     } catch (err) {
@@ -3604,36 +3757,9 @@ export default function AdminDashboard() {
 
   const openPagarProveedorView = (vendorFilter?: string | React.MouseEvent) => {
     setPreviousPagarProveedorView(currentView);
-    setPagarProveedorSuccessMsg("");
-    setShowPagarProveedorFilterPopover(false);
-
-    const filterName = typeof vendorFilter === "string" ? vendorFilter : undefined;
-    if (filterName) {
-      setPagarProveedorForm((prev) => ({
-        ...prev,
-        payeeFilter: filterName,
-      }));
-    }
-    
-    // Map existing pending/approved/received Purchase Orders from database/state to vendorBills
-    const mappedBills = purchaseOrders
-      .filter((po) => po.status !== "Cancelada" && po.status !== "Pagada")
-      .map((po) => ({
-        id: po.num,
-        vendorName: po.vendor,
-        billNumber: po.num,
-        dueDate: po.date,
-        originalAmount: po.total,
-        balanceDue: po.total,
-      }));
-
-    const targetBills = filterName
-      ? mappedBills.filter((b) => b.vendorName.toLowerCase().includes(filterName.toLowerCase()))
-      : mappedBills;
-
-    setVendorBills(mappedBills);
-    setSelectedBillIds(targetBills.length > 0 ? targetBills.map((b) => b.id) : mappedBills.map((b) => b.id));
-    setCurrentView("pagar-proveedor");
+    const filterName = typeof vendorFilter === "string" ? vendorFilter : "";
+    setSelectedPaymentVendor(filterName);
+    setCurrentView("pagos-proveedores");
   };
 
   const closePagarProveedorView = () => {
@@ -3995,7 +4121,7 @@ export default function AdminDashboard() {
   const loadDashboardData = async () => {
     setLoading(true);
     try {
-      const [accRes, cusRes, venRes, invRes, bankRes, txRes, ruleRes, noteRes, invcRes] = await Promise.all([
+      const [accRes, cusRes, venRes, invRes, bankRes, txRes, ruleRes, noteRes, invcRes, poRes] = await Promise.all([
         fetch("/api/accounts").then((r) => r.json()),
         fetch("/api/customers").then((r) => r.json()),
         fetch("/api/vendors").then((r) => r.json()),
@@ -4005,6 +4131,7 @@ export default function AdminDashboard() {
         fetch("/api/bank-rules").then((r) => r.json()),
         fetch("/api/credit-debit-notes").then((r) => r.json()).catch(() => ({ success: false })),
         fetch("/api/invoices").then((r) => r.json()).catch(() => ({ success: false })),
+        fetch("/api/purchase-orders").then((r) => r.json()).catch(() => ({ success: false })),
       ]);
 
       if (accRes.success) setAccounts(accRes.data || []);
@@ -4033,6 +4160,30 @@ export default function AdminDashboard() {
             status: inv.status,
             paymentTerms: inv.paymentTerms,
             lines: inv.lines || [],
+          }))
+        );
+      }
+
+      if (poRes && poRes.success && Array.isArray(poRes.data)) {
+        setPurchaseOrders(
+          poRes.data.map((po: any) => ({
+            id: po.id,
+            num: po.orderNumber,
+            date: po.issueDate,
+            vendor: po.vendorName,
+            vendorId: po.vendorId,
+            vendorEmail: po.vendorEmail,
+            vendorAddress: po.vendorAddress,
+            category: po.category,
+            total: Number(po.total) || 0,
+            subtotal: Number(po.subtotal) || 0,
+            tax: Number(po.tax) || 0,
+            currency: po.currency || "USD",
+            expectedDate: po.expectedDate,
+            paymentTerms: po.paymentTerms,
+            status: po.status,
+            notes: po.notes,
+            items: po.items || [],
           }))
         );
       }
@@ -5135,6 +5286,45 @@ export default function AdminDashboard() {
     setCurrentView("factura-compra-editor");
   };
 
+  const openCreatePurchaseInvoiceFromPO = (po: any) => {
+    setPurchaseInvoiceError("");
+    setPurchaseInvoiceSuccess("");
+    const matchingVendor = vendors.find(
+      (v) => v.name.toLowerCase().trim() === (po.vendor || "").toLowerCase().trim()
+    );
+
+    const mappedItems = Array.isArray(po.items) && po.items.length > 0
+      ? po.items.map((it: any) => ({
+          sku: it.sku || "INS-001",
+          description: it.productName || it.description || "Insumo de compra",
+          quantity: Number(it.quantity) || 1,
+          unitCost: Number(it.unitCost ?? it.rate) || 0,
+          lotNumber: `LOT-${new Date().toISOString().slice(0, 7)}-01`,
+        }))
+      : [
+          {
+            sku: "MAT-FLX-01",
+            description: `${po.category || "Insumos"} - Suministro según OC ${po.num}`,
+            quantity: 1,
+            unitCost: Number(po.total) || 0,
+            lotNumber: `LOT-${new Date().toISOString().slice(0, 7)}-01`,
+          },
+        ];
+
+    const cleanSuffix = (po.num || "").replace(/[^0-9]/g, "").slice(-4) || String(Math.floor(100 + Math.random() * 900));
+    setPurchaseInvoiceForm({
+      invoiceNumber: `FPROV-2026-${cleanSuffix}`,
+      purchaseOrderNumber: po.num,
+      vendorName: po.vendor || matchingVendor?.name || "Proveedor General",
+      issueDate: new Date().toISOString().split("T")[0],
+      dueDate: po.expectedDate || new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString().split("T")[0],
+      currency: po.currency || "USD",
+      notes: `Factura de compra generada automáticamente a partir de la Orden de Compra ${po.num}.`,
+      items: mappedItems,
+    });
+    setCurrentView("factura-compra-editor");
+  };
+
   const handleSavePurchaseInvoice = async (e: React.FormEvent) => {
     e.preventDefault();
     setPurchaseInvoiceLoading(true);
@@ -5792,7 +5982,19 @@ export default function AdminDashboard() {
                   <span>Facturas de compra</span>
                 </button>
 
-                {/* 4. Devoluciones a proveedores */}
+                {/* 4. Pagos a Proveedores */}
+                <button
+                  onClick={() => { setSelectedPaymentVendor(""); setCurrentView("pagos-proveedores"); }}
+                  className={`w-full text-left px-2.5 py-1.5 rounded-lg transition cursor-pointer flex items-center justify-between ${
+                    currentView === "pagos-proveedores" || currentView === "pagar-proveedor"
+                      ? "bg-[#fff7ed] text-[#f6821f] font-semibold"
+                      : "text-slate-500 hover:text-slate-900 hover:bg-slate-50"
+                  }`}
+                >
+                  <span>Pagos a Proveedores</span>
+                </button>
+
+                {/* 5. Devoluciones a proveedores */}
                 <button
                   onClick={() => { setCurrentView("devoluciones-proveedor"); loadVendorReturns(); }}
                   className={`w-full text-left px-2.5 py-1.5 rounded-lg transition cursor-pointer flex items-center justify-between ${
@@ -5970,6 +6172,7 @@ export default function AdminDashboard() {
                   {currentView === "proveedores" && "Directorio de Proveedores"}
                   {currentView === "lista-ordenes-compra" && "Gestión de Órdenes de Compra"}
                   {currentView === "factura-compra-lista" && "Facturas de Compra & Entradas"}
+                  {(currentView === "pagos-proveedores" || currentView === "pagar-proveedor") && "Cuentas por Pagar / Pagos a Proveedores"}
                   {currentView === "devoluciones-proveedor" && "Devoluciones a Proveedores"}
                   {currentView === "vendedores" && "Fuerza de Ventas"}
                   {currentView === "comisiones" && "Control de Comisiones"}
@@ -7348,6 +7551,18 @@ export default function AdminDashboard() {
                   <button
                     type="button"
                     onClick={() => {
+                      setSelectedPaymentVendor("");
+                      setCurrentView("pagos-proveedores");
+                    }}
+                    className="px-4 py-2 rounded-full border border-slate-300 text-slate-700 hover:border-[#f6821f] hover:text-[#f6821f] hover:bg-[#fff7ed] text-xs font-semibold transition cursor-pointer shadow-xs flex items-center gap-1.5"
+                  >
+                    <CreditCard className="w-3.5 h-3.5 text-[#f6821f]" />
+                    <span>Pagos a Proveedores</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
                       setModalError("");
                       setModalSuccess("");
                       setShowNewVendorDrawer(true);
@@ -7482,7 +7697,16 @@ export default function AdminDashboard() {
                           <td className="p-3.5 text-slate-500">{v.phone || "—"}</td>
                           <td className="p-3.5 text-slate-500 truncate max-w-xs">{v.address || "—"}</td>
                           <td className="p-3.5 font-medium">{v.currency}</td>
-                          <td className="p-3.5 text-right">
+                          <td className="p-3.5 text-right space-x-1.5">
+                            <button
+                              type="button"
+                              onClick={() => openPagarProveedorView(v.name)}
+                              className="px-2.5 py-1 rounded-lg bg-[#fff7ed] hover:bg-orange-100 text-[#ea580c] font-semibold cursor-pointer transition text-[11px] inline-flex items-center gap-1 border border-[#ffedd5]"
+                              title="Pagar facturas de este proveedor"
+                            >
+                              <CreditCard className="w-3 h-3" />
+                              <span>Pagar</span>
+                            </button>
                             <button
                               type="button"
                               onClick={() => handleOpenEditVendor(v)}
@@ -9351,6 +9575,16 @@ export default function AdminDashboard() {
                 openRecibirPagoView(found?.id);
               }}
               formatCurrency={formatCurrency}
+            />
+          )}
+
+          {/* ================= VIEW: PAGOS A PROVEEDORES (CUENTAS POR PAGAR) ================= */}
+          {(currentView === "pagos-proveedores" || currentView === "pagar-proveedor") && (
+            <VendorPaymentsModule
+              onBack={() => setCurrentView("proveedores")}
+              formatCurrency={formatCurrency}
+              companySettings={companySettings}
+              initialVendorFilter={selectedPaymentVendor}
             />
           )}
 
@@ -13786,7 +14020,7 @@ export default function AdminDashboard() {
                   <div className="relative flex-1 max-w-sm">
                     <input
                       type="text"
-                      placeholder="Buscar por N.º de orden, proveedor..."
+                      placeholder="Buscar por N.º de orden, proveedor, categoría..."
                       value={search}
                       onChange={(e) => setSearch(e.target.value)}
                       className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:outline-none focus:border-[#f6821f]"
@@ -13796,7 +14030,19 @@ export default function AdminDashboard() {
                     </svg>
                   </div>
 
-                  <span className="text-xs text-slate-500 font-medium">Mostrando 3 órdenes de compra</span>
+                  {(() => {
+                    const filteredPOs = purchaseOrders.filter((po) =>
+                      !search ||
+                      po.num.toLowerCase().includes(search.toLowerCase()) ||
+                      po.vendor.toLowerCase().includes(search.toLowerCase()) ||
+                      (po.category && po.category.toLowerCase().includes(search.toLowerCase()))
+                    );
+                    return (
+                      <span className="text-xs text-slate-500 font-medium">
+                        Mostrando {filteredPOs.length} {filteredPOs.length === 1 ? "orden" : "órdenes"} de compra
+                      </span>
+                    );
+                  })()}
                 </div>
 
                 <div className="overflow-x-auto">
@@ -13813,56 +14059,96 @@ export default function AdminDashboard() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 font-mono">
-                      {purchaseOrders.map((po) => (
-                        <tr key={po.num} className="hover:bg-slate-50 transition">
-                          <td className="py-3.5 px-4 font-bold text-slate-900 font-mono">{po.num}</td>
-                          <td className="py-3.5 px-4 font-sans text-slate-600">{po.date}</td>
-                          <td className="py-3.5 px-4 font-bold font-sans text-slate-900">{po.vendor}</td>
-                          <td className="py-3.5 px-4 font-sans text-slate-600">{po.category}</td>
-                          <td className="py-3.5 px-4 text-right font-bold text-slate-900">${po.total.toFixed(2)} USD</td>
-                          <td className="py-3.5 px-4 text-center font-sans">
-                            <select
-                              value={po.status}
-                              onChange={(e) => handleUpdatePOStatus(po.num, e.target.value)}
-                              className={`px-2.5 py-1 rounded-full text-[10px] font-bold cursor-pointer appearance-none outline-none border transition ${
-                                po.status === "Recibida"
-                                  ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100"
-                                  : po.status === "Aprobada"
-                                  ? "bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100"
-                                  : po.status === "Cancelada"
-                                  ? "bg-red-50 text-red-700 border-red-200 hover:bg-red-100"
-                                  : "bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100"
-                              }`}
-                            >
-                              <option value="Pendiente">Pendiente</option>
-                              <option value="Aprobada">Aprobada</option>
-                              <option value="Recibida">Recibida</option>
-                              <option value="Cancelada">Cancelada</option>
-                            </select>
-                          </td>
-                          <td className="py-3.5 px-4 text-right font-sans">
-                            <div className="flex items-center justify-end gap-2">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setSelectedPurchaseOrder(po);
-                                  setActiveModal("detalle-orden-compra");
-                                }}
-                                className="px-3 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold cursor-pointer transition text-[11px]"
+                      {(() => {
+                        const filteredPOs = purchaseOrders.filter((po) =>
+                          !search ||
+                          po.num.toLowerCase().includes(search.toLowerCase()) ||
+                          po.vendor.toLowerCase().includes(search.toLowerCase()) ||
+                          (po.category && po.category.toLowerCase().includes(search.toLowerCase()))
+                        );
+
+                        if (filteredPOs.length === 0) {
+                          return (
+                            <tr>
+                              <td colSpan={7} className="py-8 text-center text-slate-400 font-sans">
+                                No se encontraron órdenes de compra con el criterio de búsqueda.
+                              </td>
+                            </tr>
+                          );
+                        }
+
+                        return filteredPOs.map((po) => (
+                          <tr key={po.num} className="hover:bg-slate-50 transition">
+                            <td className="py-3.5 px-4 font-bold text-slate-900 font-mono">{po.num}</td>
+                            <td className="py-3.5 px-4 font-sans text-slate-600">{po.date}</td>
+                            <td className="py-3.5 px-4 font-bold font-sans text-slate-900">{po.vendor}</td>
+                            <td className="py-3.5 px-4 font-sans text-slate-600">{po.category}</td>
+                            <td className="py-3.5 px-4 text-right font-bold text-slate-900">${po.total.toFixed(2)} USD</td>
+                            <td className="py-3.5 px-4 text-center font-sans">
+                              <select
+                                value={po.status}
+                                onChange={(e) => handleUpdatePOStatus(po.num, e.target.value)}
+                                className={`px-2.5 py-1 rounded-full text-[10px] font-bold cursor-pointer appearance-none outline-none border transition ${
+                                  po.status === "Recibida"
+                                    ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100"
+                                    : po.status === "Aprobada"
+                                    ? "bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100"
+                                    : po.status === "Cancelada"
+                                    ? "bg-red-50 text-red-700 border-red-200 hover:bg-red-100"
+                                    : "bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100"
+                                }`}
                               >
-                                Ver Detalle
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => window.print()}
-                                className="px-3 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-800 font-semibold cursor-pointer transition text-[11px]"
-                              >
-                                Imprimir OC
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
+                                <option value="Pendiente">Pendiente</option>
+                                <option value="Aprobada">Aprobada</option>
+                                <option value="Recibida">Recibida</option>
+                                <option value="Cancelada">Cancelada</option>
+                              </select>
+                            </td>
+                            <td className="py-3.5 px-4 text-right font-sans">
+                              <div className="flex items-center justify-end gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedPurchaseOrder(po);
+                                    setActiveModal("detalle-orden-compra");
+                                  }}
+                                  className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold cursor-pointer transition text-[11px]"
+                                  title="Ver detalle de la orden"
+                                >
+                                  Detalle
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => openPurchaseOrderEditor(po)}
+                                  className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold cursor-pointer transition text-[11px]"
+                                  title="Editar orden en pantalla completa"
+                                >
+                                  Editar
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => openCreatePurchaseInvoiceFromPO(po)}
+                                  className="px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-semibold cursor-pointer transition text-[11px]"
+                                  title="Convertir esta orden en Factura de Compra"
+                                >
+                                  Facturar
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    openPurchaseOrderEditor(po);
+                                    setTimeout(() => window.print(), 300);
+                                  }}
+                                  className="px-2.5 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-800 font-semibold cursor-pointer transition text-[11px]"
+                                  title="Imprimir documento de orden"
+                                >
+                                  PDF
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ));
+                      })()}
                     </tbody>
                   </table>
                 </div>
@@ -14086,13 +14372,17 @@ export default function AdminDashboard() {
                             </span>
                           </td>
                           <td className="py-3.5 px-4 text-right space-x-1.5">
-                            {inv.paymentStatus === "PENDIENTE" && (
+                            {inv.paymentStatus !== "PAGADA" && (
                               <button
                                 type="button"
-                                onClick={() => handleUpdatePurchaseInvoiceStatus(inv.id, "PAGADA")}
-                                className="px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-semibold cursor-pointer transition text-[11px] border border-emerald-200"
+                                onClick={() => {
+                                  setSelectedPaymentVendor(inv.vendorName);
+                                  setCurrentView("pagos-proveedores");
+                                }}
+                                className="px-2.5 py-1 rounded-lg bg-[#fff7ed] hover:bg-orange-100 text-[#ea580c] font-semibold cursor-pointer transition text-[11px] border border-[#ffedd5]"
+                                title="Registrar abono o cancelación de esta factura"
                               >
-                                Marcar Pagada
+                                Pagar / Abonar
                               </button>
                             )}
                             <button
@@ -19129,8 +19419,8 @@ export default function AdminDashboard() {
                   <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 block">Información del Proveedor</span>
                   <p className="font-bold text-sm text-slate-900">{selectedPurchaseOrder.vendor}</p>
                   <p className="text-slate-600">RTN: 08019998124091</p>
-                  <p className="text-slate-600">Contacto: ventas@{selectedPurchaseOrder.vendor.toLowerCase().replace(/[^a-z]/g, "")}.hn</p>
-                  <p className="text-slate-600">Tel: +504 2239-5000</p>
+                  <p className="text-slate-600">Contacto: {selectedPurchaseOrder.vendorEmail || `ventas@${selectedPurchaseOrder.vendor.toLowerCase().replace(/[^a-z]/g, "")}.hn`}</p>
+                  <p className="text-slate-600">Dirección: {selectedPurchaseOrder.vendorAddress || "Zona Industrial San José, San Pedro Sula"}</p>
                 </div>
 
                 {/* Logistics Info */}
@@ -19147,11 +19437,11 @@ export default function AdminDashboard() {
                     </div>
                     <div>
                       <span className="text-slate-500 block">Condición Pago:</span>
-                      <span className="font-semibold text-slate-800">Crédito 30 días</span>
+                      <span className="font-semibold text-slate-800">{selectedPurchaseOrder.paymentTerms || "Crédito 30 días"}</span>
                     </div>
                     <div>
                       <span className="text-slate-500 block">Fecha Entrega:</span>
-                      <span className="font-semibold text-slate-800">2026-09-15</span>
+                      <span className="font-semibold text-slate-800">{selectedPurchaseOrder.expectedDate || "2026-09-18"}</span>
                     </div>
                   </div>
                 </div>
@@ -19161,7 +19451,7 @@ export default function AdminDashboard() {
               <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-2xs">
                 <div className="p-3.5 bg-slate-100/70 border-b border-slate-200 font-bold text-slate-800 flex items-center justify-between">
                   <span>Ítems / Materiales Solicitados</span>
-                  <span className="text-[11px] font-normal text-slate-500">Multimoneda USD ($)</span>
+                  <span className="text-[11px] font-normal text-slate-500">Multimoneda {selectedPurchaseOrder.currency || "USD"} ($)</span>
                 </div>
                 <table className="w-full text-left text-xs">
                   <thead className="bg-slate-50 text-slate-600 font-bold border-b border-slate-200">
@@ -19174,10 +19464,19 @@ export default function AdminDashboard() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 font-mono">
-                    {[
-                      { sku: "MAT-FLX-001", desc: `${selectedPurchaseOrder.category} - Lote Premium Grado A`, qty: 25, price: selectedPurchaseOrder.total * 0.028, total: selectedPurchaseOrder.total * 0.7 },
-                      { sku: "MAT-FLX-002", desc: `Complementos y Soluciones para ${selectedPurchaseOrder.category}`, qty: 10, price: selectedPurchaseOrder.total * 0.03, total: selectedPurchaseOrder.total * 0.3 },
-                    ].map((item, i) => (
+                    {(Array.isArray(selectedPurchaseOrder.items) && selectedPurchaseOrder.items.length > 0
+                      ? selectedPurchaseOrder.items.map((item: any) => ({
+                          sku: item.sku || "N/A",
+                          desc: item.productName || item.description || "Insumo",
+                          qty: Number(item.quantity) || 1,
+                          price: Number(item.unitCost ?? item.rate) || 0,
+                          total: Number(item.totalCost ?? item.total) || 0,
+                        }))
+                      : [
+                          { sku: "MAT-FLX-001", desc: `${selectedPurchaseOrder.category} - Lote Premium Grado A`, qty: 25, price: selectedPurchaseOrder.total * 0.028, total: selectedPurchaseOrder.total * 0.7 },
+                          { sku: "MAT-FLX-002", desc: `Complementos y Soluciones para ${selectedPurchaseOrder.category}`, qty: 10, price: selectedPurchaseOrder.total * 0.03, total: selectedPurchaseOrder.total * 0.3 },
+                        ]
+                    ).map((item, i) => (
                       <tr key={i} className="hover:bg-slate-50/80">
                         <td className="py-3 px-4 font-bold text-[#f6821f]">{item.sku}</td>
                         <td className="py-3 px-4 font-sans text-slate-800 font-medium">{item.desc}</td>
@@ -19195,14 +19494,14 @@ export default function AdminDashboard() {
                 <div className="w-full sm:w-72 bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-2 text-right">
                   <div className="flex justify-between text-slate-600 text-xs">
                     <span>Subtotal:</span>
-                    <span className="font-mono font-medium">${(selectedPurchaseOrder.total * 0.85).toLocaleString("en-US", { minimumFractionDigits: 2 })}</span>
+                    <span className="font-mono font-medium">${(selectedPurchaseOrder.subtotal ?? selectedPurchaseOrder.total * 0.85).toLocaleString("en-US", { minimumFractionDigits: 2 })}</span>
                   </div>
                   <div className="flex justify-between text-slate-600 text-xs">
                     <span>Impuesto IVA (15%):</span>
-                    <span className="font-mono font-medium">${(selectedPurchaseOrder.total * 0.15).toLocaleString("en-US", { minimumFractionDigits: 2 })}</span>
+                    <span className="font-mono font-medium">${(selectedPurchaseOrder.tax ?? selectedPurchaseOrder.total * 0.15).toLocaleString("en-US", { minimumFractionDigits: 2 })}</span>
                   </div>
                   <div className="pt-2 border-t border-slate-200 flex justify-between font-bold text-sm text-slate-900">
-                    <span>Total Orden (USD):</span>
+                    <span>Total Orden ({selectedPurchaseOrder.currency || "USD"}):</span>
                     <span className="font-mono text-[#f6821f]">${selectedPurchaseOrder.total.toLocaleString("en-US", { minimumFractionDigits: 2 })}</span>
                   </div>
                 </div>
@@ -19211,16 +19510,28 @@ export default function AdminDashboard() {
 
             {/* Footer Action Bar */}
             <div className="p-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between">
-              <button
-                type="button"
-                onClick={() => {
-                  setActiveModal(null);
-                  openPurchaseOrderEditor(selectedPurchaseOrder);
-                }}
-                className="px-4 py-2 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-700 font-semibold text-xs transition cursor-pointer"
-              >
-                Editar orden
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveModal(null);
+                    openPurchaseOrderEditor(selectedPurchaseOrder);
+                  }}
+                  className="px-4 py-2 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-700 font-semibold text-xs transition cursor-pointer"
+                >
+                  Editar orden
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveModal(null);
+                    openCreatePurchaseInvoiceFromPO(selectedPurchaseOrder);
+                  }}
+                  className="px-4 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-semibold text-xs transition cursor-pointer"
+                >
+                  Convertir a Factura
+                </button>
+              </div>
               <div className="flex items-center gap-2">
                 <button
                   type="button"
@@ -22791,7 +23102,7 @@ export default function AdminDashboard() {
               )}
             </div>
 
-            <div className="p-4 border-t border-slate-100 flex justify-end bg-slate-50">
+            <div className="p-4 border-t border-slate-100 flex justify-end gap-2.5 bg-slate-50">
               <button
                 type="button"
                 onClick={() => setSelectedDetailPurchaseInvoice(null)}
@@ -22799,6 +23110,21 @@ export default function AdminDashboard() {
               >
                 Cerrar
               </button>
+              {selectedDetailPurchaseInvoice.paymentStatus !== "PAGADA" && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const vName = selectedDetailPurchaseInvoice.vendorName;
+                    setSelectedDetailPurchaseInvoice(null);
+                    setSelectedPaymentVendor(vName);
+                    setCurrentView("pagos-proveedores");
+                  }}
+                  className="px-5 py-2 rounded-xl bg-[#f6821f] hover:bg-[#e07216] text-white font-bold text-xs transition cursor-pointer flex items-center gap-1.5 shadow-xs"
+                >
+                  <CreditCard className="w-4 h-4" />
+                  <span>Pagar / Abonar Factura</span>
+                </button>
+              )}
             </div>
           </div>
         </div>

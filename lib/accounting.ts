@@ -435,27 +435,34 @@ export async function postVendorPaymentEntry(payment: {
   date: string;
   vendorName: string;
   amount: number;
+  paymentNumber?: string;
   referenceNumber?: string;
   currency?: string;
+  bankAccountCode?: string;
+  bankAccountName?: string;
 }) {
+  const ref = payment.paymentNumber || payment.referenceNumber || "PAGO-PROV";
+  const bankCode = payment.bankAccountCode || "1100";
+  const bankName = payment.bankAccountName || "Bancos Nacionales (Cuenta de Cheques)";
+
   return await createJournalEntry({
     date: payment.date,
-    concept: `Pago a Proveedor: ${payment.vendorName}${payment.referenceNumber ? ` #${payment.referenceNumber}` : ""}`,
+    concept: `Pago a Proveedor: ${payment.vendorName}${payment.referenceNumber ? ` ref. ${payment.referenceNumber}` : ""}${payment.paymentNumber ? ` (${payment.paymentNumber})` : ""}`,
     referenceType: "PAYMENT_VENDOR",
-    referenceId: payment.referenceNumber || "PAGO-PROV",
+    referenceId: ref,
     currency: payment.currency || "USD",
     lines: [
       {
         accountCode: "2000",
-        accountName: "Accounts Payable (Cuentas por Pagar Proveedores)",
-        description: `Cancelación de factura ${payment.vendorName}`,
+        accountName: "Cuentas por Pagar Proveedores Comerciales",
+        description: `Abono / Cancelación a proveedor ${payment.vendorName}`,
         debit: Math.round(payment.amount * 100) / 100,
         credit: 0,
       },
       {
-        accountCode: "1100",
-        accountName: "Operating Checking Account (Banco Ficohsa)",
-        description: `Egreso bancario pago ${payment.vendorName}`,
+        accountCode: bankCode,
+        accountName: bankName,
+        description: `Egreso bancario pago ${payment.vendorName} [${ref}]`,
         debit: 0,
         credit: Math.round(payment.amount * 100) / 100,
       },

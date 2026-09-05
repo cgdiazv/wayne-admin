@@ -4,8 +4,17 @@ const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
 };
 
-// If cached client was created before User, PettyCash, or TaxRetention models were loaded, reset it
-if (globalForPrisma.prisma && (!(globalForPrisma.prisma as any).user || !(globalForPrisma.prisma as any).pettyCashFund || !(globalForPrisma.prisma as any).taxRetention)) {
+// If cached client was created before newer models were loaded, reset it
+if (
+  globalForPrisma.prisma &&
+  (
+    !(globalForPrisma.prisma as any).user ||
+    !(globalForPrisma.prisma as any).pettyCashFund ||
+    !(globalForPrisma.prisma as any).taxRetention ||
+    !(globalForPrisma.prisma as any).vendorPayment ||
+    !(globalForPrisma.prisma as any).purchaseOrder
+  )
+) {
   globalForPrisma.prisma = undefined;
 }
 
@@ -46,7 +55,9 @@ export const prisma: PrismaClient = new Proxy({} as PrismaClient, {
       !globalForPrisma.prisma ||
       !(globalForPrisma.prisma as any).taxRetention ||
       !(globalForPrisma.prisma as any).user ||
-      !(globalForPrisma.prisma as any).pettyCashFund
+      !(globalForPrisma.prisma as any).pettyCashFund ||
+      !(globalForPrisma.prisma as any).vendorPayment ||
+      !(globalForPrisma.prisma as any).purchaseOrder
     ) {
       globalForPrisma.prisma = createClient();
     }

@@ -45,6 +45,8 @@ model Vendor {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
   taxRetentions TaxRetention[]
+  vendorPayments VendorPayment[]
+  purchaseOrders PurchaseOrder[]
 }
 
 model InventoryItem {
@@ -124,6 +126,7 @@ model BankAccount {
   createdAt     DateTime          @default(now())
   updatedAt     DateTime          @updatedAt
   transactions  BankTransaction[]
+  vendorPayments VendorPayment[]
 }
 
 model BankTransaction {
@@ -241,6 +244,7 @@ model PurchaseInvoice {
   notes               String?
   items               PurchaseInvoiceItem[]
   taxRetentions       TaxRetention[]
+  paymentLines        VendorPaymentLine[]
   createdAt           DateTime              @default(now())
   updatedAt           DateTime              @updatedAt
 }
@@ -515,5 +519,79 @@ model TaxRetention {
   date              DateTime         @default(now())
   createdAt         DateTime         @default(now())
   updatedAt         DateTime         @updatedAt
+}
+
+model VendorPayment {
+  id                String              @id @default(cuid())
+  paymentNumber     String              @unique // e.g. "PAG-2026-0001"
+  vendorId          String?
+  vendor            Vendor?             @relation(fields: [vendorId], references: [id], onDelete: SetNull)
+  vendorName        String
+  paymentDate       String              // e.g. "2026-09-04"
+  paymentMethod     String              // "Transferencia Bancaria" | "Cheque" | "Efectivo" | "Tarjeta de Crédito"
+  referenceNumber   String?             // e.g. "TRF-99401" or "CHQ-1002"
+  bankAccountId     String?
+  bankAccount       BankAccount?        @relation(fields: [bankAccountId], references: [id], onDelete: SetNull)
+  paidAccount       String              @default("1100") // Account code or bank account name
+  currency          String              @default("USD")
+  amount            Float               @default(0)
+  notes             String?
+  status            String              @default("APLICADO") // "APLICADO" | "ANULADO"
+  journalEntryId    String?             // Reference to JournalEntry ID
+  lines             VendorPaymentLine[]
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+}
+
+model VendorPaymentLine {
+  id                String           @id @default(cuid())
+  vendorPaymentId   String
+  vendorPayment     VendorPayment    @relation(fields: [vendorPaymentId], references: [id], onDelete: Cascade)
+  purchaseInvoiceId String?
+  purchaseInvoice   PurchaseInvoice? @relation(fields: [purchaseInvoiceId], references: [id], onDelete: SetNull)
+  invoiceNumber     String           // e.g. "FPROV-2026-889"
+  originalAmount    Float            @default(0)
+  balanceBefore     Float            @default(0)
+  amountPaid        Float            @default(0)
+  balanceRemaining  Float            @default(0)
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+}
+
+model PurchaseOrder {
+  id               String              @id @default(cuid())
+  orderNumber      String              @unique // e.g. "OC-2026-0084"
+  vendorId         String?
+  vendor           Vendor?             @relation(fields: [vendorId], references: [id], onDelete: SetNull)
+  vendorName       String
+  vendorEmail      String?
+  vendorAddress    String?
+  category         String              @default("General") // "Tintas Flexo", "Cartón Corrugado", "Solventes", "Materia Prima", "Repuestos", "General"
+  issueDate        String              // "2026-09-04"
+  expectedDate     String?             // "2026-09-20"
+  paymentTerms     String              @default("Crédito 30 días")
+  currency         String              @default("USD")
+  subtotal         Float               @default(0)
+  tax              Float               @default(0)
+  total            Float               @default(0)
+  status           String              @default("Pendiente") // "Pendiente" | "Aprobada" | "Recibida" | "Facturada" | "Cancelada"
+  notes            String?
+  items            PurchaseOrderItem[]
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+}
+
+model PurchaseOrderItem {
+  id              String        @id @default(cuid())
+  purchaseOrderId String
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  productName     String
+  sku             String?
+  description     String?
+  quantity        Float         @default(1)
+  unitCost        Float         @default(0)
+  totalCost       Float         @default(0)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
 }
 

@@ -90,7 +90,24 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    // Map credit amounts by invoice number
+    // 2b. Fetch active tax retentions
+    const taxRetentions = await prisma.taxRetention.findMany({
+      where: {
+        status: "ISSUED",
+      },
+    });
+
+    // 2c. Fetch active vendor payments
+    const db = prisma as any;
+    const vendorPaymentLines = await db.vendorPaymentLine.findMany({
+      where: {
+        vendorPayment: {
+          status: "APLICADO",
+        },
+      },
+    });
+
+    // Map credit, retention, and payment amounts by invoice number
     const creditsByInvoice = new Map<string, number>();
     for (const cn of creditNotes) {
       if (cn.targetDocNum) {
@@ -104,13 +121,36 @@ export async function GET(request: NextRequest) {
         creditsByInvoice.set(vr.purchaseInvoiceNumber, prev + vr.total);
       }
     }
+    for (const tr of taxRetentions) {
+      if (tr.purchaseInvoiceId) {
+        // Will be matched by id or target invoice below if needed
+      }
+    }
+    const retentionsByInvoice = new Map<string, number>();
+    for (const tr of taxRetentions) {
+      if (tr.purchaseInvoiceId) {
+        const prev = retentionsByInvoice.get(tr.purchaseInvoiceId) || 0;
+        retentionsByInvoice.set(tr.purchaseInvoiceId, prev + tr.retentionAmount);
+      }
+    }
+    const paymentsByInvoice = new Map<string, number>();
+    for (const pl of vendorPaymentLines) {
+      const key = pl.purchaseInvoiceId || pl.invoiceNumber;
+      if (key) {
+        const prev = paymentsByInvoice.get(key) || 0;
+        paymentsByInvoice.set(key, prev + (Number(pl.amountPaid) || 0));
+      }
+    }
 
     // 3. Process each purchase invoice into aging buckets
     const vendorMap = new Map<string, VendorAgingRow>();
 
     for (const inv of invoices) {
       const creditAmount = creditsByInvoice.get(inv.invoiceNumber) || 0;
-      const netBalance = Math.max(0, Math.round((inv.total - creditAmount) * 100) / 100);
+      const retentionAmount = retentionsByInvoice.get(inv.id) || 0;
+      const paymentAmount = (paymentsByInvoice.get(inv.id) || 0) + (paymentsByInvoice.get(inv.invoiceNumber) || 0);
+
+      const netBalance = Math.max(0, Math.round((inv.total - creditAmount - retentionAmount - paymentAmount) * 100) / 100);
 
       if (netBalance <= 0) continue; // Invoice already covered
 
