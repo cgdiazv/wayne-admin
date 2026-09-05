@@ -11,7 +11,7 @@ export interface JournalLineInput {
 export interface CreateJournalEntryInput {
   date?: string;
   concept: string;
-  referenceType: "INVOICE" | "PURCHASE_INVOICE" | "PAYMENT_CUSTOMER" | "PAYMENT_VENDOR" | "BANK_TX" | "PETTY_CASH" | "MANUAL";
+  referenceType: "INVOICE" | "PURCHASE_INVOICE" | "PAYMENT_CUSTOMER" | "PAYMENT_VENDOR" | "BANK_TX" | "PETTY_CASH" | "MANUAL" | "TAX_RETENTION";
   referenceId?: string;
   currency?: string;
   lines: JournalLineInput[];
@@ -462,3 +462,90 @@ export async function postVendorPaymentEntry(payment: {
     ],
   });
 }
+
+/**
+ * Triggers automatic accounting entry for Tax Retention (Retenciones SAR de ISV/ISR a Proveedores)
+ * Débito: 2000 Cuentas por Pagar Proveedores Comerciales (Reduce la deuda neta con el proveedor por el valor retenido)
+ * Crédito: 2160 Retenciones Fiscales por Pagar (SAR: 1% ISV, 12.5% Honorarios, 10% Alquiler) (Registra la obligación fiscal con el Estado)
+ */
+export async function postTaxRetentionEntry(retention: {
+  retentionNumber: string;
+  providerName: string;
+  date: string;
+  retentionAmount: number;
+  retentionType?: string;
+  invoiceNumber?: string;
+  currency?: string;
+}) {
+  const typeLabels: Record<string, string> = {
+    ISV_1: "Retención 1% ISV",
+    ISV_100: "Retención 100% ISV",
+    ISR_12_5: "Retención 12.5% ISR Honorarios",
+    ISR_10: "Retención 10% ISR Alquiler",
+    OTRO: "Retención Fiscal",
+  };
+  const typeLabel = (retention.retentionType && typeLabels[retention.retentionType]) || "Retención Fiscal SAR";
+  const invRef = retention.invoiceNumber ? ` s/Factura ${retention.invoiceNumber}` : "";
+
+  return await createJournalEntry({
+    date: retention.date,
+    concept: `Comprobante Retención N.º ${retention.retentionNumber} - ${retention.providerName} (${typeLabel}${invRef})`,
+    referenceType: "TAX_RETENTION",
+    referenceId: retention.retentionNumber,
+    currency: retention.currency || "USD",
+    lines: [
+      {
+        accountCode: "2000",
+        accountName: "Accounts Payable (Cuentas por Pagar Proveedores)",
+        description: `Retención aplicada a proveedor ${retention.providerName} - Comp. ${retention.retentionNumber}`,
+        debit: Math.round(retention.retentionAmount * 100) / 100,
+        credit: 0,
+      },
+      {
+        accountCode: "2160",
+        accountName: "Retenciones Fiscales por Pagar (SAR: 1% ISV, 12.5% Honorarios, 10% Alquiler)",
+        description: `Obligación fiscal SAR s/retención ${retention.retentionNumber} - ${retention.providerName}`,
+        debit: 0,
+        credit: Math.round(retention.retentionAmount * 100) / 100,
+      },
+    ],
+  });
+}
+
+/**
+ * Triggers automatic reversal accounting entry when a Tax Retention is voided/cancelled
+ * Débito: 2160 Retenciones Fiscales por Pagar (Reversa la obligación fiscal con SAR)
+ * Crédito: 2000 Cuentas por Pagar Proveedores Comerciales (Restaura la cuenta por pagar al proveedor)
+ */
+export async function postTaxRetentionVoidEntry(retention: {
+  retentionNumber: string;
+  providerName: string;
+  date: string;
+  retentionAmount: number;
+  currency?: string;
+}) {
+  return await createJournalEntry({
+    date: retention.date,
+    concept: `ANULACIÓN Comprobante Retención N.º ${retention.retentionNumber} - ${retention.providerName}`,
+    referenceType: "TAX_RETENTION",
+    referenceId: `ANUL-${retention.retentionNumber}`,
+    currency: retention.currency || "USD",
+    lines: [
+      {
+        accountCode: "2160",
+        accountName: "Retenciones Fiscales por Pagar (SAR: 1% ISV, 12.5% Honorarios, 10% Alquiler)",
+        description: `Reverso por anulación de retención SAR ${retention.retentionNumber}`,
+        debit: Math.round(retention.retentionAmount * 100) / 100,
+        credit: 0,
+      },
+      {
+        accountCode: "2000",
+        accountName: "Accounts Payable (Cuentas por Pagar Proveedores)",
+        description: `Restitución de saldo proveedor por anulación comp. ${retention.retentionNumber}`,
+        debit: 0,
+        credit: Math.round(retention.retentionAmount * 100) / 100,
+      },
+    ],
+  });
+}
+

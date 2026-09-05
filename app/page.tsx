@@ -9,6 +9,7 @@ import CustomerAgingReportModule from "@/components/CustomerAgingReportModule";
 import CustomerStatementModule from "@/components/CustomerStatementModule";
 import VendorAgingReportModule from "@/components/VendorAgingReportModule";
 import QuotesModule from "@/components/QuotesModule";
+import TaxRetentionsModule from "@/components/TaxRetentionsModule";
 
 
 
@@ -194,7 +195,7 @@ type PurchaseInvoice = {
   createdAt?: string;
 };
 
-type NavItem = "dashboard" | "plan-cuentas" | "transacciones" | "macola-sync" | "caja-chica" | "clientes" | "cotizaciones" | "proveedores" | "vendedores" | "comisiones" | "inventario" | "lotes" | "series" | "notas-credito-debito" | "reportes" | "configuracion" | "factura-editor" | "lista-facturas" | "lista-ordenes-compra" | "orden-compra-editor" | "factura-compra-lista" | "factura-compra-editor" | "deposito-bancario" | "recibir-pago" | "agregar-gasto" | "pagar-proveedor" | "devoluciones-proveedor" | "antiguedad-saldos" | "antiguedad-saldos-proveedores" | "estado-cuenta-cliente";
+type NavItem = "dashboard" | "plan-cuentas" | "transacciones" | "macola-sync" | "caja-chica" | "clientes" | "cotizaciones" | "proveedores" | "vendedores" | "comisiones" | "inventario" | "lotes" | "series" | "notas-credito-debito" | "reportes" | "configuracion" | "factura-editor" | "lista-facturas" | "lista-ordenes-compra" | "orden-compra-editor" | "factura-compra-lista" | "factura-compra-editor" | "deposito-bancario" | "recibir-pago" | "agregar-gasto" | "pagar-proveedor" | "devoluciones-proveedor" | "antiguedad-saldos" | "antiguedad-saldos-proveedores" | "estado-cuenta-cliente" | "retenciones-isv";
 
 
 
@@ -1140,11 +1141,7 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [showPnL, setShowPnL] = useState(true);
   const [showGastos, setShowGastos] = useState(true);
-  const [hideConfirmWidget, setHideConfirmWidget] = useState<"pnl" | "gastos" | null>(null);
-  const [visibleWidgets, setVisibleWidgets] = useState({
-    pnl: true,
-    gastos: true,
-  });
+
 
 
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -5719,7 +5716,8 @@ export default function AdminDashboard() {
                 currentView === "factura-compra-lista" ||
                 currentView === "factura-compra-editor" ||
                 currentView === "devoluciones-proveedor" ||
-                currentView === "antiguedad-saldos-proveedores"
+                currentView === "antiguedad-saldos-proveedores" ||
+                currentView === "retenciones-isv"
                   ? "font-semibold text-slate-900"
                   : ""
               }`}
@@ -5821,6 +5819,18 @@ export default function AdminDashboard() {
                   }`}
                 >
                   <span>Antigüedad Proveedores</span>
+                </button>
+
+                {/* 6. Retenciones ISV / SAR */}
+                <button
+                  onClick={() => setCurrentView("retenciones-isv")}
+                  className={`w-full text-left px-2.5 py-1.5 rounded-lg transition cursor-pointer flex items-center justify-between ${
+                    currentView === "retenciones-isv"
+                      ? "bg-[#fff7ed] text-[#f6821f] font-semibold"
+                      : "text-slate-500 hover:text-slate-900 hover:bg-slate-50"
+                  }`}
+                >
+                  <span>Retenciones ISV / SAR</span>
                 </button>
               </div>
             )}
@@ -5970,6 +5980,7 @@ export default function AdminDashboard() {
                   {currentView === "antiguedad-saldos" && "Reportes / Antigüedad de Saldos Clientes"}
                   {currentView === "antiguedad-saldos-proveedores" && "Reportes / Antigüedad de Saldos Proveedores"}
                   {currentView === "estado-cuenta-cliente" && "Clientes / Estado de Cuenta Individual"}
+                  {currentView === "retenciones-isv" && "Compras / Comprobantes de Retención SAR"}
                   {currentView === "configuracion" && "Configuración del Sistema"}
                 </span>
                 <span className="px-2 py-0.5 text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full flex items-center gap-1">
@@ -6085,108 +6096,102 @@ export default function AdminDashboard() {
             <>
 
               {/* Metric Cards Row */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 max-w-6xl">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 w-full">
                 {/* Plan de cuentas */}
                 <div
                   onClick={() => setCurrentView("plan-cuentas")}
-                  className="p-5 rounded-2xl bg-white border border-slate-200 hover:border-[#f6821f] transition cursor-pointer shadow-xs hover:shadow-sm"
+                  className="bg-white p-5 rounded-2xl border border-slate-200/80 hover:border-[#f6821f]/50 transition-all cursor-pointer shadow-xs hover:shadow-md relative overflow-hidden group"
                 >
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Plan de Cuentas</span>
-                    <span className="p-2 rounded-xl bg-[#fff7ed] text-[#f6821f]">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-slate-500">Plan de Cuentas</span>
+                    <div className="w-8 h-8 rounded-xl bg-orange-50 text-[#f6821f] flex items-center justify-center group-hover:scale-110 transition-transform">
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
                       </svg>
-                    </span>
+                    </div>
                   </div>
-                  <div className="text-3xl font-bold text-slate-900">{accounts.length}</div>
-                  <p className="text-xs text-slate-500 mt-1">Cuentas contables activas</p>
+                  <div className="mt-2">
+                    <span className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">{accounts.length}</span>
+                  </div>
+                  <p className="text-[11px] text-slate-400 mt-1">Cuentas contables activas</p>
+                  <div className="absolute bottom-0 left-0 right-0 h-1 bg-[#f6821f]" />
                 </div>
 
                 {/* Clientes */}
                 <div
                   onClick={() => setCurrentView("clientes")}
-                  className="p-5 rounded-2xl bg-white border border-slate-200 hover:border-[#f6821f] transition cursor-pointer shadow-xs hover:shadow-sm"
+                  className="bg-white p-5 rounded-2xl border border-slate-200/80 hover:border-blue-300 transition-all cursor-pointer shadow-xs hover:shadow-md relative overflow-hidden group"
                 >
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Clientes</span>
-                    <span className="p-2 rounded-xl bg-blue-50 text-blue-600">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-slate-500">Clientes</span>
+                    <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center group-hover:scale-110 transition-transform">
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
                       </svg>
-                    </span>
+                    </div>
                   </div>
-                  <div className="text-3xl font-bold text-slate-900">{customers.length}</div>
-                  <p className="text-xs text-slate-500 mt-1">Con códigos de Macola</p>
+                  <div className="mt-2">
+                    <span className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">{customers.length}</span>
+                  </div>
+                  <p className="text-[11px] text-slate-400 mt-1">Con códigos de Macola</p>
+                  <div className="absolute bottom-0 left-0 right-0 h-1 bg-blue-500" />
                 </div>
 
                 {/* Proveedores */}
                 <div
                   onClick={() => setCurrentView("proveedores")}
-                  className="p-5 rounded-2xl bg-white border border-slate-200 hover:border-[#f6821f] transition cursor-pointer shadow-xs hover:shadow-sm"
+                  className="bg-white p-5 rounded-2xl border border-slate-200/80 hover:border-purple-300 transition-all cursor-pointer shadow-xs hover:shadow-md relative overflow-hidden group"
                 >
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Proveedores</span>
-                    <span className="p-2 rounded-xl bg-purple-50 text-purple-600">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-slate-500">Proveedores</span>
+                    <div className="w-8 h-8 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center group-hover:scale-110 transition-transform">
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                       </svg>
-                    </span>
+                    </div>
                   </div>
-                  <div className="text-3xl font-bold text-slate-900">{vendors.length}</div>
-                  <p className="text-xs text-slate-500 mt-1">Socios comerciales registrados</p>
+                  <div className="mt-2">
+                    <span className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">{vendors.length}</span>
+                  </div>
+                  <p className="text-[11px] text-slate-400 mt-1">Socios comerciales registrados</p>
+                  <div className="absolute bottom-0 left-0 right-0 h-1 bg-purple-600" />
                 </div>
 
                 {/* Valoración Inventario */}
                 <div
                   onClick={() => setCurrentView("inventario")}
-                  className="p-5 rounded-2xl bg-white border border-slate-200 hover:border-[#f6821f] transition cursor-pointer shadow-xs hover:shadow-sm"
+                  className="bg-white p-5 rounded-2xl border border-slate-200/80 hover:border-emerald-300 transition-all cursor-pointer shadow-xs hover:shadow-md relative overflow-hidden group"
                 >
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Valoración Inventario</span>
-                    <span className="p-2 rounded-xl bg-[#fff7ed] text-[#f6821f]">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-slate-500">Valoración Inventario</span>
+                    <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center group-hover:scale-110 transition-transform">
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
                       </svg>
+                    </div>
+                  </div>
+                  <div className="mt-2">
+                    <span className="text-2xl sm:text-3xl font-black text-emerald-600 tracking-tight">
+                      {formatCurrency(totalInventoryValuation)}
                     </span>
                   </div>
-                  <div className="text-3xl font-bold text-[#f6821f]">
-                    {formatCurrency(totalInventoryValuation)}
-                  </div>
-                  <p className="text-xs text-slate-500 mt-1">{totalInventoryUnits} unidades en stock</p>
+                  <p className="text-[11px] text-slate-400 mt-1">{totalInventoryUnits} unidades en stock</p>
+                  <div className="absolute bottom-0 left-0 right-0 h-1 bg-emerald-500" />
                 </div>
               </div>
 
               {/* ================= SECTION: RESUMEN DE LA EMPRESA ================= */}
-              <div className="space-y-3 max-w-6xl">
+              <div className="space-y-3 w-full">
                 <div className="flex items-center justify-between">
                   <h2 className="text-sm font-bold text-slate-900 tracking-tight">Resumen de la empresa</h2>
-                  {(!visibleWidgets.pnl || !visibleWidgets.gastos) && (
-                    <button
-                      onClick={() => setVisibleWidgets({ pnl: true, gastos: true })}
-                      className="text-xs font-semibold text-[#f6821f] hover:text-[#e07216] transition cursor-pointer flex items-center gap-1"
-                    >
-                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                      </svg>
-                      Personalizar
-                    </button>
-                  )}
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {/* Card 1: Pérdidas y Ganancias */}
-                  {visibleWidgets.pnl && (
-                    <div className="bg-white border border-slate-200/90 rounded-2xl p-6 shadow-xs flex flex-col justify-between">
+                  <div className="bg-white border border-slate-200/90 rounded-2xl p-6 shadow-xs flex flex-col justify-between">
                       <div>
-                        <div className="flex items-center justify-between mb-2">
+                        <div className="mb-2">
                           <span className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">PÉRDIDAS Y GANANCIAS</span>
-                          <button
-                            onClick={() => setHideConfirmWidget("pnl")}
-                            className="text-xs font-medium text-[#f6821f] hover:text-[#e07216] transition cursor-pointer"
-                          >
-                            Ocultar
-                          </button>
                         </div>
                         <h3 className="text-lg font-medium text-slate-900 leading-snug mb-8">
                           Consulta lo que ganas y lo que gastas en todas tus cuentas
@@ -6224,20 +6229,12 @@ export default function AdminDashboard() {
                     </div>
 
                   </div>
-                )}
 
                   {/* Card 2: Gastos */}
-                  {visibleWidgets.gastos && (
-                    <div className="bg-white border border-slate-200/90 rounded-2xl p-6 shadow-xs flex flex-col justify-between">
+                  <div className="bg-white border border-slate-200/90 rounded-2xl p-6 shadow-xs flex flex-col justify-between">
                       <div>
-                        <div className="flex items-center justify-between mb-2">
+                        <div className="mb-2">
                           <span className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">GASTOS</span>
-                          <button
-                            onClick={() => setHideConfirmWidget("gastos")}
-                            className="text-xs font-medium text-[#f6821f] hover:text-[#e07216] transition cursor-pointer"
-                          >
-                            Ocultar
-                          </button>
                         </div>
                         <h3 className="text-lg font-medium text-slate-900 leading-snug mb-4">
                           Ve a dónde va tu dinero
@@ -6295,7 +6292,7 @@ export default function AdminDashboard() {
                           </div>
 
                           {/* Dynamic Legend with real categories from database */}
-                          <div className="space-y-2 text-xs text-slate-700 font-medium w-full max-w-xs max-h-52 overflow-y-auto pr-1">
+                          <div className="space-y-2 text-xs text-slate-700 font-medium w-full max-w-md max-h-52 overflow-y-auto pr-1">
                             {expenseSlices.length > 0 ? (
                               expenseSlices.map((slice) => (
                                 <div key={slice.id} className="flex items-center justify-between gap-2">
@@ -6329,24 +6326,11 @@ export default function AdminDashboard() {
                     </div>
 
                   </div>
-                )}
                 </div>
-
-                {!visibleWidgets.pnl && !visibleWidgets.gastos && (
-                  <div className="p-6 rounded-2xl bg-white border border-slate-200 text-center space-y-3">
-                    <p className="text-xs text-slate-500">Has ocultado los widgets del resumen de la empresa.</p>
-                    <button
-                      onClick={() => setVisibleWidgets({ pnl: true, gastos: true })}
-                      className="px-4 py-2 rounded-xl border border-[#f6821f] text-[#f6821f] text-xs font-semibold hover:bg-[#fff7ed] transition cursor-pointer"
-                    >
-                      Personalizar y restaurar widgets
-                    </button>
-                  </div>
-                )}
               </div>
 
               {/* Quick Navigation Panels */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 max-w-6xl">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 w-full">
                 <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs space-y-4">
                   {/* Header */}
                   <div className="flex items-center justify-between">
@@ -7828,69 +7812,81 @@ export default function AdminDashboard() {
 
               {/* KPI Summary Cards */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-xs">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Lotes</span>
-                    <span className="p-2 rounded-xl bg-amber-50 text-amber-600">
+                <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs relative overflow-hidden transition-all hover:shadow-md">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-slate-500">Total Lotes</span>
+                    <div className="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
                       <Package className="w-4 h-4" />
-                    </span>
+                    </div>
                   </div>
-                  <div className="text-3xl font-bold text-slate-900">{allLots.length}</div>
-                  <p className="text-xs text-slate-500 mt-1">Lotes en catálogo activo</p>
+                  <div className="mt-2">
+                    <span className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">{allLots.length}</span>
+                  </div>
+                  <p className="text-[11px] text-slate-400 mt-1">Lotes en catálogo activo</p>
+                  <div className="absolute bottom-0 left-0 right-0 h-1 bg-amber-500" />
                 </div>
 
                 <div
                   onClick={() => setLotesFilter("vencidos")}
-                  className={`p-5 rounded-2xl bg-white border transition cursor-pointer shadow-xs hover:shadow-sm ${
-                    lotesFilter === "vencidos" ? "border-red-500 ring-2 ring-red-200" : "border-slate-200 hover:border-red-300"
+                  className={`bg-white p-5 rounded-2xl border transition-all cursor-pointer shadow-xs hover:shadow-md relative overflow-hidden ${
+                    lotesFilter === "vencidos" ? "border-rose-500 ring-2 ring-rose-200" : "border-slate-200/80 hover:border-rose-300"
                   }`}
                 >
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-semibold text-red-600 uppercase tracking-wider">Lotes Vencidos</span>
-                    <span className="p-2 rounded-xl bg-red-50 text-red-600">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-rose-600">Lotes Vencidos</span>
+                    <div className="w-8 h-8 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center">
                       <AlertCircle className="w-4 h-4" />
+                    </div>
+                  </div>
+                  <div className="mt-2">
+                    <span className="text-2xl sm:text-3xl font-black text-rose-600 tracking-tight">
+                      {allLots.filter((l) => l.status === "vencido").length}
                     </span>
                   </div>
-                  <div className="text-3xl font-bold text-red-600">
-                    {allLots.filter((l) => l.status === "vencido").length}
-                  </div>
-                  <p className="text-xs text-red-500 font-medium mt-1">Acción inmediata requerida</p>
+                  <p className="text-[11px] text-rose-500 font-medium mt-1">Acción inmediata requerida</p>
+                  <div className="absolute bottom-0 left-0 right-0 h-1 bg-rose-500" />
                 </div>
 
                 <div
                   onClick={() => setLotesFilter("por-vencer")}
-                  className={`p-5 rounded-2xl bg-white border transition cursor-pointer shadow-xs hover:shadow-sm ${
-                    lotesFilter === "por-vencer" ? "border-amber-500 ring-2 ring-amber-200" : "border-slate-200 hover:border-amber-300"
+                  className={`bg-white p-5 rounded-2xl border transition-all cursor-pointer shadow-xs hover:shadow-md relative overflow-hidden ${
+                    lotesFilter === "por-vencer" ? "border-amber-500 ring-2 ring-amber-200" : "border-slate-200/80 hover:border-amber-300"
                   }`}
                 >
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-semibold text-amber-700 uppercase tracking-wider">Por Vencer (&lt;30d)</span>
-                    <span className="p-2 rounded-xl bg-amber-50 text-amber-600">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-amber-700">Por Vencer (&lt;30d)</span>
+                    <div className="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
                       <Clock className="w-4 h-4" />
+                    </div>
+                  </div>
+                  <div className="mt-2">
+                    <span className="text-2xl sm:text-3xl font-black text-amber-600 tracking-tight">
+                      {allLots.filter((l) => l.status === "por-vencer").length}
                     </span>
                   </div>
-                  <div className="text-3xl font-bold text-amber-600">
-                    {allLots.filter((l) => l.status === "por-vencer").length}
-                  </div>
-                  <p className="text-xs text-amber-600 font-medium mt-1">Priorizar salida (FEFO)</p>
+                  <p className="text-[11px] text-amber-600 font-medium mt-1">Priorizar salida (FEFO)</p>
+                  <div className="absolute bottom-0 left-0 right-0 h-1 bg-amber-500" />
                 </div>
 
                 <div
                   onClick={() => setLotesFilter("vigentes")}
-                  className={`p-5 rounded-2xl bg-white border transition cursor-pointer shadow-xs hover:shadow-sm ${
-                    lotesFilter === "vigentes" ? "border-emerald-500 ring-2 ring-emerald-200" : "border-slate-200 hover:border-emerald-300"
+                  className={`bg-white p-5 rounded-2xl border transition-all cursor-pointer shadow-xs hover:shadow-md relative overflow-hidden ${
+                    lotesFilter === "vigentes" ? "border-emerald-500 ring-2 ring-emerald-200" : "border-slate-200/80 hover:border-emerald-300"
                   }`}
                 >
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-semibold text-emerald-700 uppercase tracking-wider">Lotes Vigentes</span>
-                    <span className="p-2 rounded-xl bg-emerald-50 text-emerald-600">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-emerald-700">Lotes Vigentes</span>
+                    <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
                       <CheckCircle2 className="w-4 h-4" />
+                    </div>
+                  </div>
+                  <div className="mt-2">
+                    <span className="text-2xl sm:text-3xl font-black text-emerald-600 tracking-tight">
+                      {allLots.filter((l) => l.status === "vigente").length}
                     </span>
                   </div>
-                  <div className="text-3xl font-bold text-emerald-600">
-                    {allLots.filter((l) => l.status === "vigente").length}
-                  </div>
-                  <p className="text-xs text-emerald-600 font-medium mt-1">Con vida útil adecuada</p>
+                  <p className="text-[11px] text-emerald-600 font-medium mt-1">Con vida útil adecuada</p>
+                  <div className="absolute bottom-0 left-0 right-0 h-1 bg-emerald-500" />
                 </div>
               </div>
 
@@ -8094,69 +8090,81 @@ export default function AdminDashboard() {
 
               {/* KPI Summary Cards */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-xs">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Series</span>
-                    <span className="p-2 rounded-xl bg-purple-50 text-purple-600">
+                <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs relative overflow-hidden transition-all hover:shadow-md">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-slate-500">Total Series</span>
+                    <div className="w-8 h-8 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center">
                       <Tag className="w-4 h-4" />
-                    </span>
+                    </div>
                   </div>
-                  <div className="text-3xl font-bold text-slate-900">{allSerials.length}</div>
-                  <p className="text-xs text-slate-500 mt-1">en historial de inventario</p>
+                  <div className="mt-2">
+                    <span className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">{allSerials.length}</span>
+                  </div>
+                  <p className="text-[11px] text-slate-400 mt-1">en historial de inventario</p>
+                  <div className="absolute bottom-0 left-0 right-0 h-1 bg-purple-600" />
                 </div>
 
                 <div
                   onClick={() => setSeriesFilterView("DISPONIBLE")}
-                  className={`p-5 rounded-2xl bg-white border transition cursor-pointer shadow-xs hover:shadow-sm ${
-                    seriesFilterView === "DISPONIBLE" ? "border-emerald-500 ring-2 ring-emerald-200" : "border-slate-200 hover:border-emerald-300"
+                  className={`bg-white p-5 rounded-2xl border transition-all cursor-pointer shadow-xs hover:shadow-md relative overflow-hidden ${
+                    seriesFilterView === "DISPONIBLE" ? "border-emerald-500 ring-2 ring-emerald-200" : "border-slate-200/80 hover:border-emerald-300"
                   }`}
                 >
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-semibold text-emerald-700 uppercase tracking-wider">Disponibles</span>
-                    <span className="p-2 rounded-xl bg-emerald-50 text-emerald-600">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-emerald-700">Disponibles</span>
+                    <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
                       <CheckCircle2 className="w-4 h-4" />
+                    </div>
+                  </div>
+                  <div className="mt-2">
+                    <span className="text-2xl sm:text-3xl font-black text-emerald-600 tracking-tight">
+                      {allSerials.filter((s) => s.serial.status === "DISPONIBLE").length}
                     </span>
                   </div>
-                  <div className="text-3xl font-bold text-emerald-600">
-                    {allSerials.filter((s) => s.serial.status === "DISPONIBLE").length}
-                  </div>
-                  <p className="text-xs text-emerald-600 font-medium mt-1">Listas para venta/despacho</p>
+                  <p className="text-[11px] text-emerald-600 font-medium mt-1">Listas para venta/despacho</p>
+                  <div className="absolute bottom-0 left-0 right-0 h-1 bg-emerald-500" />
                 </div>
 
                 <div
                   onClick={() => setSeriesFilterView("VENDIDO")}
-                  className={`p-5 rounded-2xl bg-white border transition cursor-pointer shadow-xs hover:shadow-sm ${
-                    seriesFilterView === "VENDIDO" ? "border-blue-500 ring-2 ring-blue-200" : "border-slate-200 hover:border-blue-300"
+                  className={`bg-white p-5 rounded-2xl border transition-all cursor-pointer shadow-xs hover:shadow-md relative overflow-hidden ${
+                    seriesFilterView === "VENDIDO" ? "border-blue-500 ring-2 ring-blue-200" : "border-slate-200/80 hover:border-blue-300"
                   }`}
                 >
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-semibold text-blue-700 uppercase tracking-wider">Vendidas</span>
-                    <span className="p-2 rounded-xl bg-blue-50 text-blue-600">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-blue-700">Vendidas</span>
+                    <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
                       <Tag className="w-4 h-4" />
+                    </div>
+                  </div>
+                  <div className="mt-2">
+                    <span className="text-2xl sm:text-3xl font-black text-blue-600 tracking-tight">
+                      {allSerials.filter((s) => s.serial.status === "VENDIDO").length}
                     </span>
                   </div>
-                  <div className="text-3xl font-bold text-blue-600">
-                    {allSerials.filter((s) => s.serial.status === "VENDIDO").length}
-                  </div>
-                  <p className="text-xs text-blue-600 font-medium mt-1">En garantía activa</p>
+                  <p className="text-[11px] text-blue-600 font-medium mt-1">En garantía activa</p>
+                  <div className="absolute bottom-0 left-0 right-0 h-1 bg-blue-500" />
                 </div>
 
                 <div
                   onClick={() => setSeriesFilterView("DEFECTUOSO")}
-                  className={`p-5 rounded-2xl bg-white border transition cursor-pointer shadow-xs hover:shadow-sm ${
-                    seriesFilterView === "DEFECTUOSO" ? "border-red-500 ring-2 ring-red-200" : "border-slate-200 hover:border-red-300"
+                  className={`bg-white p-5 rounded-2xl border transition-all cursor-pointer shadow-xs hover:shadow-md relative overflow-hidden ${
+                    seriesFilterView === "DEFECTUOSO" ? "border-rose-500 ring-2 ring-rose-200" : "border-slate-200/80 hover:border-rose-300"
                   }`}
                 >
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-semibold text-red-600 uppercase tracking-wider">Defectuosas</span>
-                    <span className="p-2 rounded-xl bg-red-50 text-red-600">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-rose-600">Defectuosas</span>
+                    <div className="w-8 h-8 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center">
                       <AlertCircle className="w-4 h-4" />
+                    </div>
+                  </div>
+                  <div className="mt-2">
+                    <span className="text-2xl sm:text-3xl font-black text-rose-600 tracking-tight">
+                      {allSerials.filter((s) => s.serial.status === "DEFECTUOSO").length}
                     </span>
                   </div>
-                  <div className="text-3xl font-bold text-red-600">
-                    {allSerials.filter((s) => s.serial.status === "DEFECTUOSO").length}
-                  </div>
-                  <p className="text-xs text-red-500 font-medium mt-1">Aisladas de despacho</p>
+                  <p className="text-[11px] text-rose-500 font-medium mt-1">Aisladas de despacho</p>
+                  <div className="absolute bottom-0 left-0 right-0 h-1 bg-rose-500" />
                 </div>
               </div>
 
@@ -8330,74 +8338,86 @@ export default function AdminDashboard() {
 
               {/* KPI Summary Cards (Matching Dashboard Typography text-3xl font-bold) */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-xs">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Notas</span>
-                    <span className="p-2 rounded-xl bg-slate-100 text-slate-700">
+                <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs relative overflow-hidden transition-all hover:shadow-md">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-slate-500">Total Notas</span>
+                    <div className="w-8 h-8 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center">
                       <FileText className="w-4 h-4" />
-                    </span>
+                    </div>
                   </div>
-                  <div className="text-3xl font-bold text-slate-900">{creditDebitNotes.length}</div>
-                  <p className="text-xs text-slate-500 mt-1">documentos registrados</p>
+                  <div className="mt-2">
+                    <span className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">{creditDebitNotes.length}</span>
+                  </div>
+                  <p className="text-[11px] text-slate-400 mt-1">documentos registrados</p>
+                  <div className="absolute bottom-0 left-0 right-0 h-1 bg-slate-400" />
                 </div>
 
                 <div
                   onClick={() => setNotasFilter("CREDITO")}
-                  className={`p-5 rounded-2xl bg-white border transition cursor-pointer shadow-xs hover:shadow-sm ${
-                    notasFilter === "CREDITO" ? "border-emerald-500 ring-2 ring-emerald-200" : "border-slate-200 hover:border-emerald-300"
+                  className={`bg-white p-5 rounded-2xl border transition-all cursor-pointer shadow-xs hover:shadow-md relative overflow-hidden ${
+                    notasFilter === "CREDITO" ? "border-emerald-500 ring-2 ring-emerald-200" : "border-slate-200/80 hover:border-emerald-300"
                   }`}
                 >
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-semibold text-emerald-700 uppercase tracking-wider">Notas de Crédito</span>
-                    <span className="p-2 rounded-xl bg-emerald-50 text-emerald-600">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-emerald-700">Notas de Crédito</span>
+                    <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
                       <CheckCircle2 className="w-4 h-4" />
+                    </div>
+                  </div>
+                  <div className="mt-2">
+                    <span className="text-2xl sm:text-3xl font-black text-emerald-600 tracking-tight">
+                      ${creditDebitNotes
+                        .filter((n) => n.type === "CREDIT" && n.status === "APLICADA")
+                        .reduce((acc, n) => acc + n.total, 0)
+                        .toLocaleString("es-HN", { minimumFractionDigits: 2 })}
                     </span>
                   </div>
-                  <div className="text-3xl font-bold text-emerald-600">
-                    ${creditDebitNotes
-                      .filter((n) => n.type === "CREDIT" && n.status === "APLICADA")
-                      .reduce((acc, n) => acc + n.total, 0)
-                      .toLocaleString("es-HN", { minimumFractionDigits: 2 })}
-                  </div>
-                  <p className="text-xs text-emerald-600 font-medium mt-1">
+                  <p className="text-[11px] text-emerald-600 font-medium mt-1">
                     {creditDebitNotes.filter((n) => n.type === "CREDIT").length} créditos aplicados
                   </p>
+                  <div className="absolute bottom-0 left-0 right-0 h-1 bg-emerald-500" />
                 </div>
 
                 <div
                   onClick={() => setNotasFilter("DEBITO")}
-                  className={`p-5 rounded-2xl bg-white border transition cursor-pointer shadow-xs hover:shadow-sm ${
-                    notasFilter === "DEBITO" ? "border-blue-500 ring-2 ring-blue-200" : "border-slate-200 hover:border-blue-300"
+                  className={`bg-white p-5 rounded-2xl border transition-all cursor-pointer shadow-xs hover:shadow-md relative overflow-hidden ${
+                    notasFilter === "DEBITO" ? "border-blue-500 ring-2 ring-blue-200" : "border-slate-200/80 hover:border-blue-300"
                   }`}
                 >
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-semibold text-blue-700 uppercase tracking-wider">Notas de Débito</span>
-                    <span className="p-2 rounded-xl bg-blue-50 text-blue-600">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-blue-700">Notas de Débito</span>
+                    <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
                       <FileText className="w-4 h-4" />
+                    </div>
+                  </div>
+                  <div className="mt-2">
+                    <span className="text-2xl sm:text-3xl font-black text-blue-600 tracking-tight">
+                      ${creditDebitNotes
+                        .filter((n) => n.type === "DEBIT" && n.status === "APLICADA")
+                        .reduce((acc, n) => acc + n.total, 0)
+                        .toLocaleString("es-HN", { minimumFractionDigits: 2 })}
                     </span>
                   </div>
-                  <div className="text-3xl font-bold text-blue-600">
-                    ${creditDebitNotes
-                      .filter((n) => n.type === "DEBIT" && n.status === "APLICADA")
-                      .reduce((acc, n) => acc + n.total, 0)
-                      .toLocaleString("es-HN", { minimumFractionDigits: 2 })}
-                  </div>
-                  <p className="text-xs text-blue-600 font-medium mt-1">
+                  <p className="text-[11px] text-blue-600 font-medium mt-1">
                     {creditDebitNotes.filter((n) => n.type === "DEBIT").length} débitos aplicados
                   </p>
+                  <div className="absolute bottom-0 left-0 right-0 h-1 bg-blue-500" />
                 </div>
 
-                <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-xs">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-semibold text-[#f6821f] uppercase tracking-wider">Facturas Afectadas</span>
-                    <span className="p-2 rounded-xl bg-[#fff7ed] text-[#f6821f]">
+                <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs relative overflow-hidden transition-all hover:shadow-md">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-[#f6821f]">Facturas Afectadas</span>
+                    <div className="w-8 h-8 rounded-xl bg-orange-50 text-[#f6821f] flex items-center justify-center">
                       <FileText className="w-4 h-4" />
+                    </div>
+                  </div>
+                  <div className="mt-2">
+                    <span className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+                      {new Set(creditDebitNotes.map((n) => n.targetDocNum).filter(Boolean)).size}
                     </span>
                   </div>
-                  <div className="text-3xl font-bold text-slate-900">
-                    {new Set(creditDebitNotes.map((n) => n.targetDocNum).filter(Boolean)).size}
-                  </div>
-                  <p className="text-xs text-slate-500 mt-1">documentos de origen</p>
+                  <p className="text-[11px] text-slate-400 mt-1">documentos de origen</p>
+                  <div className="absolute bottom-0 left-0 right-0 h-1 bg-[#f6821f]" />
                 </div>
               </div>
 
@@ -8618,65 +8638,69 @@ export default function AdminDashboard() {
 
               {/* KPI Summary Cards */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-xs flex items-center justify-between">
-                  <div>
-                    <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider block mb-1">
-                      Fuerza de Ventas Total
-                    </span>
-                    <span className="text-3xl font-bold text-slate-900">{salesReps.length}</span>
-                    <span className="text-[11px] text-slate-500 block mt-1">Ejecutivos comerciales</span>
+                <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs relative overflow-hidden transition-all hover:shadow-md">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-slate-500">Fuerza de Ventas Total</span>
+                    <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                      <Users className="w-4 h-4" />
+                    </div>
                   </div>
-                  <div className="p-3 rounded-xl bg-blue-50 text-blue-600">
-                    <Users className="w-6 h-6" />
+                  <div className="mt-2">
+                    <span className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">{salesReps.length}</span>
                   </div>
+                  <p className="text-[11px] text-slate-400 mt-1">Ejecutivos comerciales</p>
+                  <div className="absolute bottom-0 left-0 right-0 h-1 bg-blue-500" />
                 </div>
 
-                <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-xs flex items-center justify-between">
-                  <div>
-                    <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider block mb-1">
-                      Meta General Mensual
-                    </span>
-                    <span className="text-3xl font-bold text-slate-900">
+                <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs relative overflow-hidden transition-all hover:shadow-md">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-slate-500">Meta General Mensual</span>
+                    <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                      <CheckCircle2 className="w-4 h-4" />
+                    </div>
+                  </div>
+                  <div className="mt-2">
+                    <span className="text-2xl sm:text-3xl font-black text-emerald-600 tracking-tight">
                       ${salesReps.reduce((acc, r) => acc + (r.monthlyTarget || 0), 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}
                     </span>
-                    <span className="text-[11px] text-slate-500 block mt-1">USD acumulado objetivo</span>
                   </div>
-                  <div className="p-3 rounded-xl bg-emerald-50 text-emerald-600">
-                    <CheckCircle2 className="w-6 h-6" />
-                  </div>
+                  <p className="text-[11px] text-slate-400 mt-1">USD acumulado objetivo</p>
+                  <div className="absolute bottom-0 left-0 right-0 h-1 bg-emerald-500" />
                 </div>
 
-                <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-xs flex items-center justify-between">
-                  <div>
-                    <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider block mb-1">
-                      Tasa Base Promedio
-                    </span>
-                    <span className="text-3xl font-bold text-slate-900">
+                <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs relative overflow-hidden transition-all hover:shadow-md">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-slate-500">Tasa Base Promedio</span>
+                    <div className="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
+                      <Clock className="w-4 h-4" />
+                    </div>
+                  </div>
+                  <div className="mt-2">
+                    <span className="text-2xl sm:text-3xl font-black text-amber-600 tracking-tight">
                       {(
                         salesReps.reduce((acc, r) => acc + (r.commissionRate || 0), 0) /
                         (salesReps.length || 1)
                       ).toFixed(1)}%
                     </span>
-                    <span className="text-[11px] text-slate-500 block mt-1">% comisión sobre factura</span>
                   </div>
-                  <div className="p-3 rounded-xl bg-amber-50 text-amber-600">
-                    <Clock className="w-6 h-6" />
-                  </div>
+                  <p className="text-[11px] text-slate-400 mt-1">% comisión sobre factura</p>
+                  <div className="absolute bottom-0 left-0 right-0 h-1 bg-amber-500" />
                 </div>
 
-                <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-xs flex items-center justify-between">
-                  <div>
-                    <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider block mb-1">
-                      Comisiones del Mes
-                    </span>
-                    <span className="text-3xl font-bold text-[#f6821f]">
+                <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs relative overflow-hidden transition-all hover:shadow-md">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-[#f6821f]">Comisiones del Mes</span>
+                    <div className="w-8 h-8 rounded-xl bg-orange-50 text-[#f6821f] flex items-center justify-center">
+                      <FileText className="w-4 h-4" />
+                    </div>
+                  </div>
+                  <div className="mt-2">
+                    <span className="text-2xl sm:text-3xl font-black text-[#f6821f] tracking-tight">
                       ${commissionRecords.reduce((acc, c) => acc + (c.commissionAmount || 0), 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}
                     </span>
-                    <span className="text-[11px] text-slate-500 block mt-1">USD liquidados y por liquidar</span>
                   </div>
-                  <div className="p-3 rounded-xl bg-orange-50 text-[#f6821f]">
-                    <FileText className="w-6 h-6" />
-                  </div>
+                  <p className="text-[11px] text-slate-400 mt-1">USD liquidados y por liquidar</p>
+                  <div className="absolute bottom-0 left-0 right-0 h-1 bg-[#f6821f]" />
                 </div>
               </div>
 
@@ -8858,64 +8882,68 @@ export default function AdminDashboard() {
 
               {/* KPI Summary Cards */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-xs flex items-center justify-between">
-                  <div>
-                    <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider block mb-1">
-                      Total Comisiones
-                    </span>
-                    <span className="text-3xl font-bold text-slate-900">
+                <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs relative overflow-hidden transition-all hover:shadow-md">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-slate-500">Total Comisiones</span>
+                    <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                      <FileText className="w-4 h-4" />
+                    </div>
+                  </div>
+                  <div className="mt-2">
+                    <span className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
                       ${commissionRecords.reduce((acc, c) => acc + (c.commissionAmount || 0), 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}
                     </span>
-                    <span className="text-[11px] text-slate-500 block mt-1">USD acumulados</span>
                   </div>
-                  <div className="p-3 rounded-xl bg-blue-50 text-blue-600">
-                    <FileText className="w-6 h-6" />
-                  </div>
+                  <p className="text-[11px] text-slate-400 mt-1">USD acumulados</p>
+                  <div className="absolute bottom-0 left-0 right-0 h-1 bg-blue-500" />
                 </div>
 
-                <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-xs flex items-center justify-between">
-                  <div>
-                    <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider block mb-1">
-                      Por Aprobar / Liquidar
-                    </span>
-                    <span className="text-3xl font-bold text-amber-600">
+                <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs relative overflow-hidden transition-all hover:shadow-md">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-amber-700">Por Aprobar / Liquidar</span>
+                    <div className="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
+                      <Clock className="w-4 h-4" />
+                    </div>
+                  </div>
+                  <div className="mt-2">
+                    <span className="text-2xl sm:text-3xl font-black text-amber-600 tracking-tight">
                       ${commissionRecords.filter((c) => c.status === "PENDIENTE").reduce((acc, c) => acc + (c.commissionAmount || 0), 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}
                     </span>
-                    <span className="text-[11px] text-slate-500 block mt-1">USD pendientes de pago</span>
                   </div>
-                  <div className="p-3 rounded-xl bg-amber-50 text-amber-600">
-                    <Clock className="w-6 h-6" />
-                  </div>
+                  <p className="text-[11px] text-amber-600 font-medium mt-1">USD pendientes de pago</p>
+                  <div className="absolute bottom-0 left-0 right-0 h-1 bg-amber-500" />
                 </div>
 
-                <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-xs flex items-center justify-between">
-                  <div>
-                    <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider block mb-1">
-                      Comisiones Aprobadas
-                    </span>
-                    <span className="text-3xl font-bold text-blue-600">
+                <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs relative overflow-hidden transition-all hover:shadow-md">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-blue-700">Comisiones Aprobadas</span>
+                    <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                      <CheckCircle2 className="w-4 h-4" />
+                    </div>
+                  </div>
+                  <div className="mt-2">
+                    <span className="text-2xl sm:text-3xl font-black text-blue-600 tracking-tight">
                       ${commissionRecords.filter((c) => c.status === "APROBADO").reduce((acc, c) => acc + (c.commissionAmount || 0), 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}
                     </span>
-                    <span className="text-[11px] text-slate-500 block mt-1">USD listos para pago</span>
                   </div>
-                  <div className="p-3 rounded-xl bg-blue-50 text-blue-600">
-                    <CheckCircle2 className="w-6 h-6" />
-                  </div>
+                  <p className="text-[11px] text-blue-600 font-medium mt-1">USD listos para pago</p>
+                  <div className="absolute bottom-0 left-0 right-0 h-1 bg-blue-500" />
                 </div>
 
-                <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-xs flex items-center justify-between">
-                  <div>
-                    <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider block mb-1">
-                      Comisiones Liquidadas
-                    </span>
-                    <span className="text-3xl font-bold text-emerald-600">
+                <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs relative overflow-hidden transition-all hover:shadow-md">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-emerald-700">Comisiones Liquidadas</span>
+                    <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                      <CheckCircle2 className="w-4 h-4" />
+                    </div>
+                  </div>
+                  <div className="mt-2">
+                    <span className="text-2xl sm:text-3xl font-black text-emerald-600 tracking-tight">
                       ${commissionRecords.filter((c) => c.status === "PAGADO").reduce((acc, c) => acc + (c.commissionAmount || 0), 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}
                     </span>
-                    <span className="text-[11px] text-slate-500 block mt-1">USD pagados a ejecutivos</span>
                   </div>
-                  <div className="p-3 rounded-xl bg-emerald-50 text-emerald-600">
-                    <CheckCircle2 className="w-6 h-6" />
-                  </div>
+                  <p className="text-[11px] text-emerald-600 font-medium mt-1">USD pagados a ejecutivos</p>
+                  <div className="absolute bottom-0 left-0 right-0 h-1 bg-emerald-500" />
                 </div>
               </div>
 
@@ -9267,6 +9295,40 @@ export default function AdminDashboard() {
                 setCurrentView("factura-compra-lista");
               }}
               formatCurrency={formatCurrency}
+            />
+          )}
+
+          {/* ================= VIEW: RETENCIONES FISCALES ISV / SAR ================= */}
+          {currentView === "retenciones-isv" && (
+            <TaxRetentionsModule
+              onBack={() => setCurrentView("proveedores")}
+              formatCurrency={formatCurrency}
+              companySettings={companySettings}
+              vendorsList={vendors.map((v) => ({
+                id: v.id,
+                name: v.name,
+                macolaCode: v.macolaCode,
+                email: v.email,
+                phone: v.phone,
+                address: v.address,
+                currency: v.currency,
+              }))}
+              purchaseInvoicesList={purchaseInvoices.map((inv) => ({
+                id: inv.id,
+                invoiceNumber: inv.invoiceNumber,
+                vendorId: inv.vendorId,
+                vendorName: inv.vendorName,
+                subtotal: inv.subtotal,
+                tax: inv.tax,
+                total: inv.total,
+                issueDate: inv.issueDate,
+                paymentStatus: inv.paymentStatus,
+                currency: inv.currency,
+              }))}
+              onNavigateToBill={(invNum) => {
+                setPurchaseInvoicesSearch(invNum);
+                setCurrentView("factura-compra-lista");
+              }}
             />
           )}
 
@@ -13436,59 +13498,77 @@ export default function AdminDashboard() {
               {/* Stats Grid (Matching Dashboard Metric Cards) */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 {/* Total Facturado */}
-                <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-xs">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Facturado</span>
-                    <span className="p-2 rounded-xl bg-blue-50 text-blue-600">
+                <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs relative overflow-hidden transition-all hover:shadow-md">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-slate-500">Total Facturado</span>
+                    <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
+                    </div>
+                  </div>
+                  <div className="mt-2">
+                    <span className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+                      ${totalFacturado.toLocaleString("es-HN", { minimumFractionDigits: 2 })}
                     </span>
                   </div>
-                  <div className="text-3xl font-bold text-slate-900">${totalFacturado.toLocaleString("es-HN", { minimumFractionDigits: 2 })}</div>
-                  <p className="text-xs text-slate-500 mt-1">USD en facturación comercial</p>
+                  <p className="text-[11px] text-slate-400 mt-1">USD en facturación comercial</p>
+                  <div className="absolute bottom-0 left-0 right-0 h-1 bg-blue-500" />
                 </div>
 
                 {/* Facturas Cobradas */}
-                <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-xs">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Facturas Cobradas</span>
-                    <span className="p-2 rounded-xl bg-emerald-50 text-emerald-600">
+                <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs relative overflow-hidden transition-all hover:shadow-md">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-emerald-700">Facturas Cobradas</span>
+                    <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
+                    </div>
+                  </div>
+                  <div className="mt-2">
+                    <span className="text-2xl sm:text-3xl font-black text-emerald-600 tracking-tight">
+                      ${totalCobradas.toLocaleString("es-HN", { minimumFractionDigits: 2 })}
                     </span>
                   </div>
-                  <div className="text-3xl font-bold text-emerald-600">${totalCobradas.toLocaleString("es-HN", { minimumFractionDigits: 2 })}</div>
-                  <p className="text-xs text-slate-500 mt-1">{facturasCobradas.length} facturas pagadas</p>
+                  <p className="text-[11px] text-emerald-600 font-medium mt-1">{facturasCobradas.length} facturas pagadas</p>
+                  <div className="absolute bottom-0 left-0 right-0 h-1 bg-emerald-500" />
                 </div>
 
                 {/* Pendiente de Cobro */}
-                <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-xs">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Pendiente de Cobro</span>
-                    <span className="p-2 rounded-xl bg-[#fff7ed] text-[#f6821f]">
+                <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs relative overflow-hidden transition-all hover:shadow-md">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-[#f6821f]">Pendiente de Cobro</span>
+                    <div className="w-8 h-8 rounded-xl bg-orange-50 text-[#f6821f] flex items-center justify-center">
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
+                    </div>
+                  </div>
+                  <div className="mt-2">
+                    <span className="text-2xl sm:text-3xl font-black text-[#f6821f] tracking-tight">
+                      ${totalPendientes.toLocaleString("es-HN", { minimumFractionDigits: 2 })}
                     </span>
                   </div>
-                  <div className="text-3xl font-bold text-[#f6821f]">${totalPendientes.toLocaleString("es-HN", { minimumFractionDigits: 2 })}</div>
-                  <p className="text-xs text-slate-500 mt-1">{facturasPendientes.length} factura pendiente</p>
+                  <p className="text-[11px] text-slate-400 mt-1">{facturasPendientes.length} factura pendiente</p>
+                  <div className="absolute bottom-0 left-0 right-0 h-1 bg-[#f6821f]" />
                 </div>
 
                 {/* Total Facturas */}
-                <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-xs">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Facturas</span>
-                    <span className="p-2 rounded-xl bg-purple-50 text-purple-600">
+                <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs relative overflow-hidden transition-all hover:shadow-md">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-slate-500">Total Facturas</span>
+                    <div className="w-8 h-8 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center">
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                       </svg>
-                    </span>
+                    </div>
                   </div>
-                  <div className="text-3xl font-bold text-slate-900">{invoicesList.length}</div>
-                  <p className="text-xs text-slate-500 mt-1">Emitidas este mes</p>
+                  <div className="mt-2">
+                    <span className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">{invoicesList.length}</span>
+                  </div>
+                  <p className="text-[11px] text-slate-400 mt-1">Emitidas este mes</p>
+                  <div className="absolute bottom-0 left-0 right-0 h-1 bg-purple-600" />
                 </div>
               </div>
 
@@ -13626,59 +13706,77 @@ export default function AdminDashboard() {
               {/* Stats Grid (Matching Dashboard Metric Cards) */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 {/* Monto Total en Órdenes */}
-                <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-xs">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Monto Total Órdenes</span>
-                    <span className="p-2 rounded-xl bg-blue-50 text-blue-600">
+                <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs relative overflow-hidden transition-all hover:shadow-md">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-slate-500">Monto Total Órdenes</span>
+                    <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
                       </svg>
+                    </div>
+                  </div>
+                  <div className="mt-2">
+                    <span className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+                      ${totalPO.toLocaleString("es-HN", { minimumFractionDigits: 2 })}
                     </span>
                   </div>
-                  <div className="text-3xl font-bold text-slate-900">${totalPO.toLocaleString("es-HN", { minimumFractionDigits: 2 })}</div>
-                  <p className="text-xs text-slate-500 mt-1">USD contratados</p>
+                  <p className="text-[11px] text-slate-400 mt-1">USD contratados</p>
+                  <div className="absolute bottom-0 left-0 right-0 h-1 bg-blue-500" />
                 </div>
 
                 {/* Órdenes Recibidas */}
-                <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-xs">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Órdenes Recibidas</span>
-                    <span className="p-2 rounded-xl bg-emerald-50 text-emerald-600">
+                <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs relative overflow-hidden transition-all hover:shadow-md">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-emerald-700">Órdenes Recibidas</span>
+                    <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
                       </svg>
+                    </div>
+                  </div>
+                  <div className="mt-2">
+                    <span className="text-2xl sm:text-3xl font-black text-emerald-600 tracking-tight">
+                      ${totalPORecibidas.toLocaleString("es-HN", { minimumFractionDigits: 2 })}
                     </span>
                   </div>
-                  <div className="text-3xl font-bold text-emerald-600">${totalPORecibidas.toLocaleString("es-HN", { minimumFractionDigits: 2 })}</div>
-                  <p className="text-xs text-slate-500 mt-1">{poRecibidas.length} orden en almacén</p>
+                  <p className="text-[11px] text-emerald-600 font-medium mt-1">{poRecibidas.length} orden en almacén</p>
+                  <div className="absolute bottom-0 left-0 right-0 h-1 bg-emerald-500" />
                 </div>
 
                 {/* Pendiente de Recibir */}
-                <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-xs">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Pendiente de Recibir</span>
-                    <span className="p-2 rounded-xl bg-[#fff7ed] text-[#f6821f]">
+                <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs relative overflow-hidden transition-all hover:shadow-md">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-[#f6821f]">Pendiente de Recibir</span>
+                    <div className="w-8 h-8 rounded-xl bg-orange-50 text-[#f6821f] flex items-center justify-center">
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
+                    </div>
+                  </div>
+                  <div className="mt-2">
+                    <span className="text-2xl sm:text-3xl font-black text-[#f6821f] tracking-tight">
+                      ${totalPOPendientes.toLocaleString("es-HN", { minimumFractionDigits: 2 })}
                     </span>
                   </div>
-                  <div className="text-3xl font-bold text-[#f6821f]">${totalPOPendientes.toLocaleString("es-HN", { minimumFractionDigits: 2 })}</div>
-                  <p className="text-xs text-slate-500 mt-1">{poPendientes.length} órdenes en tránsito</p>
+                  <p className="text-[11px] text-slate-400 mt-1">{poPendientes.length} órdenes en tránsito</p>
+                  <div className="absolute bottom-0 left-0 right-0 h-1 bg-[#f6821f]" />
                 </div>
 
                 {/* Órdenes Registradas */}
-                <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-xs">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Órdenes Registradas</span>
-                    <span className="p-2 rounded-xl bg-purple-50 text-purple-600">
+                <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs relative overflow-hidden transition-all hover:shadow-md">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-slate-500">Órdenes Registradas</span>
+                    <div className="w-8 h-8 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center">
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                       </svg>
-                    </span>
+                    </div>
                   </div>
-                  <div className="text-3xl font-bold text-slate-900">{purchaseOrders.length}</div>
-                  <p className="text-xs text-slate-500 mt-1">Órdenes activas</p>
+                  <div className="mt-2">
+                    <span className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">{purchaseOrders.length}</span>
+                  </div>
+                  <p className="text-[11px] text-slate-400 mt-1">Órdenes activas</p>
+                  <div className="absolute bottom-0 left-0 right-0 h-1 bg-purple-600" />
                 </div>
               </div>
 
@@ -13824,56 +13922,68 @@ export default function AdminDashboard() {
 
               {/* Stats Grid */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-xs">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Facturado</span>
-                    <span className="p-2 rounded-xl bg-blue-50 text-blue-600">
+                <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs relative overflow-hidden transition-all hover:shadow-md">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-slate-500">Total Facturado</span>
+                    <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
                       <FileText className="w-4 h-4" />
+                    </div>
+                  </div>
+                  <div className="mt-2">
+                    <span className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+                      ${purchaseInvoices.reduce((acc, inv) => acc + (inv.total || 0), 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}
                     </span>
                   </div>
-                  <div className="text-3xl font-bold text-slate-900">
-                    ${purchaseInvoices.reduce((acc, inv) => acc + (inv.total || 0), 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}
-                  </div>
-                  <div className="text-[11px] text-slate-500 mt-1">Monto bruto acumulado USD</div>
+                  <p className="text-[11px] text-slate-400 mt-1">Monto bruto acumulado USD</p>
+                  <div className="absolute bottom-0 left-0 right-0 h-1 bg-blue-500" />
                 </div>
 
-                <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-xs">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Cuentas por Pagar</span>
-                    <span className="p-2 rounded-xl bg-amber-50 text-amber-600">
+                <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs relative overflow-hidden transition-all hover:shadow-md">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-amber-700">Cuentas por Pagar</span>
+                    <div className="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
                       <Clock className="w-4 h-4" />
+                    </div>
+                  </div>
+                  <div className="mt-2">
+                    <span className="text-2xl sm:text-3xl font-black text-amber-600 tracking-tight">
+                      ${purchaseInvoices.filter((inv) => inv.paymentStatus === "PENDIENTE").reduce((acc, inv) => acc + (inv.total || 0), 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}
                     </span>
                   </div>
-                  <div className="text-3xl font-bold text-amber-600">
-                    ${purchaseInvoices.filter((inv) => inv.paymentStatus === "PENDIENTE").reduce((acc, inv) => acc + (inv.total || 0), 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}
-                  </div>
-                  <div className="text-[11px] text-slate-500 mt-1">Pendiente de pago a proveedores</div>
+                  <p className="text-[11px] text-amber-600 font-medium mt-1">Pendiente de pago a proveedores</p>
+                  <div className="absolute bottom-0 left-0 right-0 h-1 bg-amber-500" />
                 </div>
 
-                <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-xs">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Facturas Pagadas</span>
-                    <span className="p-2 rounded-xl bg-emerald-50 text-emerald-600">
+                <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs relative overflow-hidden transition-all hover:shadow-md">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-emerald-700">Facturas Pagadas</span>
+                    <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
                       <CheckCircle2 className="w-4 h-4" />
+                    </div>
+                  </div>
+                  <div className="mt-2">
+                    <span className="text-2xl sm:text-3xl font-black text-emerald-600 tracking-tight">
+                      ${purchaseInvoices.filter((inv) => inv.paymentStatus === "PAGADA").reduce((acc, inv) => acc + (inv.total || 0), 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}
                     </span>
                   </div>
-                  <div className="text-3xl font-bold text-emerald-600">
-                    ${purchaseInvoices.filter((inv) => inv.paymentStatus === "PAGADA").reduce((acc, inv) => acc + (inv.total || 0), 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}
-                  </div>
-                  <div className="text-[11px] text-slate-500 mt-1">Total abonado / liquidado</div>
+                  <p className="text-[11px] text-emerald-600 font-medium mt-1">Total abonado / liquidado</p>
+                  <div className="absolute bottom-0 left-0 right-0 h-1 bg-emerald-500" />
                 </div>
 
-                <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-xs">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Entradas a Inventario</span>
-                    <span className="p-2 rounded-xl bg-purple-50 text-purple-600">
+                <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs relative overflow-hidden transition-all hover:shadow-md">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-slate-500">Entradas a Inventario</span>
+                    <div className="w-8 h-8 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center">
                       <Package className="w-4 h-4" />
+                    </div>
+                  </div>
+                  <div className="mt-2">
+                    <span className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+                      {purchaseInvoices.filter((inv) => inv.inventoryStatus === "INGRESADO").length}
                     </span>
                   </div>
-                  <div className="text-3xl font-bold text-slate-900">
-                    {purchaseInvoices.filter((inv) => inv.inventoryStatus === "INGRESADO").length}
-                  </div>
-                  <div className="text-[11px] text-slate-500 mt-1">Comprobantes procesados</div>
+                  <p className="text-[11px] text-slate-400 mt-1">Comprobantes procesados</p>
+                  <div className="absolute bottom-0 left-0 right-0 h-1 bg-purple-600" />
                 </div>
               </div>
 
@@ -14060,7 +14170,7 @@ export default function AdminDashboard() {
 
               {/* Summary Metric Cards */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs">
+                <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs relative overflow-hidden transition-all hover:shadow-md">
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-medium text-slate-500">Monto Total Devoluciones</span>
                     <div className="w-8 h-8 rounded-xl bg-orange-50 text-[#f6821f] flex items-center justify-center">
@@ -14069,52 +14179,64 @@ export default function AdminDashboard() {
                       </svg>
                     </div>
                   </div>
-                  <div className="text-xl font-bold text-slate-900 mt-2">
-                    ${vendorReturns
-                      .filter((r) => r.status !== "ANULADA")
-                      .reduce((acc, r) => acc + (r.total || 0), 0)
-                      .toLocaleString("en-US", { minimumFractionDigits: 2 })}
-                  </div>
-                  <div className="text-[11px] text-slate-400 mt-0.5">USD en crédito/reembolso</div>
-                </div>
-
-                <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-medium text-slate-500">Borradores Pendientes</span>
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800">
-                      Acción requerida
+                  <div className="mt-2">
+                    <span className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+                      ${vendorReturns
+                        .filter((r) => r.status !== "ANULADA")
+                        .reduce((acc, r) => acc + (r.total || 0), 0)
+                        .toLocaleString("en-US", { minimumFractionDigits: 2 })}
                     </span>
                   </div>
-                  <div className="text-xl font-bold text-amber-900 mt-2">
-                    {vendorReturns.filter((r) => r.status === "BORRADOR").length}
-                  </div>
-                  <div className="text-[11px] text-slate-400 mt-0.5">Sin aprobar ni despachar</div>
+                  <p className="text-[11px] text-slate-400 mt-1">USD en crédito/reembolso</p>
+                  <div className="absolute bottom-0 left-0 right-0 h-1 bg-[#f6821f]" />
                 </div>
 
-                <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs">
+                <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs relative overflow-hidden transition-all hover:shadow-md">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-medium text-slate-500">Aprobadas / En Tránsito</span>
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800">
-                      En curso
+                    <span className="text-xs font-medium text-amber-700">Borradores Pendientes</span>
+                    <div className="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
+                      <Clock className="w-4 h-4" />
+                    </div>
+                  </div>
+                  <div className="mt-2">
+                    <span className="text-2xl sm:text-3xl font-black text-amber-600 tracking-tight">
+                      {vendorReturns.filter((r) => r.status === "BORRADOR").length}
                     </span>
                   </div>
-                  <div className="text-xl font-bold text-blue-900 mt-2">
-                    {vendorReturns.filter((r) => r.status === "APROBADA" || r.status === "ENVIADA").length}
-                  </div>
-                  <div className="text-[11px] text-slate-400 mt-0.5">Esperando confirmación prov.</div>
+                  <p className="text-[11px] text-amber-600 font-medium mt-1">Sin aprobar ni despachar</p>
+                  <div className="absolute bottom-0 left-0 right-0 h-1 bg-amber-500" />
                 </div>
 
-                <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs">
+                <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs relative overflow-hidden transition-all hover:shadow-md">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-medium text-slate-500">Completadas</span>
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
-                      Stock ajustado
+                    <span className="text-xs font-medium text-blue-700">Aprobadas / En Tránsito</span>
+                    <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                      <FileText className="w-4 h-4" />
+                    </div>
+                  </div>
+                  <div className="mt-2">
+                    <span className="text-2xl sm:text-3xl font-black text-blue-600 tracking-tight">
+                      {vendorReturns.filter((r) => r.status === "APROBADA" || r.status === "ENVIADA").length}
                     </span>
                   </div>
-                  <div className="text-xl font-bold text-emerald-900 mt-2">
-                    {vendorReturns.filter((r) => r.status === "COMPLETADA").length}
+                  <p className="text-[11px] text-blue-600 font-medium mt-1">Esperando confirmación prov.</p>
+                  <div className="absolute bottom-0 left-0 right-0 h-1 bg-blue-500" />
+                </div>
+
+                <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs relative overflow-hidden transition-all hover:shadow-md">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-emerald-700">Completadas</span>
+                    <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                      <CheckCircle2 className="w-4 h-4" />
+                    </div>
                   </div>
-                  <div className="text-[11px] text-slate-400 mt-0.5">Inventario actualizado</div>
+                  <div className="mt-2">
+                    <span className="text-2xl sm:text-3xl font-black text-emerald-600 tracking-tight">
+                      {vendorReturns.filter((r) => r.status === "COMPLETADA").length}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-emerald-600 font-medium mt-1">Inventario actualizado</p>
+                  <div className="absolute bottom-0 left-0 right-0 h-1 bg-emerald-500" />
                 </div>
               </div>
 
@@ -16459,25 +16581,11 @@ export default function AdminDashboard() {
                 </div>
 
                 {/* Top Right Actions */}
-                <div className="flex items-center gap-4 text-xs font-medium text-slate-600">
-                  <button
-                    type="button"
-                    onClick={() => setShowPOOptionsSidebar(!showPOOptionsSidebar)}
-                    className={`flex items-center gap-1 cursor-pointer font-semibold text-xs px-3 py-1.5 rounded-lg border transition ${
-                      showPOOptionsSidebar
-                        ? "bg-[#fff7ed] text-[#f6821f] border-[#f6821f]/40 shadow-2xs"
-                        : "bg-slate-100 text-slate-700 hover:bg-slate-200 border-slate-200"
-                    }`}
-                  >
-                    <svg className="w-3.5 h-3.5 text-[#f6821f]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                    </svg>
-                    <span>Administrar</span>
-                  </button>
+                <div className="flex items-center gap-2 text-xs font-medium text-slate-600">
                   <button
                     type="button"
                     onClick={closePurchaseOrderEditor}
-                    className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition cursor-pointer ml-2"
+                    className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition cursor-pointer"
                   >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
@@ -16770,31 +16878,6 @@ export default function AdminDashboard() {
                   {/* VISTA DE PDF */}
                   {activePOTab === "Vista de PDF" && (
                     <div className="overflow-x-auto pb-12 flex flex-col items-center">
-                      <div className="w-[8.5in] mb-4 flex items-center justify-between bg-white px-5 py-3 rounded-2xl border border-slate-200 shadow-xs">
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold text-xs text-slate-800">Vista Previa de Orden de Compra</span>
-                          <span className="text-[11px] text-slate-400 font-mono">N.º {poForm.num}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={() => window.print()}
-                            className="px-3.5 py-1.5 rounded-xl border border-slate-300 hover:bg-slate-50 text-xs font-semibold text-slate-700 transition cursor-pointer"
-                          >
-                            Imprimir
-                          </button>
-                          <button
-                            type="button"
-                            onClick={downloadPOPDF}
-                            disabled={isGeneratingPDF}
-                            className="px-3.5 py-1.5 rounded-xl bg-[#f6821f] hover:bg-[#e07216] text-white text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 shadow-xs"
-                          >
-                            <Download className="w-3.5 h-3.5" />
-                            <span>{isGeneratingPDF ? "Descargando..." : "Descargar PDF"}</span>
-                          </button>
-                        </div>
-                      </div>
-
                       <div className="w-[8.5in] min-h-[11in] bg-white border border-slate-300 rounded-xs shadow-2xl p-12 flex flex-col justify-between animate-in fade-in duration-150 text-xs text-slate-800 shrink-0">
                         <div className="space-y-6">
                           {/* Header */}
@@ -19814,53 +19897,7 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      {/* ================= MODAL: OCULTAR WIDGET CONFIRMATION ================= */}
-      {hideConfirmWidget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs">
-          <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-sm p-6 shadow-2xl relative animate-in fade-in zoom-in-95 duration-150">
-            {/* Close button */}
-            <button
-              onClick={() => setHideConfirmWidget(null)}
-              className="absolute top-4 right-4 p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition cursor-pointer"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
 
-            <div className="pt-2">
-              <h3 className="text-xl font-bold text-slate-900 leading-snug mb-3">
-                ¿Seguro que deseas ocultar este widget?
-              </h3>
-              <p className="text-xs text-slate-600 mb-6">
-                Para volver a añadirlo, selecciona Personalizar.
-              </p>
-
-              <div className="border-t border-slate-200 pt-4 flex items-center justify-end gap-3">
-                <button
-                  type="button"
-                  onClick={() => setHideConfirmWidget(null)}
-                  className="px-5 py-2 rounded-xl border border-slate-300 text-slate-700 hover:bg-slate-50 font-semibold text-xs transition cursor-pointer"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (hideConfirmWidget) {
-                      setVisibleWidgets((prev) => ({ ...prev, [hideConfirmWidget]: false }));
-                    }
-                    setHideConfirmWidget(null);
-                  }}
-                  className="px-5 py-2 rounded-xl bg-[#f6821f] hover:bg-[#e07216] text-white font-semibold text-xs transition cursor-pointer shadow-md shadow-[#f6821f]/20"
-                >
-                  Ocultar
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
       {/* ================= RIGHT SIDEBAR DRAWER: NUEVA CUENTA (Matching screenshot) ================= */}
       {showNewAccountModal && (
         <div className="fixed inset-0 z-50 flex justify-end">

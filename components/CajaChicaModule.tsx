@@ -752,15 +752,15 @@ export default function CajaChicaModule({
       {/* ================= EXECUTIVE KPI CARDS ================= */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
         {/* Card 1: Fondo Fijo */}
-        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden">
+        <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/80 shadow-xs relative overflow-hidden transition-all hover:shadow-md">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Fondo Fijo Asignado</span>
-            <span className="w-6 h-6 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center text-xs font-bold">
-              {currentFund?.currency}
-            </span>
+            <span className="text-xs font-medium text-slate-500">Fondo Fijo Asignado</span>
+            <div className="w-8 h-8 rounded-xl bg-orange-50 text-[#f6821f] flex items-center justify-center font-black text-xs">
+              {currentFund?.currency || "$"}
+            </div>
           </div>
           <div className="mt-2">
-            <span className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
+            <span className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
               {formatAmount(fixedAmount)}
             </span>
           </div>
@@ -768,27 +768,28 @@ export default function CajaChicaModule({
             <span className="truncate font-medium text-slate-700">
               Custodio: {currentFund?.custodianName || "Sin asignar"}
             </span>
-            <span className="text-slate-400 shrink-0">{currentFund?.code}</span>
+            <span className="text-slate-400 shrink-0 font-mono text-[10px]">{currentFund?.code}</span>
           </div>
+          <div className="absolute bottom-0 left-0 right-0 h-1 bg-[#f6821f]" />
         </div>
 
         {/* Card 2: Saldo Físico Disponible */}
-        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden">
+        <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/80 shadow-xs relative overflow-hidden transition-all hover:shadow-md">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Saldo Físico en Caja</span>
-            <span
-              className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+            <span className="text-xs font-medium text-slate-500">Saldo Físico en Caja</span>
+            <div
+              className={`px-2 py-0.5 rounded-lg text-[10px] font-bold ${
                 isReplenishmentRequired
                   ? "bg-rose-100 text-rose-700 border border-rose-200"
                   : "bg-emerald-100 text-emerald-700 border border-emerald-200"
               }`}
             >
-              {cashPercentage}% Restante
-            </span>
+              {cashPercentage}%
+            </div>
           </div>
           <div className="mt-2 flex items-baseline gap-2">
             <span
-              className={`text-2xl sm:text-3xl font-bold tracking-tight ${
+              className={`text-2xl sm:text-3xl font-black tracking-tight ${
                 isReplenishmentRequired ? "text-rose-600" : "text-slate-900"
               }`}
             >
@@ -803,22 +804,23 @@ export default function CajaChicaModule({
               style={{ width: `${Math.min(100, Math.max(0, cashPercentage))}%` }}
             ></div>
           </div>
-          <div className="mt-2 text-[10px] text-slate-400 flex justify-between">
-            <span>Mínimo alerta: {formatAmount(minThreshold)}</span>
+          <div className="mt-2 text-[11px] text-slate-400 flex justify-between">
+            <span>Mínimo: {formatAmount(minThreshold)}</span>
             {isReplenishmentRequired && <span className="text-rose-600 font-bold">¡Reponer!</span>}
           </div>
+          <div className={`absolute bottom-0 left-0 right-0 h-1 ${isReplenishmentRequired ? "bg-rose-500" : "bg-emerald-500"}`} />
         </div>
 
         {/* Card 3: Comprobantes por Rendir */}
-        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden">
+        <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/80 shadow-xs relative overflow-hidden transition-all hover:shadow-md">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Gastos por Rendir</span>
-            <span className="w-5 h-5 rounded-full bg-orange-50 text-[#f6821f] text-[10px] font-bold flex items-center justify-center">
+            <span className="text-xs font-medium text-slate-500">Gastos por Rendir</span>
+            <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-xs">
               {unreimbursedExpenses.length}
-            </span>
+            </div>
           </div>
           <div className="mt-2">
-            <span className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
+            <span className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
               {formatAmount(unreimbursedTotal)}
             </span>
           </div>
@@ -826,57 +828,64 @@ export default function CajaChicaModule({
             <span className="text-slate-500">Facturas / Recibos</span>
             <button
               onClick={() => setActiveTab("reposicion")}
-              className="text-[#f6821f] hover:underline font-bold text-[11px] cursor-pointer"
+              className="text-blue-600 hover:text-blue-700 font-bold cursor-pointer"
             >
               Ver Reposición →
             </button>
           </div>
+          <div className="absolute bottom-0 left-0 right-0 h-1 bg-blue-500" />
         </div>
 
         {/* Card 4: Vales Provisionales Activos */}
-        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden">
+        <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/80 shadow-xs relative overflow-hidden transition-all hover:shadow-md">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Vales Provisionales</span>
-            <span className="w-5 h-5 rounded-full bg-amber-50 text-amber-700 text-[10px] font-bold flex items-center justify-center">
+            <span className="text-xs font-medium text-slate-500">Vales Provisionales</span>
+            <div className="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold text-xs">
               {activeVouchers.length}
-            </span>
+            </div>
           </div>
           <div className="mt-2">
-            <span className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
+            <span className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
               {formatAmount(activeVouchersTotal)}
             </span>
           </div>
           <div className="mt-2 pt-2 border-t border-slate-100 flex items-center justify-between text-[11px]">
-            <span className="text-slate-500">Anticipos pendientes</span>
+            <span className="text-slate-500">Anticipos activos</span>
             <button
               onClick={() => setActiveTab("vales")}
-              className="text-amber-700 hover:underline font-bold text-[11px] cursor-pointer"
+              className="text-amber-600 hover:text-amber-700 font-bold cursor-pointer"
             >
               Gestionar →
             </button>
           </div>
+          <div className="absolute bottom-0 left-0 right-0 h-1 bg-amber-500" />
         </div>
 
         {/* Card 5: Integridad Teórica */}
-        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden">
+        <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/80 shadow-xs relative overflow-hidden transition-all hover:shadow-md">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Integridad de Fondo</span>
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+            <span className="text-xs font-medium text-slate-500">Integridad de Fondo</span>
+            <div className="w-8 h-8 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+              </svg>
+            </div>
           </div>
           <div className="mt-2">
-            <span className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
+            <span className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
               {formatAmount(currentCash + unreimbursedTotal + activeVouchersTotal)}
             </span>
           </div>
           <div className="mt-2 pt-2 border-t border-slate-100 flex items-center justify-between text-[11px]">
             <span className="text-emerald-700 font-semibold flex items-center gap-1">
-              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+              <svg className="w-3 h-3 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" />
               </svg>
               Cuadre 100% OK
             </span>
-            <span className="text-slate-400 text-[10px]">Caja + Docs + Vales</span>
+            <span className="text-slate-400 text-[10px]">Caja + Recs + Vales</span>
           </div>
+          <div className="absolute bottom-0 left-0 right-0 h-1 bg-purple-600" />
         </div>
       </div>
 

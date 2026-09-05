@@ -472,41 +472,81 @@ export default function CustomerStatementModule({
           </div>
 
           {/* Highlight Financial Summary Cards */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6 text-xs">
-            <div className="p-3.5 rounded-xl bg-slate-100/70 border border-slate-200">
-              <span className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">
-                Saldo Anterior
-              </span>
-              <span className="text-base sm:text-lg font-extrabold text-slate-800 font-mono mt-1 block">
-                {formatCurrency(statement.summary.saldoInicial)}
-              </span>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 mb-6">
+            {/* Saldo Anterior */}
+            <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/80 shadow-xs relative overflow-hidden transition-all hover:shadow-md">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium text-slate-500">Saldo Anterior</span>
+                <div className="w-8 h-8 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+              </div>
+              <div className="mt-2">
+                <span className="text-2xl font-black text-slate-900 font-mono tracking-tight">
+                  {formatCurrency(statement.summary.saldoInicial)}
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-400 mt-1">Corte período anterior</p>
+              <div className="absolute bottom-0 left-0 right-0 h-1 bg-slate-400" />
             </div>
 
-            <div className="p-3.5 rounded-xl bg-blue-50/70 border border-blue-200">
-              <span className="block text-[10px] font-bold text-blue-800 uppercase tracking-wider">
-                Total Cargos (+)
-              </span>
-              <span className="text-base sm:text-lg font-extrabold text-blue-900 font-mono mt-1 block">
-                {formatCurrency(statement.summary.totalCargos)}
-              </span>
+            {/* Total Cargos */}
+            <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/80 shadow-xs relative overflow-hidden transition-all hover:shadow-md">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium text-slate-500">Total Cargos (+)</span>
+                <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                  </svg>
+                </div>
+              </div>
+              <div className="mt-2">
+                <span className="text-2xl font-black text-blue-600 font-mono tracking-tight">
+                  {formatCurrency(statement.summary.totalCargos)}
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-400 mt-1">Facturas y notas de débito</p>
+              <div className="absolute bottom-0 left-0 right-0 h-1 bg-blue-500" />
             </div>
 
-            <div className="p-3.5 rounded-xl bg-emerald-50/70 border border-emerald-200">
-              <span className="block text-[10px] font-bold text-emerald-800 uppercase tracking-wider">
-                Total Pagos / Abonos (-)
-              </span>
-              <span className="text-base sm:text-lg font-extrabold text-emerald-900 font-mono mt-1 block">
-                {formatCurrency(statement.summary.totalAbonos)}
-              </span>
+            {/* Total Pagos / Abonos */}
+            <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/80 shadow-xs relative overflow-hidden transition-all hover:shadow-md">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium text-slate-500">Total Pagos / Abonos (-)</span>
+                <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+              </div>
+              <div className="mt-2">
+                <span className="text-2xl font-black text-emerald-600 font-mono tracking-tight">
+                  {formatCurrency(statement.summary.totalAbonos)}
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-400 mt-1">Recibos y notas de crédito</p>
+              <div className="absolute bottom-0 left-0 right-0 h-1 bg-emerald-500" />
             </div>
 
-            <div className="p-3.5 rounded-xl bg-[#fff7ed] border border-[#fed7aa]">
-              <span className="block text-[10px] font-bold text-[#f6821f] uppercase tracking-wider">
-                Saldo Final a Pagar
-              </span>
-              <span className="text-base sm:text-lg font-extrabold text-[#c2410c] font-mono mt-1 block">
-                {formatCurrency(statement.summary.saldoFinal)}
-              </span>
+            {/* Saldo Final */}
+            <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/80 shadow-xs relative overflow-hidden transition-all hover:shadow-md">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium text-slate-500">Saldo Final Pendiente</span>
+                <div className="w-8 h-8 rounded-xl bg-orange-50 text-[#f6821f] flex items-center justify-center">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+                  </svg>
+                </div>
+              </div>
+              <div className="mt-2">
+                <span className="text-2xl font-black text-[#f6821f] font-mono tracking-tight">
+                  {formatCurrency(statement.summary.saldoFinal)}
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-400 mt-1">Monto actual exigible</p>
+              <div className="absolute bottom-0 left-0 right-0 h-1 bg-[#f6821f]" />
             </div>
           </div>
 

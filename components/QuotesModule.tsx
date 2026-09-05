@@ -26,7 +26,6 @@ import {
   Send,
   Check,
   Percent,
-  Sparkles,
   Info,
 } from "lucide-react";
 
@@ -130,7 +129,7 @@ export default function QuotesModule({
 
   // Modales
   const [showEditorModal, setShowEditorModal] = useState(false);
-  const [activeEditorTab, setActiveEditorTab] = useState<"Editar" | "Vista de PDF">("Editar");
+  const [activeEditorTab, setActiveEditorTab] = useState<"Editar" | "Vista de correo electrónico" | "Vista de PDF">("Editar");
   const [showPrintModal, setShowPrintModal] = useState(false);
   const [showConvertConfirmModal, setShowConvertConfirmModal] = useState(false);
   const [quoteToConvert, setQuoteToConvert] = useState<Quote | null>(null);
@@ -175,18 +174,28 @@ export default function QuotesModule({
   const printDropdownRef = useRef<HTMLDivElement>(null);
   const [showPrintDownloadDropdown, setShowPrintDownloadDropdown] = useState(false);
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+  const quoteSaveDropdownRef = useRef<HTMLDivElement>(null);
+  const [showQuoteSaveDropdown, setShowQuoteSaveDropdown] = useState(false);
+  const quoteSendDropdownRef = useRef<HTMLDivElement>(null);
+  const [showQuoteSendDropdown, setShowQuoteSendDropdown] = useState(false);
+  const [sendingQuoteEmail, setSendingQuoteEmail] = useState(false);
 
-  // Cerrar el dropdown al hacer clic fuera
+  // Cerrar dropdowns al hacer clic fuera
   useEffect(() => {
-    if (!showPrintDownloadDropdown) return;
     const handleClickOutside = (e: MouseEvent) => {
       if (printDropdownRef.current && !printDropdownRef.current.contains(e.target as Node)) {
         setShowPrintDownloadDropdown(false);
       }
+      if (quoteSaveDropdownRef.current && !quoteSaveDropdownRef.current.contains(e.target as Node)) {
+        setShowQuoteSaveDropdown(false);
+      }
+      if (quoteSendDropdownRef.current && !quoteSendDropdownRef.current.contains(e.target as Node)) {
+        setShowQuoteSendDropdown(false);
+      }
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [showPrintDownloadDropdown]);
+  }, []);
 
   // Cargar Cotizaciones desde la API
   const fetchQuotes = async () => {
@@ -393,20 +402,17 @@ export default function QuotesModule({
   };
 
   // Guardar Cotización (POST)
-  const handleSaveQuote = async (e?: React.FormEvent) => {
-    if (e && typeof e.preventDefault === "function") {
-      e.preventDefault();
-    }
+  const handleSaveQuote = async (closeModal = true): Promise<boolean> => {
     if (!formData.customerName.trim()) {
       setErrorAlert("Debe ingresar o seleccionar un cliente.");
-      return;
+      return false;
     }
     const hasValidLine = formData.lines.some(
       (l) => l.productName.trim() && l.quantity > 0 && l.rate > 0
     );
     if (!hasValidLine) {
       setErrorAlert("Debe incluir al menos un ítem con descripción, cantidad y precio.");
-      return;
+      return false;
     }
 
     try {
@@ -423,14 +429,103 @@ export default function QuotesModule({
       const data = await res.json();
       if (data.success) {
         setSuccessAlert(`Cotización ${formData.quoteNumber} guardada exitosamente.`);
-        setShowEditorModal(false);
+        if (closeModal) {
+          setShowEditorModal(false);
+        }
         fetchQuotes();
+        return true;
       } else {
         setErrorAlert(data.error || "Error al guardar la cotización.");
+        return false;
       }
     } catch (err) {
       console.error(err);
       setErrorAlert("Error de conexión al guardar la cotización.");
+      return false;
+    }
+  };
+
+  const handleSaveAndNewQuote = async () => {
+    const saved = await handleSaveQuote(false);
+    if (saved) {
+      handleOpenCreate();
+    }
+  };
+
+  // Revisar y enviar cotización (idéntico al de Facturas)
+  const handleReviewAndSendQuote = async () => {
+    if (!formData.customerName.trim()) {
+      setErrorAlert("Debe ingresar o seleccionar un cliente.");
+      setActiveEditorTab("Editar");
+      return;
+    }
+    const hasValidLine = formData.lines.some(
+      (l) => l.productName.trim() && l.quantity > 0 && l.rate > 0
+    );
+    if (!hasValidLine) {
+      setErrorAlert("Debe incluir al menos un ítem con descripción, cantidad y precio.");
+      setActiveEditorTab("Editar");
+      return;
+    }
+
+    const targetEmail = formData.customerEmail || customers.find((c) => c.name === formData.customerName)?.email || "sac@waynetrademarkhn.com";
+    setSendingQuoteEmail(true);
+    try {
+      // 1. Envío de correo electrónico vía Resend
+      try {
+        const emailRes = await fetch("/api/send-quote", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            to: targetEmail,
+            quoteNumber: formData.quoteNumber,
+            customerName: formData.customerName || "Estimado cliente",
+            quoteDate: formData.quoteDate,
+            validUntil: formData.validUntil,
+            paymentTerms: formData.paymentTerms,
+            lines: formData.lines,
+            currency: formData.currency === "HNL" ? "L" : "$",
+            subtotal: formCalculations.subtotal,
+            tax: formCalculations.tax,
+            total: formCalculations.total,
+            notes: formData.notes,
+            termsConditions: formData.termsConditions,
+            salesRepName: formData.salesRepName,
+          }),
+        });
+        const emailData = await emailRes.json();
+        if (!emailRes.ok) {
+          console.warn("Aviso al enviar correo por Resend:", emailData?.error);
+        }
+      } catch (emailErr) {
+        console.warn("Fallo en llamada a /api/send-quote:", emailErr);
+      }
+
+      // 2. Guardar cotización con estado "Enviada"
+      const res = await fetch("/api/quotes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...formData,
+          status: "Enviada",
+          subtotal: formCalculations.subtotal,
+          tax: formCalculations.tax,
+          total: formCalculations.total,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setSuccessAlert(`¡Cotización N.º ${formData.quoteNumber} enviada a ${targetEmail} (From: notifications@indevasa.com, Reply-To: sac@waynetrademarkhn.com)!`);
+        setShowEditorModal(false);
+        fetchQuotes();
+      } else {
+        setErrorAlert(data.error || "Error al enviar la cotización.");
+      }
+    } catch (err: any) {
+      console.error(err);
+      setErrorAlert(`Error al procesar envío: ${err?.message || "Error desconocido"}`);
+    } finally {
+      setSendingQuoteEmail(false);
     }
   };
 
@@ -711,7 +806,7 @@ export default function QuotesModule({
       case "Facturada":
         return (
           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200">
-            <Sparkles className="w-3.5 h-3.5 text-blue-600" />
+            <FileText className="w-3.5 h-3.5 text-blue-600" />
             Facturada
           </span>
         );
@@ -843,74 +938,78 @@ export default function QuotesModule({
         {/* Total Cotizado */}
         <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs relative overflow-hidden">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-              Total Cotizado
-            </span>
-            <span className="p-2 bg-amber-50 text-[#f6821f] rounded-xl">
+            <span className="text-xs font-medium text-slate-500">Total Cotizado</span>
+            <div className="w-8 h-8 rounded-xl bg-orange-50 text-[#f6821f] flex items-center justify-center">
               <DollarSign className="w-4 h-4" />
+            </div>
+          </div>
+          <div className="mt-2 flex items-baseline gap-2">
+            <span className="text-2xl font-black text-slate-900 tracking-tight">
+              ${metrics.totalQuoted.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </span>
           </div>
-          <p className="text-2xl font-bold text-slate-900 mt-2">
-            ${metrics.totalQuoted.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-          </p>
-          <p className="text-xs text-slate-500 mt-1">
+          <p className="text-[11px] text-slate-400 mt-1">
             {quotes.length} cotizaciones generadas
           </p>
+          <div className="absolute bottom-0 left-0 right-0 h-1 bg-[#f6821f]" />
         </div>
 
         {/* Total Aprobado */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs">
+        <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs relative overflow-hidden">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-              Monto Aprobado
-            </span>
-            <span className="p-2 bg-emerald-50 text-emerald-600 rounded-xl">
+            <span className="text-xs font-medium text-slate-500">Monto Aprobado</span>
+            <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
               <CheckCircle2 className="w-4 h-4" />
+            </div>
+          </div>
+          <div className="mt-2 flex items-baseline gap-2">
+            <span className="text-2xl font-black text-slate-900 tracking-tight">
+              ${metrics.totalApproved.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </span>
           </div>
-          <p className="text-2xl font-bold text-emerald-600 mt-2">
-            ${metrics.totalApproved.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-          </p>
-          <p className="text-xs text-slate-500 mt-1">
+          <p className="text-[11px] text-slate-400 mt-1">
             Listas o procesadas para despacho
           </p>
+          <div className="absolute bottom-0 left-0 right-0 h-1 bg-emerald-500" />
         </div>
 
         {/* Facturadas / Conectadas a Libros */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs">
+        <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs relative overflow-hidden">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-              Convertidas a Factura
-            </span>
-            <span className="p-2 bg-blue-50 text-blue-600 rounded-xl">
+            <span className="text-xs font-medium text-slate-500">Convertidas a Factura</span>
+            <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
               <BookOpen className="w-4 h-4" />
+            </div>
+          </div>
+          <div className="mt-2 flex items-baseline gap-2">
+            <span className="text-2xl font-black text-slate-900 tracking-tight">
+              {metrics.facturadasCount}
             </span>
           </div>
-          <p className="text-2xl font-bold text-blue-600 mt-2">
-            {metrics.facturadasCount}
-          </p>
-          <p className="text-xs text-slate-500 mt-1 flex items-center gap-1">
+          <p className="text-[11px] text-slate-400 mt-1 flex items-center gap-1">
             <Check className="w-3 h-3 text-blue-500" />
             Contabilizadas en Libro Diario
           </p>
+          <div className="absolute bottom-0 left-0 right-0 h-1 bg-blue-500" />
         </div>
 
         {/* En Proceso / Borrador */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs">
+        <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs relative overflow-hidden">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-              En Seguimiento
-            </span>
-            <span className="p-2 bg-slate-100 text-slate-600 rounded-xl">
+            <span className="text-xs font-medium text-slate-500">En Seguimiento</span>
+            <div className="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
               <Clock className="w-4 h-4" />
+            </div>
+          </div>
+          <div className="mt-2 flex items-baseline gap-2">
+            <span className="text-2xl font-black text-slate-900 tracking-tight">
+              {metrics.pendingCount}
             </span>
           </div>
-          <p className="text-2xl font-bold text-slate-800 mt-2">
-            {metrics.pendingCount}
-          </p>
-          <p className="text-xs text-slate-500 mt-1">
+          <p className="text-[11px] text-slate-400 mt-1">
             Borrador o enviadas a cliente
           </p>
+          <div className="absolute bottom-0 left-0 right-0 h-1 bg-amber-500" />
         </div>
       </div>
 
@@ -1081,7 +1180,7 @@ export default function QuotesModule({
                               className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition shadow-2xs cursor-pointer"
                               title="Convertir a Factura y contabilizar en Libros"
                             >
-                              <Sparkles className="w-3.5 h-3.5" />
+                              <FileText className="w-3.5 h-3.5" />
                               Facturar
                             </button>
                           ) : (
@@ -1162,9 +1261,9 @@ export default function QuotesModule({
                 <span>{formData.id ? `Editar Cotización ${formData.quoteNumber}` : `Cotización ${formData.quoteNumber}`}</span>
               </h1>
 
-              {/* Sub-tabs: Editar vs Vista de PDF */}
+              {/* Sub-tabs: Editar vs Vista de correo electrónico vs Vista de PDF */}
               <div className="flex items-center gap-1 border-l border-slate-200 pl-6">
-                {(["Editar", "Vista de PDF"] as const).map((tab) => (
+                {(["Editar", "Vista de correo electrónico", "Vista de PDF"] as const).map((tab) => (
                   <button
                     key={tab}
                     type="button"
@@ -1675,9 +1774,68 @@ export default function QuotesModule({
                 </div>
               )}
 
-              {/* PESTAÑA: VISTA DE PDF */}
+              {/* PESTAÑA: VISTA DE CORREO ELECTRÓNICO */}
+              {activeEditorTab === "Vista de correo electrónico" && (
+                <div className="bg-white border border-slate-200 rounded-2xl p-8 shadow-xs max-w-3xl mx-auto space-y-6 animate-in fade-in duration-150">
+                  <div className="border-b border-slate-200 pb-4">
+                    <h3 className="font-bold text-base text-slate-900">Vista previa del correo electrónico para el cliente</h3>
+                    <p className="text-xs text-slate-500">Así es como el cliente visualizará el correo de la cotización comercial de Wayne Trademark.</p>
+                  </div>
+
+                  <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 text-xs space-y-2 text-slate-700">
+                    <p><strong>De:</strong> info@waynetrademarkhn.com</p>
+                    <p><strong>Para:</strong> {formData.customerEmail || customers.find((c) => c.name === formData.customerName)?.email || "cliente@empresa.hn"}</p>
+                    <p><strong>Asunto:</strong> Cotización Comercial {formData.quoteNumber} de Wayne Trademark Printing &amp; Packaging</p>
+                  </div>
+
+                  <div className="p-6 border border-slate-200 rounded-2xl space-y-4 bg-white text-xs text-slate-700 leading-relaxed">
+                    <p className="font-semibold text-slate-900">Estimado(a) {formData.customerName || "Cliente"},</p>
+                    <p>
+                      Es un placer saludarle de parte de <strong>Wayne Trademark Printing and Packaging de Honduras S. de R.L.</strong> Adjunto encontrará la cotización formal <strong>{formData.quoteNumber}</strong> con la propuesta y detalle de precios para su requerimiento.
+                    </p>
+
+                    <div className="my-4 p-4 rounded-xl bg-[#fff7ed] border border-[#f6821f]/30 flex justify-between items-center">
+                      <div>
+                        <span className="text-xs font-bold text-[#f6821f] block uppercase tracking-wider">Monto Total Cotizado</span>
+                        <span className="text-2xl font-black text-slate-900">
+                          ${formCalculations.total.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {formData.currency}
+                        </span>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-xs font-semibold text-slate-600 block">Válida hasta:</span>
+                        <span className="text-xs font-bold text-slate-900">{formData.validUntil || "30 días posteriores a emisión"}</span>
+                      </div>
+                    </div>
+
+                    {formData.notes && (
+                      <div className="bg-slate-50 p-3 rounded-xl border border-slate-200">
+                        <p className="font-semibold text-slate-700 mb-1">Nota adicional:</p>
+                        <p className="text-slate-600 italic">{formData.notes}</p>
+                      </div>
+                    )}
+
+                    <p>
+                      Para aprobar esta cotización o coordinar la corrida de muestras y producción, puede responder a este correo o comunicarse directamente con su ejecutivo asignado ({formData.salesRepName || "Wayne Sales"}).
+                    </p>
+
+                    <p className="pt-4 border-t border-slate-100 text-slate-500">
+                      Atentamente,<br />
+                      <strong>Wayne Trademark Printing and Packaging de Honduras</strong><br />
+                      Parque Industrial Zip Búfalo, Edificio 1B, Villanueva, Cortés<br />
+                      Tel: +504 9452-2666 | info@waynetrademarkhn.com
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* PESTAÑA: VISTA DE PDF (Carta 8.5" × 11") */}
               {activeEditorTab === "Vista de PDF" && (
-                <div className="bg-white border border-slate-200 rounded-2xl p-8 sm:p-12 shadow-xs max-w-4xl mx-auto space-y-6 text-slate-800 animate-in fade-in duration-150">
+                <div className="overflow-x-auto pb-12 flex flex-col items-center">
+                  <div
+                    className="w-[8.5in] min-h-[11in] bg-white border border-slate-300 rounded-xs shadow-xl p-12 flex flex-col justify-between text-slate-800 text-xs shrink-0 my-2 animate-in fade-in duration-150"
+                    style={{ width: "8.5in", minHeight: "11in" }}
+                  >
+                    <div className="space-y-6">
                   {/* Membrete formal */}
                   <div className="flex justify-between items-start border-b border-slate-200 pb-6">
                     <div>
@@ -1691,10 +1849,8 @@ export default function QuotesModule({
                     </div>
 
                     <div className="text-right">
-                      <div className="inline-block px-3 py-1 bg-amber-50 border border-amber-200 text-[#f6821f] font-bold text-sm rounded-lg">
-                        COTIZACIÓN
-                      </div>
-                      <p className="text-base font-extrabold text-slate-900 mt-2">{formData.quoteNumber}</p>
+                      <h2 className="text-xl font-bold text-slate-900">COTIZACIÓN</h2>
+                      <p className="font-mono font-bold text-slate-700 text-sm mt-1">{formData.quoteNumber}</p>
                       <p className="text-xs text-slate-500 mt-0.5">Fecha: {formData.quoteDate}</p>
                       <p className="text-xs text-slate-500">Válida hasta: {formData.validUntil}</p>
                     </div>
@@ -1767,15 +1923,18 @@ export default function QuotesModule({
                     </div>
                   </div>
 
-                  {/* Firmas */}
-                  <div className="pt-12 grid grid-cols-2 gap-12 text-center text-xs text-slate-600">
-                    <div className="border-t border-slate-300 pt-2">
-                      <p className="font-semibold text-slate-900">Wayne Trademark Printing & Packaging</p>
-                      <p className="text-[11px] text-slate-400">Firma y Sello Autorizado</p>
                     </div>
-                    <div className="border-t border-slate-300 pt-2">
-                      <p className="font-semibold text-slate-900">{formData.customerName || "Cliente"}</p>
-                      <p className="text-[11px] text-slate-400">Aceptación de Cotización</p>
+
+                    {/* Firmas al pie de página */}
+                    <div className="pt-12 grid grid-cols-2 gap-12 text-center text-xs text-slate-600">
+                      <div className="border-t border-slate-300 pt-2">
+                        <p className="font-semibold text-slate-900">Wayne Trademark Printing & Packaging</p>
+                        <p className="text-[11px] text-slate-400">Firma y Sello Autorizado</p>
+                      </div>
+                      <div className="border-t border-slate-300 pt-2">
+                        <p className="font-semibold text-slate-900">{formData.customerName || "Cliente"}</p>
+                        <p className="text-[11px] text-slate-400">Aceptación de Cotización</p>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -1801,10 +1960,8 @@ export default function QuotesModule({
               </div>
 
               <div className="text-right">
-                <div className="inline-block px-3 py-1 bg-amber-50 border border-amber-200 text-[#f6821f] font-bold text-sm rounded-lg">
-                  COTIZACIÓN
-                </div>
-                <p className="text-base font-extrabold text-slate-900 mt-2">{formData.quoteNumber}</p>
+                <h2 className="text-xl font-bold text-slate-900">COTIZACIÓN</h2>
+                <p className="font-mono font-bold text-slate-700 text-sm mt-1">{formData.quoteNumber}</p>
                 <p className="text-xs text-slate-500 mt-0.5">Fecha: {formData.quoteDate}</p>
                 <p className="text-xs text-slate-500">Válida hasta: {formData.validUntil}</p>
               </div>
@@ -1949,13 +2106,113 @@ export default function QuotesModule({
                 Cancelar
               </button>
 
-              <button
-                type="button"
-                onClick={() => handleSaveQuote()}
-                className="px-5 py-2 rounded-lg bg-[#f6821f] hover:bg-[#e07216] text-white font-bold text-xs transition shadow-sm cursor-pointer flex items-center gap-1.5"
-              >
-                <span>Guardar cotización</span>
-              </button>
+              {/* Split Button 1: Guardar v (Idéntico a Crear Factura) */}
+              <div ref={quoteSaveDropdownRef} className="relative inline-flex rounded-lg shadow-sm">
+                <button
+                  type="button"
+                  onClick={() => handleSaveQuote(false)}
+                  className="px-4 py-2 rounded-l-lg bg-[#f6821f] hover:bg-[#e07216] text-white font-semibold text-xs transition cursor-pointer"
+                >
+                  Guardar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowQuoteSaveDropdown(!showQuoteSaveDropdown)}
+                  className="px-2.5 py-2 rounded-r-lg bg-[#e07216] hover:bg-[#d06512] text-white border-l border-white/20 transition cursor-pointer flex items-center justify-center"
+                >
+                  <svg
+                    className={`w-3.5 h-3.5 transition-transform ${showQuoteSaveDropdown ? "rotate-180" : "rotate-0"}`}
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+
+                {showQuoteSaveDropdown && (
+                  <div className="absolute bottom-full right-0 mb-2 w-52 bg-white rounded-xl shadow-2xl border border-slate-200 py-1 z-40 animate-in fade-in zoom-in-95 duration-150">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowQuoteSaveDropdown(false);
+                        handleSaveQuote(true);
+                      }}
+                      className="w-full text-left px-4 py-2.5 text-xs text-slate-700 hover:bg-[#fff7ed] hover:text-[#f6821f] font-semibold transition cursor-pointer"
+                    >
+                      Guardar y cerrar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowQuoteSaveDropdown(false);
+                        handleSaveAndNewQuote();
+                      }}
+                      className="w-full text-left px-4 py-2.5 text-xs text-slate-700 hover:bg-[#fff7ed] hover:text-[#f6821f] font-semibold transition cursor-pointer"
+                    >
+                      Guardar y crear nueva
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Split Button 2: Revisar y enviar v (Idéntico a Crear Factura) */}
+              <div ref={quoteSendDropdownRef} className="relative inline-flex rounded-lg shadow-sm">
+                <button
+                  type="button"
+                  disabled={sendingQuoteEmail}
+                  onClick={handleReviewAndSendQuote}
+                  className="px-5 py-2 rounded-l-lg bg-[#004d40] hover:bg-[#00382e] text-white font-bold text-xs transition cursor-pointer flex items-center gap-2 disabled:opacity-50"
+                >
+                  {sendingQuoteEmail ? (
+                    <>
+                      <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      <span>Enviando por Resend...</span>
+                    </>
+                  ) : (
+                    <span>Revisar y enviar</span>
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowQuoteSendDropdown(!showQuoteSendDropdown)}
+                  className="px-2.5 py-2 rounded-r-lg bg-[#00382e] hover:bg-[#002821] text-white border-l border-white/20 transition cursor-pointer flex items-center justify-center"
+                >
+                  <svg
+                    className={`w-3.5 h-3.5 transition-transform ${showQuoteSendDropdown ? "rotate-180" : "rotate-0"}`}
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+
+                {showQuoteSendDropdown && (
+                  <div className="absolute bottom-full right-0 mb-2 w-52 bg-white rounded-xl shadow-2xl border border-slate-200 py-1 z-40 animate-in fade-in zoom-in-95 duration-150">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowQuoteSendDropdown(false);
+                        setActiveEditorTab("Vista de PDF");
+                      }}
+                      className="w-full text-left px-4 py-2.5 text-xs text-slate-700 hover:bg-[#fff7ed] hover:text-[#f6821f] font-semibold transition cursor-pointer"
+                    >
+                      Vista previa PDF
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowQuoteSendDropdown(false);
+                        setActiveEditorTab("Vista de correo electrónico");
+                      }}
+                      className="w-full text-left px-4 py-2.5 text-xs text-slate-700 hover:bg-[#fff7ed] hover:text-[#f6821f] font-semibold transition cursor-pointer"
+                    >
+                      Vista previa correo
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           </footer>
         </div>
@@ -1967,7 +2224,7 @@ export default function QuotesModule({
           <div className="bg-white rounded-2xl max-w-md w-full border border-slate-200 shadow-2xl p-6 space-y-4 animate-in fade-in zoom-in-95">
             <div className="flex items-center gap-3 text-emerald-700">
               <div className="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center border border-emerald-200 shrink-0">
-                <Sparkles className="w-5 h-5 text-emerald-600" />
+                <FileText className="w-5 h-5 text-emerald-600" />
               </div>
               <div>
                 <h3 className="font-bold text-slate-900 text-sm">
@@ -2049,35 +2306,50 @@ export default function QuotesModule({
         </div>
       )}
 
-      {/* MODAL: VISTA PREVIA E IMPRESIÓN FORMAL DE COTIZACIÓN */}
+      {/* MODAL: VISTA PREVIA E IMPRESIÓN FORMAL DE COTIZACIÓN (8.5x11 CARTA) */}
       {showPrintModal && activePrintQuote && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto">
-          <div className="bg-white rounded-2xl max-w-3xl w-full border border-slate-200 shadow-2xl my-6 overflow-hidden">
-            {/* Header de herramientas */}
-            <div className="px-6 py-3 bg-slate-100 border-b border-slate-200 flex items-center justify-between no-print">
-              <span className="text-xs font-bold text-slate-700 flex items-center gap-2">
-                <Printer className="w-4 h-4 text-slate-500" />
+        <div className="fixed inset-0 z-50 flex flex-col items-center p-4 sm:p-6 bg-slate-900/70 backdrop-blur-xs overflow-y-auto overflow-x-auto">
+          {/* Header de herramientas */}
+          <div className="w-full max-w-[8.5in] mb-4 flex items-center justify-between bg-white px-5 py-3 rounded-2xl border border-slate-200 shadow-xl no-print shrink-0">
+            <div className="flex items-center gap-2">
+              <Printer className="w-4 h-4 text-[#f6821f]" />
+              <span className="text-xs font-bold text-slate-800">
                 Vista Previa de Impresión / PDF
               </span>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => window.print()}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-[#f6821f] hover:bg-[#e06f12] rounded-lg transition cursor-pointer shadow-xs"
-                >
-                  <Printer className="w-3.5 h-3.5" />
-                  Imprimir / Guardar PDF
-                </button>
-                <button
-                  onClick={() => setShowPrintModal(false)}
-                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-200 transition cursor-pointer"
-                >
-                  ✕
-                </button>
-              </div>
+              <span className="text-[11px] font-bold text-[#f6821f] bg-orange-50 px-2.5 py-0.5 rounded-full border border-orange-200">
+                8.5&quot; × 11&quot; Carta
+              </span>
+              <span className="text-[11px] text-slate-400 font-mono hidden sm:inline">
+                {activePrintQuote.quoteNumber}
+              </span>
             </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => window.print()}
+                className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-[#f6821f] hover:bg-[#e06f12] rounded-xl transition cursor-pointer shadow-md shadow-[#f6821f]/20"
+              >
+                <Printer className="w-3.5 h-3.5" />
+                <span>Imprimir / Guardar PDF</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowPrintModal(false)}
+                className="p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition cursor-pointer font-bold text-sm"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
 
-            {/* Documento Imprimible */}
-            <div ref={printAreaRef} className="p-8 sm:p-12 text-slate-800 space-y-6 bg-white print:p-0">
+          {/* Documento Imprimible 8.5in x 11in */}
+          <div
+            ref={printAreaRef}
+            id="printable-quote-document"
+            className="w-[8.5in] min-h-[11in] bg-white border border-slate-300 rounded-xs shadow-2xl p-12 flex flex-col justify-between text-slate-800 text-xs shrink-0 my-2 print:my-0 print:border-none print:shadow-none print:p-8 printable-document"
+            style={{ width: "8.5in", minHeight: "11in" }}
+          >
+            <div className="space-y-6">
               {/* Membrete */}
               <div className="flex justify-between items-start border-b border-slate-200 pb-6">
                 <div>
@@ -2093,10 +2365,8 @@ export default function QuotesModule({
                 </div>
 
                 <div className="text-right">
-                  <div className="inline-block px-3 py-1 bg-amber-50 border border-amber-200 text-[#f6821f] font-bold text-sm rounded-lg">
-                    COTIZACIÓN
-                  </div>
-                  <p className="text-base font-extrabold text-slate-900 mt-2">
+                  <h2 className="text-xl font-bold text-slate-900">COTIZACIÓN</h2>
+                  <p className="font-mono font-bold text-slate-700 text-sm mt-1">
                     {activePrintQuote.quoteNumber}
                   </p>
                   <p className="text-xs text-slate-500 mt-0.5">Fecha: {activePrintQuote.quoteDate}</p>
@@ -2192,16 +2462,17 @@ export default function QuotesModule({
                 {activePrintQuote.notes && <p className="text-slate-400">{activePrintQuote.notes}</p>}
               </div>
 
-              {/* Firmas */}
-              <div className="pt-12 grid grid-cols-2 gap-12 text-center text-xs text-slate-600">
-                <div className="border-t border-slate-300 pt-2">
-                  <p className="font-semibold text-slate-900">Wayne Trademark Printing & Packaging</p>
-                  <p className="text-[11px] text-slate-400">Firma y Sello Autorizado</p>
-                </div>
-                <div className="border-t border-slate-300 pt-2">
-                  <p className="font-semibold text-slate-900">{activePrintQuote.customerName}</p>
-                  <p className="text-[11px] text-slate-400">Aceptación de Cotización</p>
-                </div>
+            </div>
+
+            {/* Firmas al pie de página */}
+            <div className="pt-12 grid grid-cols-2 gap-12 text-center text-xs text-slate-600">
+              <div className="border-t border-slate-300 pt-2">
+                <p className="font-semibold text-slate-900">Wayne Trademark Printing & Packaging</p>
+                <p className="text-[11px] text-slate-400">Firma y Sello Autorizado</p>
+              </div>
+              <div className="border-t border-slate-300 pt-2">
+                <p className="font-semibold text-slate-900">{activePrintQuote.customerName}</p>
+                <p className="text-[11px] text-slate-400">Aceptación de Cotización</p>
               </div>
             </div>
           </div>

@@ -310,124 +310,145 @@ export default function CustomerAgingReportModule({
       {summary && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3.5">
           {/* Card 1: Total Cuentas por Cobrar */}
-          <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden">
+          <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs relative overflow-hidden">
             <div className="flex items-center justify-between">
-              <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+              <span className="text-xs font-medium text-slate-500">
                 Total Cuentas por Cobrar
               </span>
-              <span className="w-6 h-6 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center text-xs font-bold">
-                $
-              </span>
+              <div className="w-8 h-8 rounded-xl bg-orange-50 text-[#f6821f] flex items-center justify-center font-bold text-xs">
+                <DollarSign className="w-4 h-4" />
+              </div>
             </div>
-            <div className="mt-2">
-              <span className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
+            <div className="mt-2 flex items-baseline gap-2">
+              <span className="text-2xl font-black text-slate-900 tracking-tight">
                 {formatCurrency(summary.totalReceivables)}
               </span>
             </div>
-            <div className="mt-2 pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
+            <p className="text-[11px] text-slate-400 mt-1 flex items-center justify-between">
               <span>{summary.totalCustomers} clientes</span>
               <span>{summary.totalInvoices} facturas</span>
-            </div>
+            </p>
+            <div className="absolute bottom-0 left-0 right-0 h-1 bg-[#f6821f]" />
           </div>
 
           {/* Card 2: Corriente (Al día) */}
-          <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden">
+          <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs relative overflow-hidden">
             <div className="flex items-center justify-between">
-              <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+              <span className="text-xs font-medium text-slate-500">
                 Al Día (Corriente)
               </span>
-              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-700 border border-emerald-200">
+              <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                <CheckCircle2 className="w-4 h-4" />
+              </div>
+            </div>
+            <div className="mt-2 flex items-baseline gap-2">
+              <span className="text-2xl font-black text-emerald-600 tracking-tight">
+                {formatCurrency(summary.current)}
+              </span>
+              <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-700">
                 {summary.currentPct}%
               </span>
             </div>
-            <div className="mt-2">
-              <span className="text-2xl sm:text-3xl font-bold text-emerald-700 tracking-tight">
-                {formatCurrency(summary.current)}
-              </span>
-            </div>
-            <div className="mt-2 pt-2 border-t border-slate-100 text-[11px] text-slate-500">
-              <span>Sin vencer</span>
-            </div>
+            <p className="text-[11px] text-slate-400 mt-1">
+              Sin vencer (en término)
+            </p>
+            <div className="absolute bottom-0 left-0 right-0 h-1 bg-emerald-500" />
           </div>
 
           {/* Card 3: 1 a 30 días */}
-          <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden">
+          <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs relative overflow-hidden">
             <div className="flex items-center justify-between">
-              <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+              <span className="text-xs font-medium text-slate-500">
                 1 a 30 Días
               </span>
-              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
+              <div className="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
+                <Clock className="w-4 h-4" />
+              </div>
+            </div>
+            <div className="mt-2 flex items-baseline gap-2">
+              <span className="text-2xl font-black text-amber-600 tracking-tight">
+                {formatCurrency(summary.days1to30)}
+              </span>
+              <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-700">
                 {summary.days1to30Pct}%
               </span>
             </div>
-            <div className="mt-2">
-              <span className="text-2xl sm:text-3xl font-bold text-amber-700 tracking-tight">
-                {formatCurrency(summary.days1to30)}
-              </span>
-            </div>
-            <div className="mt-2 pt-2 border-t border-slate-100 text-[11px] text-slate-500">
-              <span>Mora temprana</span>
-            </div>
+            <p className="text-[11px] text-slate-400 mt-1">
+              Mora temprana de cobro
+            </p>
+            <div className="absolute bottom-0 left-0 right-0 h-1 bg-amber-500" />
           </div>
 
           {/* Card 4: 31 a 60 días */}
-          <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden">
+          <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs relative overflow-hidden">
             <div className="flex items-center justify-between">
-              <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+              <span className="text-xs font-medium text-slate-500">
                 31 a 60 Días
               </span>
-              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-orange-100 text-[#e07216] border border-orange-200">
+              <div className="w-8 h-8 rounded-xl bg-orange-50 text-[#e07216] flex items-center justify-center">
+                <AlertTriangle className="w-4 h-4" />
+              </div>
+            </div>
+            <div className="mt-2 flex items-baseline gap-2">
+              <span className="text-2xl font-black text-[#e07216] tracking-tight">
+                {formatCurrency(summary.days31to60)}
+              </span>
+              <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-orange-100 text-[#e07216]">
                 {summary.days31to60Pct}%
               </span>
             </div>
-            <div className="mt-2">
-              <span className="text-2xl sm:text-3xl font-bold text-[#e07216] tracking-tight">
-                {formatCurrency(summary.days31to60)}
-              </span>
-            </div>
-            <div className="mt-2 pt-2 border-t border-slate-100 text-[11px] text-slate-500">
-              <span>Mora intermedia</span>
-            </div>
+            <p className="text-[11px] text-slate-400 mt-1">
+              Mora intermedia de cobro
+            </p>
+            <div className="absolute bottom-0 left-0 right-0 h-1 bg-orange-500" />
           </div>
 
           {/* Card 5: 61 a 90 días */}
-          <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden">
+          <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs relative overflow-hidden">
             <div className="flex items-center justify-between">
-              <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+              <span className="text-xs font-medium text-slate-500">
                 61 a 90 Días
               </span>
-              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-700 border border-rose-200">
+              <div className="w-8 h-8 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center">
+                <AlertTriangle className="w-4 h-4" />
+              </div>
+            </div>
+            <div className="mt-2 flex items-baseline gap-2">
+              <span className="text-2xl font-black text-rose-600 tracking-tight">
+                {formatCurrency(summary.days61to90)}
+              </span>
+              <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-700">
                 {summary.days61to90Pct}%
               </span>
             </div>
-            <div className="mt-2">
-              <span className="text-2xl sm:text-3xl font-bold text-rose-700 tracking-tight">
-                {formatCurrency(summary.days61to90)}
-              </span>
-            </div>
-            <div className="mt-2 pt-2 border-t border-slate-100 text-[11px] text-slate-500">
-              <span>Prioridad alta</span>
-            </div>
+            <p className="text-[11px] text-slate-400 mt-1">
+              Gestión urgente requerida
+            </p>
+            <div className="absolute bottom-0 left-0 right-0 h-1 bg-rose-500" />
           </div>
 
           {/* Card 6: Más de 90 días */}
-          <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden">
+          <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs relative overflow-hidden">
             <div className="flex items-center justify-between">
-              <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+              <span className="text-xs font-medium text-slate-500">
                 Más de 90 Días
               </span>
-              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-200 text-rose-900 border border-rose-300">
+              <div className="w-8 h-8 rounded-xl bg-purple-50 text-purple-700 flex items-center justify-center">
+                <AlertTriangle className="w-4 h-4" />
+              </div>
+            </div>
+            <div className="mt-2 flex items-baseline gap-2">
+              <span className="text-2xl font-black text-purple-900 tracking-tight">
+                {formatCurrency(summary.daysOver90)}
+              </span>
+              <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-700">
                 {summary.daysOver90Pct}%
               </span>
             </div>
-            <div className="mt-2">
-              <span className="text-2xl sm:text-3xl font-bold text-rose-900 tracking-tight">
-                {formatCurrency(summary.daysOver90)}
-              </span>
-            </div>
-            <div className="mt-2 pt-2 border-t border-slate-100 text-[11px] text-rose-700 font-bold">
-              <span>Crítico</span>
-            </div>
+            <p className="text-[11px] text-slate-400 mt-1">
+              Riesgo alto de incobrabilidad
+            </p>
+            <div className="absolute bottom-0 left-0 right-0 h-1 bg-purple-700" />
           </div>
         </div>
       )}

@@ -4,8 +4,8 @@ const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
 };
 
-// If cached client was created before the User or PettyCash models were loaded, reset it
-if (globalForPrisma.prisma && (!(globalForPrisma.prisma as any).user || !(globalForPrisma.prisma as any).pettyCashFund)) {
+// If cached client was created before User, PettyCash, or TaxRetention models were loaded, reset it
+if (globalForPrisma.prisma && (!(globalForPrisma.prisma as any).user || !(globalForPrisma.prisma as any).pettyCashFund || !(globalForPrisma.prisma as any).taxRetention)) {
   globalForPrisma.prisma = undefined;
 }
 
@@ -20,15 +20,39 @@ if (!process.env.DATABASE_URL) {
   }
 }
 
-export const prisma =
-  globalForPrisma.prisma ??
-  new PrismaClient({
-    log: process.env.NODE_ENV === "development" ? ["query", "error", "warn"] : ["error"],
-  });
-
-if (process.env.NODE_ENV !== "production") {
-  globalForPrisma.prisma = prisma;
+function createClient(): PrismaClient {
+  try {
+    const dynamicRequire = eval("require");
+    // Clear node require cache for prisma
+    for (const key of Object.keys(dynamicRequire.cache || {})) {
+      if (key.includes(".prisma") || key.includes("@prisma")) {
+        delete dynamicRequire.cache[key];
+      }
+    }
+    const { PrismaClient: FreshClient } = dynamicRequire("@prisma/client");
+    return new FreshClient({
+      log: process.env.NODE_ENV === "development" ? ["query", "error", "warn"] : ["error"],
+    });
+  } catch {
+    return new PrismaClient({
+      log: process.env.NODE_ENV === "development" ? ["query", "error", "warn"] : ["error"],
+    });
+  }
 }
+
+export const prisma: PrismaClient = new Proxy({} as PrismaClient, {
+  get(_target, prop) {
+    if (
+      !globalForPrisma.prisma ||
+      !(globalForPrisma.prisma as any).taxRetention ||
+      !(globalForPrisma.prisma as any).user ||
+      !(globalForPrisma.prisma as any).pettyCashFund
+    ) {
+      globalForPrisma.prisma = createClient();
+    }
+    return (globalForPrisma.prisma as any)[prop];
+  },
+});
 
 export default prisma;
 

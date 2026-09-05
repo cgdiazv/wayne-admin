@@ -44,6 +44,7 @@ model Vendor {
   currency   String   @default("USD")
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
+  taxRetentions TaxRetention[]
 }
 
 model InventoryItem {
@@ -239,6 +240,7 @@ model PurchaseInvoice {
   inventoryStatus     String                @default("INGRESADO") // "INGRESADO" | "PENDIENTE_ENTRADA"
   notes               String?
   items               PurchaseInvoiceItem[]
+  taxRetentions       TaxRetention[]
   createdAt           DateTime              @default(now())
   updatedAt           DateTime              @updatedAt
 }
@@ -492,5 +494,26 @@ model QuoteLine {
   amount      Float    @default(0)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+}
+
+model TaxRetention {
+  id                String           @id @default(cuid())
+  retentionNumber   String           @unique // Número correlativo del comprobante ej. "RET-2026-0001"
+  providerId        String
+  provider          Vendor           @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  purchaseInvoiceId String?
+  purchaseInvoice   PurchaseInvoice? @relation(fields: [purchaseInvoiceId], references: [id], onDelete: SetNull)
+  
+  baseAmount        Float            // Monto base sobre el cual se calcula
+  retentionRate     Float            // Porcentaje retenido (ej. 1% ISV, 100% ISV, 12.5% Honorarios, 10% Alquiler)
+  retentionAmount   Float            // Monto retenido total
+  retentionType     String           @default("ISV_1") // "ISV_1" | "ISV_100" | "ISR_12_5" | "ISR_10" | "OTRO"
+  status            String           @default("ISSUED") // "ISSUED" | "VOIDED"
+  cai               String?          // Código de Autorización de Impresión del SAR
+  notes             String?
+  journalEntryId    String?          // Enlace al asiento contable generado
+  date              DateTime         @default(now())
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
 }
 
