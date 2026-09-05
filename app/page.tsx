@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { Users, Factory, Package, Tag, Boxes, AlertCircle, Clock, CheckCircle2, ShieldAlert, Layers, Hash, BookOpen, Download, Upload, FileSpreadsheet, ArrowRight, ArrowLeft, RefreshCw, X, FileText, Calendar, CreditCard, Printer } from "lucide-react";
+import { Users, Factory, Package, Tag, Boxes, AlertCircle, Clock, CheckCircle2, ShieldAlert, Layers, Hash, BookOpen, Download, Upload, FileSpreadsheet, ArrowRight, ArrowLeft, RefreshCw, X, FileText, Calendar, CreditCard, Printer, Database, ArrowUpDown, FileUp, FolderOpen, HelpCircle, Receipt, Check } from "lucide-react";
 import CajaChicaModule from "@/components/CajaChicaModule";
 import AccountingBooksModule from "@/components/AccountingBooksModule";
 import CustomerAgingReportModule from "@/components/CustomerAgingReportModule";
@@ -1821,12 +1821,578 @@ export default function AdminDashboard() {
   // Hub de Listas State
   const [activeListModal, setActiveListModal] = useState<string | null>(null);
 
-  // Import Data Wizard State (Clientes, Proveedores, Productos para Inventario, Catálogo de Cuentas)
-  const [selectedImportCategory, setSelectedImportCategory] = useState<"clientes" | "proveedores" | "productos" | "cuentas">("clientes");
+  // Advanced Import / Export Data Wizard State
+  const [dataExchangeMode, setDataExchangeMode] = useState<"import" | "export">("import");
+  const [selectedImportCategory, setSelectedImportCategory] = useState<
+    "clientes" | "proveedores" | "productos" | "cuentas" | "facturas_venta" | "facturas_compra"
+  >("clientes");
+  const [selectedExportCategory, setSelectedExportCategory] = useState<
+    "clientes" | "proveedores" | "productos" | "cuentas" | "facturas_venta" | "facturas_compra" | "pedidos_venta" | "cotizaciones" | "asientos"
+  >("clientes");
+  const [exportFormat, setExportFormat] = useState<"csv" | "excel" | "json">("csv");
+  const [exportDelimiter, setExportDelimiter] = useState<"," | ";" | "\t">(",");
+  const [isExporting, setIsExporting] = useState<boolean>(false);
+
+  // Advanced Import Wizard Specific State
+  const [importInputMethod, setImportInputMethod] = useState<"file" | "paste">("file");
+  const [importFileName, setImportFileName] = useState<string>("");
+  const [importHasHeaders, setImportHasHeaders] = useState<boolean>(true);
   const [importPasteText, setImportPasteText] = useState<string>("");
-  const [importPreviewRows, setImportPreviewRows] = useState<any[]>([]);
+  const [importRawRows, setImportRawRows] = useState<string[][]>([]);
+  const [importDetectedHeaders, setImportDetectedHeaders] = useState<string[]>([]);
+  const [importColumnMapping, setImportColumnMapping] = useState<Record<string, number>>({});
   const [importNotification, setImportNotification] = useState<string>("");
+  const [importNotificationType, setImportNotificationType] = useState<"success" | "error" | "info">("info");
   const [isImporting, setIsImporting] = useState<boolean>(false);
+  const [importIsDragging, setImportIsDragging] = useState<boolean>(false);
+  const [importResultReport, setImportResultReport] = useState<{
+    successCount: number;
+    errorCount: number;
+    errors: string[];
+  } | null>(null);
+
+  const importFileInputRef = useRef<HTMLInputElement>(null);
+
+  // Import schemas definition for all supported master entities
+  const importCategorySchemas = useMemo(() => ({
+    clientes: {
+      title: "Clientes",
+      desc: "Nombres, RTN, correos, teléfonos y direcciones de entrega",
+      endpoint: "/api/customers",
+      fields: [
+        { key: "name", label: "Nombre / Razón Social", required: true, hint: "Ej: Textiles Búfalo S.A." },
+        { key: "macolaCode", label: "Código Macola / Cliente", required: false, hint: "Ej: CLI-001" },
+        { key: "rtn", label: "RTN / ID Fiscal", required: false, hint: "Ej: 08019012345678" },
+        { key: "email", label: "Correo Electrónico", required: false, hint: "Ej: compras@bufalo.hn" },
+        { key: "phone", label: "Teléfono", required: false, hint: "Ej: +504 2550-1122" },
+        { key: "address", label: "Dirección", required: false, hint: "Ej: Zip Búfalo Nave 4" },
+        { key: "currency", label: "Moneda (USD / HNL)", required: false, hint: "USD o HNL" },
+      ],
+      sampleCsv: "Nombre,RTN,Correo,Telefono,Dirección,Moneda\nTextiles Búfalo S.A.,08019012345678,compras@bufalo.hn,+504 2550-1122,Zip Búfalo Nave 4,USD\nEmpaques del Norte S. de R.L.,05019009876543,ventas@empaques.hn,+504 9988-7766,San Pedro Sula,USD",
+      mapRowToPayload: (m: Record<string, string>) => ({
+        name: m.name?.trim(),
+        macolaCode: m.macolaCode?.trim() || null,
+        rtn: m.rtn?.trim() || null,
+        email: m.email?.trim() || null,
+        phone: m.phone?.trim() || null,
+        address: m.address?.trim() || null,
+        currency: m.currency?.trim().toUpperCase() === "HNL" ? "HNL" : "USD",
+      }),
+    },
+    proveedores: {
+      title: "Proveedores",
+      desc: "Proveedores de insumos, materias primas y servicios",
+      endpoint: "/api/vendors",
+      fields: [
+        { key: "name", label: "Nombre / Razón Social", required: true, hint: "Ej: Insumos Flexográficos S.A." },
+        { key: "macolaCode", label: "Código Macola / Proveedor", required: false, hint: "Ej: PROV-001" },
+        { key: "rtn", label: "RTN / ID Fiscal", required: false, hint: "Ej: 08019998877665" },
+        { key: "email", label: "Correo Electrónico", required: false, hint: "Ej: contacto@insumosflexo.com" },
+        { key: "phone", label: "Teléfono", required: false, hint: "Ej: +504 2233-4455" },
+        { key: "address", label: "Dirección", required: false, hint: "Ej: Tegucigalpa M.D.C." },
+        { key: "currency", label: "Moneda (USD / HNL)", required: false, hint: "USD o HNL" },
+      ],
+      sampleCsv: "Nombre,RTN,Correo,Telefono,Dirección,Moneda\nInsumos Flexográficos S.A.,08019998877665,contacto@insumosflexo.com,+504 2233-4455,Tegucigalpa,USD\nPapelera Hondureña S.A.,05018887766554,pedidos@papelera.hn,+504 2550-9900,San Pedro Sula,USD",
+      mapRowToPayload: (m: Record<string, string>) => ({
+        name: m.name?.trim(),
+        macolaCode: m.macolaCode?.trim() || null,
+        rtn: m.rtn?.trim() || null,
+        email: m.email?.trim() || null,
+        phone: m.phone?.trim() || null,
+        address: m.address?.trim() || null,
+        currency: m.currency?.trim().toUpperCase() === "HNL" ? "HNL" : "USD",
+      }),
+    },
+    productos: {
+      title: "Productos e Inventario",
+      desc: "Catálogo de artículos, SKU, stock inicial, costo y precios",
+      endpoint: "/api/inventory",
+      fields: [
+        { key: "sku", label: "Código SKU / Artículo", required: true, hint: "Ej: FLEX-1001" },
+        { key: "description", label: "Descripción del Producto", required: true, hint: "Ej: Cajas Flexográficas 12x12" },
+        { key: "quantity", label: "Stock Inicial", required: false, hint: "Ej: 500" },
+        { key: "cost", label: "Costo Unitario", required: false, hint: "Ej: 1.25" },
+        { key: "price", label: "Precio de Venta", required: false, hint: "Ej: 2.10" },
+        { key: "trackingType", label: "Tipo Seguimiento (NONE / LOT / SERIAL)", required: false, hint: "NONE, LOT o SERIAL" },
+      ],
+      sampleCsv: "SKU,Descripcion,Cantidad,Costo,Precio,Seguimiento\nFLEX-1001,Cajas Flexográficas Flauta B 12x12,500,1.25,2.10,NONE\nETIQ-2002,Etiquetas BOPP Termoencogibles Rollo,1200,4.50,8.75,LOT",
+      mapRowToPayload: (m: Record<string, string>) => ({
+        sku: m.sku?.trim(),
+        description: m.description?.trim(),
+        quantity: m.quantity ? Number(m.quantity.replace(/[^0-9.-]/g, "")) || 0 : 0,
+        cost: m.cost ? Number(m.cost.replace(/[^0-9.-]/g, "")) || 0 : 0,
+        price: m.price ? Number(m.price.replace(/[^0-9.-]/g, "")) || 0 : 0,
+        trackingType: ["LOT", "SERIAL"].includes(m.trackingType?.trim().toUpperCase()) ? m.trackingType.trim().toUpperCase() : "NONE",
+      }),
+    },
+    cuentas: {
+      title: "Catálogo Contable",
+      desc: "Plan de cuentas, código contable, tipo de cuenta y saldo",
+      endpoint: "/api/accounts",
+      fields: [
+        { key: "code", label: "Código Contable", required: true, hint: "Ej: 1101" },
+        { key: "name", label: "Nombre de Cuenta", required: true, hint: "Ej: Caja General" },
+        { key: "type", label: "Tipo (Activo, Pasivo, Capital, Ingreso, Gasto)", required: true, hint: "Activo, Pasivo, etc." },
+        { key: "currency", label: "Moneda", required: false, hint: "USD o HNL" },
+        { key: "balance", label: "Saldo Inicial", required: false, hint: "Ej: 0.00" },
+      ],
+      sampleCsv: "Codigo,Nombre,Tipo,Moneda,Saldo\n1101,Caja General,Activo,USD,0\n1102,Banco Ficohsa Corriente,Activo,USD,0\n2101,Cuentas por Pagar Comerciales,Pasivo,USD,0\n4101,Ingresos por Ventas Flexo,Ingreso,USD,0",
+      mapRowToPayload: (m: Record<string, string>) => ({
+        code: m.code?.trim(),
+        name: m.name?.trim(),
+        type: m.type?.trim() || "Activo",
+        currency: m.currency?.trim().toUpperCase() === "HNL" ? "HNL" : "USD",
+        balance: m.balance ? Number(m.balance.replace(/[^0-9.-]/g, "")) || 0 : 0,
+        isActive: true,
+      }),
+    },
+    facturas_venta: {
+      title: "Facturas de Venta",
+      desc: "Historial de facturación de clientes para migración",
+      endpoint: "/api/invoices",
+      fields: [
+        { key: "invoiceNumber", label: "Número de Factura", required: true, hint: "Ej: FAC-2026-001" },
+        { key: "customerName", label: "Nombre del Cliente", required: true, hint: "Ej: Textiles Búfalo S.A." },
+        { key: "total", label: "Monto Total", required: true, hint: "Ej: 1500.00" },
+        { key: "invoiceDate", label: "Fecha Emisión (YYYY-MM-DD)", required: false, hint: "2026-08-15" },
+        { key: "dueDate", label: "Fecha Vencimiento (YYYY-MM-DD)", required: false, hint: "2026-09-15" },
+        { key: "currency", label: "Moneda (USD / HNL)", required: false, hint: "USD o HNL" },
+      ],
+      sampleCsv: "NumeroFactura,Cliente,Total,FechaEmision,FechaVencimiento,Moneda\nFAC-2026-001,Textiles Búfalo S.A.,1500.00,2026-08-15,2026-09-15,USD\nFAC-2026-002,Empaques del Norte,2850.50,2026-08-20,2026-09-20,USD",
+      mapRowToPayload: (m: Record<string, string>) => ({
+        invoiceNumber: m.invoiceNumber?.trim(),
+        customerName: m.customerName?.trim(),
+        total: Number(m.total?.replace(/[^0-9.-]/g, "")) || 0,
+        subtotal: Number(m.total?.replace(/[^0-9.-]/g, "")) || 0,
+        invoiceDate: m.invoiceDate?.trim() || new Date().toISOString().split("T")[0],
+        dueDate: m.dueDate?.trim() || new Date().toISOString().split("T")[0],
+        currency: m.currency?.trim().toUpperCase() === "HNL" ? "HNL" : "USD",
+        status: "Emitida",
+      }),
+    },
+    facturas_compra: {
+      title: "Facturas de Compra",
+      desc: "Historial de facturas de proveedores y cuentas por pagar",
+      endpoint: "/api/purchase-invoices",
+      fields: [
+        { key: "invoiceNumber", label: "Número Factura Proveedor", required: true, hint: "Ej: FPROV-2026-01" },
+        { key: "vendorName", label: "Nombre del Proveedor", required: true, hint: "Ej: Insumos Flexográficos S.A." },
+        { key: "total", label: "Monto Total", required: true, hint: "Ej: 950.00" },
+        { key: "issueDate", label: "Fecha Emisión (YYYY-MM-DD)", required: false, hint: "2026-08-10" },
+        { key: "dueDate", label: "Fecha Vencimiento (YYYY-MM-DD)", required: false, hint: "2026-09-10" },
+        { key: "currency", label: "Moneda (USD / HNL)", required: false, hint: "USD o HNL" },
+      ],
+      sampleCsv: "NumeroFactura,Proveedor,Total,FechaEmision,FechaVencimiento,Moneda\nFPROV-2026-01,Insumos Flexográficos S.A.,950.00,2026-08-10,2026-09-10,USD\nFPROV-2026-02,Papelera Hondureña,3200.00,2026-08-18,2026-09-18,USD",
+      mapRowToPayload: (m: Record<string, string>) => ({
+        invoiceNumber: m.invoiceNumber?.trim(),
+        vendorName: m.vendorName?.trim(),
+        total: Number(m.total?.replace(/[^0-9.-]/g, "")) || 0,
+        subtotal: Number(m.total?.replace(/[^0-9.-]/g, "")) || 0,
+        issueDate: m.issueDate?.trim() || new Date().toISOString().split("T")[0],
+        dueDate: m.dueDate?.trim() || new Date().toISOString().split("T")[0],
+        currency: m.currency?.trim().toUpperCase() === "HNL" ? "HNL" : "USD",
+        paymentStatus: "PENDIENTE",
+        inventoryStatus: "INGRESADO",
+      }),
+    },
+  }), []);
+
+  // Smart CSV/TSV string parser supporting quotes & delimiters
+  const parseRawCsv = (text: string): string[][] => {
+    const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
+    return lines.map((line) => {
+      const delim = line.includes("\t") ? "\t" : line.includes(";") ? ";" : ",";
+      const result: string[] = [];
+      let cur = "";
+      let inQuotes = false;
+      for (let i = 0; i < line.length; i++) {
+        const c = line[i];
+        if (c === '"') {
+          if (inQuotes && line[i + 1] === '"') {
+            cur += '"';
+            i++;
+          } else {
+            inQuotes = !inQuotes;
+          }
+        } else if (c === delim && !inQuotes) {
+          result.push(cur.trim());
+          cur = "";
+        } else {
+          cur += c;
+        }
+      }
+      result.push(cur.trim());
+      return result;
+    });
+  };
+
+  // Auto-map file column headers to system fields based on keywords
+  const autoMapHeaders = (
+    headers: string[],
+    fields: Array<{ key: string; label: string; required: boolean }>
+  ): Record<string, number> => {
+    const mapping: Record<string, number> = {};
+    const norm = (str: string) =>
+      str
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^a-z0-9]/g, "");
+
+    fields.forEach((field) => {
+      const keyNorm = norm(field.key);
+      const labelNorm = norm(field.label);
+      let matchIndex = -1;
+
+      headers.forEach((h, idx) => {
+        if (matchIndex !== -1) return;
+        const hNorm = norm(h);
+        if (!hNorm) return;
+
+        if (hNorm === keyNorm || hNorm === labelNorm) {
+          matchIndex = idx;
+          return;
+        }
+
+        if (field.key === "name" && (hNorm.includes("nom") || hNorm.includes("client") || hNorm.includes("razon") || hNorm.includes("prov"))) matchIndex = idx;
+        else if (field.key === "rtn" && (hNorm.includes("rtn") || hNorm.includes("nit") || hNorm.includes("tax") || hNorm.includes("fiscal") || hNorm.includes("cai"))) matchIndex = idx;
+        else if (field.key === "sku" && (hNorm.includes("sku") || hNorm.includes("cod") || hNorm.includes("art"))) matchIndex = idx;
+        else if (field.key === "description" && (hNorm.includes("desc") || hNorm.includes("prod") || hNorm.includes("item"))) matchIndex = idx;
+        else if (field.key === "email" && (hNorm.includes("mail") || hNorm.includes("correo"))) matchIndex = idx;
+        else if (field.key === "phone" && (hNorm.includes("tel") || hNorm.includes("cel") || hNorm.includes("phone"))) matchIndex = idx;
+        else if (field.key === "address" && (hNorm.includes("dir") || hNorm.includes("address") || hNorm.includes("ubic"))) matchIndex = idx;
+        else if (field.key === "price" && (hNorm.includes("prec") || hNorm.includes("price") || hNorm.includes("vent"))) matchIndex = idx;
+        else if (field.key === "cost" && (hNorm.includes("cost") || hNorm.includes("comp"))) matchIndex = idx;
+        else if (field.key === "quantity" && (hNorm.includes("cant") || hNorm.includes("stock") || hNorm.includes("qty"))) matchIndex = idx;
+        else if (field.key === "total" && (hNorm.includes("tot") || hNorm.includes("mont") || hNorm.includes("imp"))) matchIndex = idx;
+        else if (field.key === "code" && (hNorm.includes("cod") || hNorm.includes("num") || hNorm.includes("code"))) matchIndex = idx;
+        else if (field.key === "type" && (hNorm.includes("tip") || hNorm.includes("type") || hNorm.includes("cat"))) matchIndex = idx;
+        else if (field.key === "invoiceNumber" && (hNorm.includes("fact") || hNorm.includes("num") || hNorm.includes("inv"))) matchIndex = idx;
+        else if (field.key === "currency" && (hNorm.includes("mon") || hNorm.includes("curr") || hNorm.includes("div"))) matchIndex = idx;
+      });
+
+      if (matchIndex !== -1) {
+        mapping[field.key] = matchIndex;
+      }
+    });
+
+    return mapping;
+  };
+
+  const handleProcessImportText = (text: string, fileName = "", hasHeaders = importHasHeaders) => {
+    setImportPasteText(text);
+    if (fileName) setImportFileName(fileName);
+    setImportResultReport(null);
+
+    const parsed = parseRawCsv(text);
+    if (parsed.length === 0) {
+      setImportRawRows([]);
+      setImportDetectedHeaders([]);
+      setImportColumnMapping({});
+      return;
+    }
+
+    const schema = (importCategorySchemas as any)[selectedImportCategory];
+    if (hasHeaders && parsed.length > 0) {
+      const headers = parsed[0];
+      const data = parsed.slice(1);
+      setImportDetectedHeaders(headers);
+      setImportRawRows(data);
+      if (schema) {
+        const auto = autoMapHeaders(headers, schema.fields);
+        setImportColumnMapping(auto);
+      }
+    } else {
+      const colCount = Math.max(...parsed.map((r) => r.length));
+      const dummyHeaders = Array.from({ length: colCount }, (_, i) => `Columna ${i + 1}`);
+      setImportDetectedHeaders(dummyHeaders);
+      setImportRawRows(parsed);
+      const seqMapping: Record<string, number> = {};
+      schema?.fields.forEach((f: any, idx: number) => {
+        if (idx < colCount) seqMapping[f.key] = idx;
+      });
+      setImportColumnMapping(seqMapping);
+    }
+  };
+
+  const handleExecuteRealImport = async () => {
+    const schema = (importCategorySchemas as any)[selectedImportCategory];
+    if (!schema || importRawRows.length === 0) return;
+
+    setIsImporting(true);
+    setImportNotification("");
+    setImportResultReport(null);
+
+    let successCount = 0;
+    let errorCount = 0;
+    const errors: string[] = [];
+
+    const activeCompanyId = companySettings.nombreLegal || companySettings.nombre || "WAYNE-DEFAULT";
+
+    for (let i = 0; i < importRawRows.length; i++) {
+      const row = importRawRows[i];
+      const rowMap: Record<string, string> = {};
+
+      schema.fields.forEach((f: any) => {
+        const colIdx = importColumnMapping[f.key];
+        if (colIdx !== undefined && colIdx >= 0 && colIdx < row.length) {
+          rowMap[f.key] = row[colIdx];
+        } else {
+          rowMap[f.key] = "";
+        }
+      });
+
+      // Check required fields
+      const missingRequired = schema.fields.filter(
+        (f: any) => f.required && (!rowMap[f.key] || rowMap[f.key].trim().length === 0)
+      );
+
+      if (missingRequired.length > 0) {
+        errorCount++;
+        errors.push(`Fila ${i + 1}: Faltan campos requeridos (${missingRequired.map((m: any) => m.label).join(", ")}). Omitida.`);
+        continue;
+      }
+
+      const payload = {
+        ...schema.mapRowToPayload(rowMap),
+        companyId: activeCompanyId,
+      };
+
+      try {
+        const res = await fetch(schema.endpoint, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        const json = await res.json();
+        if (res.ok && (json.success !== false)) {
+          successCount++;
+        } else {
+          errorCount++;
+          errors.push(`Fila ${i + 1} (${rowMap.name || rowMap.sku || rowMap.code || rowMap.invoiceNumber || ""}): ${json.error || json.message || "Error al guardar en el servidor"}`);
+        }
+      } catch (err: any) {
+        errorCount++;
+        errors.push(`Fila ${i + 1}: Fallo de conexión o red (${err.message || "Error"}).`);
+      }
+    }
+
+    setIsImporting(false);
+    setImportResultReport({ successCount, errorCount, errors });
+
+    if (successCount > 0) {
+      setImportNotificationType("success");
+      setImportNotification(
+        `¡Importación completada! Se guardaron exitosamente ${successCount} registro(s) en ${schema.title}${
+          errorCount > 0 ? ` (${errorCount} filas omitidas con observaciones)` : "."
+        }`
+      );
+
+      // Trigger background state refresh for refreshed lists
+      if (selectedImportCategory === "productos") {
+        fetch("/api/inventory").then((r) => r.json()).then((j) => {
+          if (j.success && Array.isArray(j.data)) setInventory(j.data);
+        });
+      } else if (selectedImportCategory === "facturas_compra") {
+        fetch("/api/purchase-invoices").then((r) => r.json()).then((j) => {
+          if (j.success && Array.isArray(j.data)) setPurchaseInvoices(j.data);
+        });
+      }
+    } else {
+      setImportNotificationType("error");
+      setImportNotification(`No se pudo importar ningún registro. Revisa las observaciones detalladas.`);
+    }
+  };
+
+  const currentImportSchema = (importCategorySchemas as any)[selectedImportCategory];
+  const importRequiredFields = useMemo(() => {
+    return currentImportSchema?.fields.filter((f: any) => f.required) || [];
+  }, [currentImportSchema]);
+
+  const validatedImportRows = useMemo(() => {
+    if (!currentImportSchema || importRawRows.length === 0) return [];
+    return importRawRows.map((row, idx) => {
+      const missing = importRequiredFields.filter((rf: any) => {
+        const colIdx = importColumnMapping[rf.key];
+        if (colIdx === undefined || colIdx < 0) return true;
+        const cellVal = row[colIdx];
+        return !cellVal || cellVal.trim().length === 0;
+      });
+      return {
+        idx,
+        row,
+        isValid: missing.length === 0,
+        missingFields: missing.map((m: any) => m.label),
+      };
+    });
+  }, [currentImportSchema, importRawRows, importColumnMapping, importRequiredFields]);
+
+  const handleExportData = async (catOverride?: string) => {
+    const targetCat = catOverride || selectedExportCategory;
+    setIsExporting(true);
+    setImportNotification("");
+    try {
+      let endpoint = "";
+      let filename = "";
+      let columnHeaders: string[] = [];
+      let extractRow: (item: any) => string[] = () => [];
+
+      switch (targetCat) {
+        case "clientes":
+          endpoint = "/api/customers";
+          filename = "Clientes";
+          columnHeaders = ["Código Macola", "Nombre", "RTN", "Correo", "Teléfono", "Dirección", "Moneda"];
+          extractRow = (c) => [c.macolaCode || "", c.name || "", c.rtn || "", c.email || "", c.phone || "", c.address || "", c.currency || "USD"];
+          break;
+        case "proveedores":
+          endpoint = "/api/vendors";
+          filename = "Proveedores";
+          columnHeaders = ["Código Macola", "Nombre / Razón Social", "RTN", "Correo", "Teléfono", "Dirección", "Moneda"];
+          extractRow = (v) => [v.macolaCode || "", v.name || "", v.rtn || "", v.email || "", v.phone || "", v.address || "", v.currency || "USD"];
+          break;
+        case "productos":
+          endpoint = "/api/inventory";
+          filename = "Productos_Inventario";
+          columnHeaders = ["SKU", "Descripción", "Cantidad en Stock", "Costo Unitario", "Precio de Venta", "Tipo Seguimiento"];
+          extractRow = (i) => [i.sku || "", i.description || "", String(i.quantity ?? 0), String(i.cost ?? 0), String(i.price ?? 0), i.trackingType || "NONE"];
+          break;
+        case "cuentas":
+          endpoint = "/api/accounts";
+          filename = "Catalogo_Cuentas_Contables";
+          columnHeaders = ["Código", "Nombre de Cuenta", "Tipo de Cuenta", "Moneda", "Saldo Actual", "Estado"];
+          extractRow = (a) => [a.code || "", a.name || "", a.type || "", a.currency || "USD", String(a.balance ?? 0), a.isActive ? "Activa" : "Inactiva"];
+          break;
+        case "facturas_venta":
+          endpoint = "/api/invoices";
+          filename = "Facturas_Venta";
+          columnHeaders = ["Número Factura", "Cliente", "Fecha Emisión", "Fecha Vencimiento", "Moneda", "Subtotal", "ISV", "Total", "Estado"];
+          extractRow = (inv) => [
+            inv.invoiceNumber || inv.num || "",
+            inv.customerName || inv.customer || "",
+            inv.invoiceDate || inv.date || "",
+            inv.dueDate || "",
+            inv.currency || "USD",
+            String(inv.subtotal ?? inv.total ?? 0),
+            String(inv.isv15 ?? 0),
+            String(inv.total ?? 0),
+            inv.status || "Emitida",
+          ];
+          break;
+        case "facturas_compra":
+          endpoint = "/api/purchase-invoices";
+          filename = "Facturas_Compra_Proveedores";
+          columnHeaders = ["Número Factura", "Proveedor", "Fecha Emisión", "Fecha Vencimiento", "Moneda", "Total", "Estado Pago", "Estado Inventario"];
+          extractRow = (pi) => [
+            pi.invoiceNumber || "",
+            pi.vendorName || "",
+            pi.issueDate || "",
+            pi.dueDate || "",
+            pi.currency || "USD",
+            String(pi.total ?? 0),
+            pi.paymentStatus || "PENDIENTE",
+            pi.inventoryStatus || "INGRESADO",
+          ];
+          break;
+        case "pedidos_venta":
+          endpoint = "/api/sales-orders";
+          filename = "Pedidos_de_Venta";
+          columnHeaders = ["Número Orden", "Cliente", "Fecha Orden", "Fecha Entrega", "Moneda", "Total", "Estado"];
+          extractRow = (so) => [
+            so.orderNumber || "",
+            so.customerName || "",
+            so.orderDate || "",
+            so.deliveryDate || "",
+            so.currency || "USD",
+            String(so.total ?? 0),
+            so.status || "CONFIRMADO",
+          ];
+          break;
+        case "cotizaciones":
+          endpoint = "/api/quotes";
+          filename = "Cotizaciones";
+          columnHeaders = ["Número Cotización", "Cliente", "Fecha", "Válida Hasta", "Vendedor", "Total", "Estado"];
+          extractRow = (q) => [
+            q.quoteNumber || "",
+            q.customerName || "",
+            q.quoteDate || "",
+            q.validUntil || "",
+            q.salesRep || "",
+            String(q.total ?? 0),
+            q.status || "BORRADOR",
+          ];
+          break;
+        case "asientos":
+          endpoint = "/api/journal-entries";
+          filename = "Libro_Diario_Asientos";
+          columnHeaders = ["Número Asiento", "Fecha", "Concepto / Descripción", "Referencia", "Total Débito", "Total Crédito", "Estado"];
+          extractRow = (je) => [
+            je.entryNumber || "",
+            je.entryDate || "",
+            je.description || "",
+            je.reference || "",
+            String(je.totalDebit ?? 0),
+            String(je.totalCredit ?? 0),
+            je.status || "ASENTADO",
+          ];
+          break;
+        default:
+          throw new Error("Categoría de exportación no soportada.");
+      }
+
+      const res = await fetch(endpoint);
+      const json = await res.json();
+      const records: any[] = Array.isArray(json) ? json : json.data || [];
+
+      if (!records || records.length === 0) {
+        setImportNotificationType("info");
+        setImportNotification(`No se encontraron registros en la tabla de ${filename.replace(/_/g, " ")} para exportar.`);
+        setIsExporting(false);
+        return;
+      }
+
+      let fileContent = "";
+      let mimeType = "text/csv;charset=utf-8;";
+      let ext = "csv";
+
+      if (exportFormat === "json") {
+        fileContent = JSON.stringify(records, null, 2);
+        mimeType = "application/json;charset=utf-8;";
+        ext = "json";
+      } else {
+        const delim = exportFormat === "excel" ? ";" : exportDelimiter;
+        const escapeCell = (c: any) => {
+          const str = String(c ?? "");
+          if (str.includes(delim) || str.includes('"') || str.includes("\n")) {
+            return `"${str.replace(/"/g, '""')}"`;
+          }
+          return str;
+        };
+        const headerRow = columnHeaders.map(escapeCell).join(delim);
+        const rows = records.map((r) => extractRow(r).map(escapeCell).join(delim));
+        fileContent = "\uFEFF" + [headerRow, ...rows].join("\r\n");
+      }
+
+      const blob = new Blob([fileContent], { type: mimeType });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      const finalFileName = `${companySettings.nombreLegal || "Wayne_Trademark"}_${filename}_${new Date().toISOString().split("T")[0]}.${ext}`;
+      link.setAttribute("href", url);
+      link.setAttribute("download", finalFileName);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      setImportNotificationType("success");
+      setImportNotification(`¡Se exportaron exitosamente ${records.length} registros en formato ${ext.toUpperCase()} (${finalFileName})!`);
+    } catch (err: any) {
+      console.error("Error al exportar datos:", err);
+      setImportNotificationType("error");
+      setImportNotification(`Error durante la exportación: ${err.message || "Fallo inesperado"}`);
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   const [productCategoriesList, setProductCategoriesList] = useState<string[]>([
     "Empaque e Impresión Flexográfica",
@@ -9711,7 +10277,7 @@ export default function AdminDashboard() {
                       { id: "horas", label: "Horas trabajadas" },
                       { id: "monedas", label: "Monedas" },
                       { id: "listas", label: "Todas las listas" },
-                      { id: "importar", label: "Importar datos" },
+                      { id: "importar", label: "Importar / Exportar" },
                       { id: "avanzadas", label: "Opciones avanzadas" },
                     ].map((tab) => {
                       const isActive = configSubTab === tab.id;
@@ -12569,18 +13135,18 @@ export default function AdminDashboard() {
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-8 pt-2">
                         {/* Columna 1 */}
                         <div className="space-y-7">
-                          {/* Item: Importar datos */}
+                          {/* Item: Importar / Exportar datos */}
                           <div className="p-3.5 rounded-xl bg-orange-50/70 border border-[#f6821f]/30">
                             <button
                               type="button"
                               onClick={() => setConfigSubTab("importar")}
                               className="font-bold text-sm text-[#f6821f] hover:underline cursor-pointer text-left mb-1 flex items-center gap-2"
                             >
-                              <Download className="w-4 h-4 text-[#f6821f] shrink-0" />
-                              <span>Importar datos (Clientes, Proveedores, Inventario, Catálogo)</span>
+                              <ArrowUpDown className="w-4 h-4 text-[#f6821f] shrink-0" />
+                              <span>Importar / Exportar datos (Clientes, Proveedores, Inventario, Catálogo)</span>
                             </button>
                             <p className="text-xs text-slate-600 leading-relaxed">
-                              Permite importar de forma masiva tablas de clientes, proveedores, catálogo de productos/inventario y catálogo de cuentas contables desde archivos CSV o Excel.
+                              Permite importar o exportar de forma masiva tablas de clientes, proveedores, catálogo de productos/inventario, facturación y catálogo de cuentas contables desde y hacia archivos CSV, Excel o JSON.
                             </p>
                           </div>
 
@@ -12810,248 +13376,917 @@ export default function AdminDashboard() {
                   )}
 
                   {/* SUBTAB: IMPORTAR DATOS */}
+                  {/* SUBTAB: IMPORTAR / EXPORTAR DATOS */}
                   {configSubTab === "importar" && (
                     <div className="max-w-4xl space-y-6 animate-in fade-in duration-150">
-                      <div>
-                        <h2 className="font-bold text-lg text-slate-900">Importación Masiva de Tablas</h2>
-                        <p className="text-xs text-slate-500 mt-0.5">
-                          Selecciona el tipo de datos que deseas importar a la base de datos de Wayne Trademark mediante archivos CSV o Excel.
-                        </p>
+                      {/* Header */}
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                        <div>
+                          <h2 className="font-bold text-lg text-slate-900 flex items-center gap-2">
+                            <ArrowUpDown className="w-5 h-5 text-[#f6821f]" />
+                            <span>Importar / Exportar Datos</span>
+                          </h2>
+                          <p className="text-xs text-slate-500 mt-0.5">
+                            Carga masiva y descarga de tablas maestras, catálogos y transacciones de {companySettings.nombreLegal || companySettings.nombre || "Wayne Trademark"}.
+                          </p>
+                        </div>
+
+                        {/* Mode Switcher Tabs */}
+                        <div className="inline-flex p-1 rounded-xl bg-slate-100 border border-slate-200 self-start sm:self-auto shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setDataExchangeMode("import");
+                              setImportNotification("");
+                            }}
+                            className={`px-4 py-2 rounded-lg text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
+                              dataExchangeMode === "import"
+                                ? "bg-white text-[#f6821f] shadow-xs"
+                                : "text-slate-600 hover:text-slate-900"
+                            }`}
+                          >
+                            <Upload className="w-3.5 h-3.5" />
+                            <span>Importar Datos</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setDataExchangeMode("export");
+                              setImportNotification("");
+                            }}
+                            className={`px-4 py-2 rounded-lg text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
+                              dataExchangeMode === "export"
+                                ? "bg-white text-[#f6821f] shadow-xs"
+                                : "text-slate-600 hover:text-slate-900"
+                            }`}
+                          >
+                            <Download className="w-3.5 h-3.5" />
+                            <span>Exportar Datos</span>
+                          </button>
+                        </div>
                       </div>
 
                       {importNotification && (
-                        <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold flex items-center justify-between animate-in fade-in">
+                        <div className={`p-4 rounded-xl border text-xs font-semibold flex items-center justify-between animate-in fade-in ${
+                          importNotificationType === "error"
+                            ? "bg-rose-50 border-rose-200 text-rose-800"
+                            : importNotificationType === "info"
+                            ? "bg-blue-50 border-blue-200 text-blue-800"
+                            : "bg-emerald-50 border-emerald-200 text-emerald-800"
+                        }`}>
                           <span>{importNotification}</span>
                           <button
                             type="button"
                             onClick={() => setImportNotification("")}
-                            className="text-emerald-600 hover:text-emerald-900 font-bold"
+                            className="text-slate-400 hover:text-slate-700 font-bold cursor-pointer"
                           >
                             ✕
                           </button>
                         </div>
                       )}
 
-                      {/* 1. Selection Cards */}
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                        {[
-                          {
-                            id: "clientes",
-                            title: "Clientes",
-                            desc: "Nombres, RTN, correos, teléfonos y direcciones de entrega",
-                            Icon: Users,
-                            color: "bg-blue-50 text-blue-700 border-blue-200",
-                          },
-                          {
-                            id: "proveedores",
-                            title: "Proveedores",
-                            desc: "Proveedores de insumos, cartón, tinta y materias primas",
-                            Icon: Factory,
-                            color: "bg-amber-50 text-amber-700 border-amber-200",
-                          },
-                          {
-                            id: "productos",
-                            title: "Productos Inventario",
-                            desc: "Catálogo de artículos, SKU, precios unitarios y stock inicial",
-                            Icon: Package,
-                            color: "bg-emerald-50 text-emerald-700 border-emerald-200",
-                          },
-                          {
-                            id: "cuentas",
-                            title: "Catálogo de Cuentas",
-                            desc: "Plan contable, números de cuenta, categorías y saldos",
-                            Icon: BookOpen,
-                            color: "bg-purple-50 text-purple-700 border-purple-200",
-                          },
-                        ].map((cat) => {
-                          const isSelected = selectedImportCategory === cat.id;
-                          const IconComp = cat.Icon;
-                          return (
-                            <button
-                              key={cat.id}
-                              type="button"
-                              onClick={() => {
-                                setSelectedImportCategory(cat.id as any);
-                                setImportPasteText("");
-                                setImportPreviewRows([]);
-                              }}
-                              className={`p-4 rounded-2xl border text-left transition cursor-pointer flex flex-col justify-between h-36 ${
-                                isSelected
-                                  ? `${cat.color} ring-2 ring-[#f6821f] font-semibold shadow-xs`
-                                  : "bg-white border-slate-200 hover:border-slate-300 text-slate-700"
-                              }`}
-                            >
+                      {/* ================= MODE: IMPORTAR ================= */}
+                      {dataExchangeMode === "import" && (
+                        <div className="space-y-6 animate-in fade-in duration-150">
+                          {/* 1. Entity Selection Cards */}
+                          <div>
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="text-xs font-bold text-slate-700">
+                                1. Selecciona la tabla o catálogo a importar:
+                              </span>
+                              <span className="text-[11px] text-slate-500 font-medium">
+                                Entidad destino: <strong className="text-[#f6821f] capitalize">{currentImportSchema?.title || selectedImportCategory}</strong>
+                              </span>
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
+                              {[
+                                {
+                                  id: "clientes",
+                                  title: "Clientes",
+                                  desc: "Nombres, RTN, correos, teléfonos y direcciones de entrega",
+                                  Icon: Users,
+                                  color: "bg-blue-50 text-blue-700 border-blue-200",
+                                },
+                                {
+                                  id: "proveedores",
+                                  title: "Proveedores",
+                                  desc: "Proveedores de insumos, materias primas y servicios",
+                                  Icon: Factory,
+                                  color: "bg-amber-50 text-amber-700 border-amber-200",
+                                },
+                                {
+                                  id: "productos",
+                                  title: "Productos e Inventario",
+                                  desc: "Catálogo de artículos, SKU, existencias iniciales y precios",
+                                  Icon: Package,
+                                  color: "bg-emerald-50 text-emerald-700 border-emerald-200",
+                                },
+                                {
+                                  id: "cuentas",
+                                  title: "Catálogo Contable",
+                                  desc: "Plan contable general, código contable, tipo y saldo inicial",
+                                  Icon: BookOpen,
+                                  color: "bg-purple-50 text-purple-700 border-purple-200",
+                                },
+                                {
+                                  id: "facturas_venta",
+                                  title: "Facturas de Venta",
+                                  desc: "Historial de facturación de clientes y cuentas por cobrar",
+                                  Icon: FileText,
+                                  color: "bg-indigo-50 text-indigo-700 border-indigo-200",
+                                },
+                                {
+                                  id: "facturas_compra",
+                                  title: "Facturas de Compra",
+                                  desc: "Facturas de proveedores recibidas y cuentas por pagar",
+                                  Icon: Receipt,
+                                  color: "bg-teal-50 text-teal-700 border-teal-200",
+                                },
+                              ].map((cat) => {
+                                const isSelected = selectedImportCategory === cat.id;
+                                const IconComp = cat.Icon;
+                                return (
+                                  <button
+                                    key={cat.id}
+                                    type="button"
+                                    onClick={() => {
+                                      setSelectedImportCategory(cat.id as any);
+                                      setImportPasteText("");
+                                      setImportFileName("");
+                                      setImportRawRows([]);
+                                      setImportDetectedHeaders([]);
+                                      setImportColumnMapping({});
+                                      setImportResultReport(null);
+                                      if (importFileInputRef.current) importFileInputRef.current.value = "";
+                                    }}
+                                    className={`p-3.5 rounded-2xl border text-left transition cursor-pointer flex flex-col justify-between h-32 ${
+                                      isSelected
+                                        ? `${cat.color} ring-2 ring-[#f6821f] font-semibold shadow-xs`
+                                        : "bg-white border-slate-200 hover:border-slate-300 text-slate-700"
+                                    }`}
+                                  >
+                                    <div>
+                                      <div className="flex items-center justify-between mb-1.5">
+                                        <IconComp className="w-5 h-5 stroke-[2]" />
+                                        {isSelected && <CheckCircle2 className="w-4 h-4 text-[#f6821f]" />}
+                                      </div>
+                                      <h3 className="font-bold text-xs text-slate-900">{cat.title}</h3>
+                                      <p className="text-[11px] text-slate-500 mt-0.5 line-clamp-2">{cat.desc}</p>
+                                    </div>
+                                    <span className="text-[10px] font-bold uppercase tracking-wider text-[#f6821f]">
+                                      {isSelected ? "Seleccionada" : "Seleccionar"}
+                                    </span>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+
+                          {/* 2. Data Source Switcher (File Upload vs Excel Paste) */}
+                          <div className="border border-slate-200 rounded-2xl p-6 bg-white space-y-5 shadow-xs">
+                            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-slate-100 pb-4">
                               <div>
-                                <div className="mb-2">
-                                  <IconComp className="w-6 h-6 stroke-[2]" />
-                                </div>
-                                <h3 className="font-bold text-xs text-slate-900">{cat.title}</h3>
-                                <p className="text-[11px] text-slate-500 mt-1 line-clamp-2">{cat.desc}</p>
+                                <h3 className="font-bold text-sm text-slate-900">
+                                  2. Carga de Datos ({currentImportSchema?.title || selectedImportCategory})
+                                </h3>
+                                <p className="text-xs text-slate-500 mt-0.5">
+                                  Sube un archivo delimitado o pega las celdas copiadas directamente de tu hoja de cálculo.
+                                </p>
                               </div>
-                              <span className="text-[10px] font-bold text-[#0066cc] uppercase tracking-wider flex items-center gap-1">
-                                {isSelected ? (
+
+                              <div className="flex flex-wrap items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (!currentImportSchema?.sampleCsv) return;
+                                    const blob = new Blob([currentImportSchema.sampleCsv], { type: "text/csv;charset=utf-8;" });
+                                    const url = URL.createObjectURL(blob);
+                                    const link = document.createElement("a");
+                                    link.setAttribute("href", url);
+                                    link.setAttribute("download", `Plantilla_Importacion_${selectedImportCategory}.csv`);
+                                    document.body.appendChild(link);
+                                    link.click();
+                                    document.body.removeChild(link);
+                                  }}
+                                  className="px-3 py-1.5 rounded-xl border border-slate-300 bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-semibold transition cursor-pointer flex items-center gap-1.5"
+                                  title="Descargar plantilla CSV oficial con los nombres de columna esperados"
+                                >
+                                  <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
+                                  <span>Descargar Plantilla CSV</span>
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* Source Method Tabs & Options */}
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                              <div className="inline-flex p-1 rounded-xl bg-slate-100 border border-slate-200 self-start">
+                                <button
+                                  type="button"
+                                  onClick={() => setImportInputMethod("file")}
+                                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                                    importInputMethod === "file"
+                                      ? "bg-white text-[#f6821f] shadow-xs"
+                                      : "text-slate-600 hover:text-slate-900"
+                                  }`}
+                                >
+                                  <FileUp className="w-3.5 h-3.5" />
+                                  <span>Subir Archivo (.csv, .tsv, .txt)</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setImportInputMethod("paste")}
+                                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                                    importInputMethod === "paste"
+                                      ? "bg-white text-[#f6821f] shadow-xs"
+                                      : "text-slate-600 hover:text-slate-900"
+                                  }`}
+                                >
+                                  <FileText className="w-3.5 h-3.5" />
+                                  <span>Pegar de Excel / Google Sheets</span>
+                                </button>
+                              </div>
+
+                              <div className="flex items-center gap-4 text-xs">
+                                <label className="inline-flex items-center gap-2 text-slate-700 cursor-pointer select-none">
+                                  <input
+                                    type="checkbox"
+                                    checked={importHasHeaders}
+                                    onChange={(e) => {
+                                      const next = e.target.checked;
+                                      setImportHasHeaders(next);
+                                      if (importPasteText) {
+                                        handleProcessImportText(importPasteText, importFileName, next);
+                                      }
+                                    }}
+                                    className="w-4 h-4 rounded border-slate-300 text-[#f6821f] focus:ring-[#f6821f]"
+                                  />
+                                  <span className="font-semibold text-[11px] text-slate-700">
+                                    La 1.ª fila contiene encabezados
+                                  </span>
+                                </label>
+
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (currentImportSchema?.sampleCsv) {
+                                      handleProcessImportText(currentImportSchema.sampleCsv, `Ejemplo_${selectedImportCategory}.csv`, importHasHeaders);
+                                      setImportInputMethod("paste");
+                                    }
+                                  }}
+                                  className="text-[11px] font-bold text-[#f6821f] hover:underline cursor-pointer"
+                                >
+                                  Cargar datos de prueba
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* Method A: File Upload Drag & Drop */}
+                            {importInputMethod === "file" && (
+                              <div>
+                                <input
+                                  type="file"
+                                  ref={importFileInputRef}
+                                  accept=".csv,.txt,.tsv"
+                                  className="hidden"
+                                  onChange={(e) => {
+                                    const file = e.target.files?.[0];
+                                    if (file) {
+                                      const reader = new FileReader();
+                                      reader.onload = (ev) => {
+                                        const fileContent = (ev.target?.result as string) || "";
+                                        handleProcessImportText(fileContent, file.name, importHasHeaders);
+                                      };
+                                      reader.readAsText(file);
+                                    }
+                                  }}
+                                />
+
+                                {importFileName && importRawRows.length > 0 ? (
+                                  <div className="p-4 rounded-xl border border-emerald-200 bg-emerald-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                    <div className="flex items-center gap-3">
+                                      <div className="p-2.5 rounded-xl bg-emerald-100 text-emerald-700 shrink-0">
+                                        <FileSpreadsheet className="w-5 h-5" />
+                                      </div>
+                                      <div>
+                                        <div className="flex items-center gap-2">
+                                          <span className="font-bold text-xs text-slate-900">{importFileName}</span>
+                                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                                            ✓ Archivo cargado
+                                          </span>
+                                        </div>
+                                        <p className="text-[11px] text-slate-500 mt-0.5">
+                                          {importRawRows.length} filas de datos detectadas • {importDetectedHeaders.length} columnas
+                                        </p>
+                                      </div>
+                                    </div>
+
+                                    <div className="flex items-center gap-2">
+                                      <button
+                                        type="button"
+                                        onClick={() => importFileInputRef.current?.click()}
+                                        className="px-3 py-1.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold transition cursor-pointer"
+                                      >
+                                        Cambiar archivo
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setImportFileName("");
+                                          setImportPasteText("");
+                                          setImportRawRows([]);
+                                          setImportDetectedHeaders([]);
+                                          setImportColumnMapping({});
+                                          if (importFileInputRef.current) importFileInputRef.current.value = "";
+                                        }}
+                                        className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 cursor-pointer"
+                                        title="Quitar archivo"
+                                      >
+                                        <X className="w-4 h-4" />
+                                      </button>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div
+                                    onDragOver={(e) => {
+                                      e.preventDefault();
+                                      setImportIsDragging(true);
+                                    }}
+                                    onDragLeave={() => setImportIsDragging(false)}
+                                    onDrop={(e) => {
+                                      e.preventDefault();
+                                      setImportIsDragging(false);
+                                      const file = e.dataTransfer.files?.[0];
+                                      if (file) {
+                                        const reader = new FileReader();
+                                        reader.onload = (ev) => {
+                                          const fileContent = (ev.target?.result as string) || "";
+                                          handleProcessImportText(fileContent, file.name, importHasHeaders);
+                                        };
+                                        reader.readAsText(file);
+                                      }
+                                    }}
+                                    onClick={() => importFileInputRef.current?.click()}
+                                    className={`border-2 border-dashed rounded-2xl p-8 text-center transition cursor-pointer flex flex-col items-center justify-center gap-3 ${
+                                      importIsDragging
+                                        ? "border-[#f6821f] bg-orange-50/50 scale-[0.99]"
+                                        : "border-slate-300 hover:border-slate-400 bg-slate-50/50 hover:bg-slate-50"
+                                    }`}
+                                  >
+                                    <div className="p-3.5 rounded-2xl bg-white shadow-xs border border-slate-200 text-[#f6821f]">
+                                      <Upload className="w-6 h-6 stroke-[2]" />
+                                    </div>
+                                    <div>
+                                      <p className="font-bold text-xs text-slate-900">
+                                        Arrastra tu archivo aquí o haz clic para seleccionarlo
+                                      </p>
+                                      <p className="text-[11px] text-slate-500 mt-1">
+                                        Formatos compatibles: <strong>CSV</strong> (delimitado por comas o punto y coma), <strong>TSV</strong> o <strong>TXT</strong>
+                                      </p>
+                                    </div>
+                                    <span className="px-3.5 py-1.5 rounded-xl bg-[#f6821f] text-white text-xs font-semibold shadow-xs hover:bg-[#e07216]">
+                                      Examinar archivos
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+
+                            {/* Method B: Paste Text from Spreadsheet */}
+                            {importInputMethod === "paste" && (
+                              <div className="space-y-2">
+                                <div className="flex items-center justify-between">
+                                  <label className="text-xs font-semibold text-slate-700">
+                                    Copia celdas desde Excel o Google Sheets y pégalas aquí (Ctrl + V):
+                                  </label>
+                                  {importPasteText && (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setImportPasteText("");
+                                        setImportRawRows([]);
+                                        setImportDetectedHeaders([]);
+                                        setImportColumnMapping({});
+                                      }}
+                                      className="text-[11px] font-semibold text-rose-600 hover:text-rose-800 cursor-pointer"
+                                    >
+                                      Limpiar contenido
+                                    </button>
+                                  )}
+                                </div>
+                                <textarea
+                                  rows={6}
+                                  value={importPasteText}
+                                  onChange={(e) => handleProcessImportText(e.target.value, "Pegado_Excel", importHasHeaders)}
+                                  placeholder={currentImportSchema?.sampleCsv || "Pega aquí tus datos..."}
+                                  className="w-full p-3.5 text-xs font-mono rounded-xl border border-slate-300 bg-slate-50/60 text-slate-900 focus:outline-none focus:border-[#f6821f] focus:bg-white transition"
+                                />
+                              </div>
+                            )}
+                          </div>
+
+                          {/* 3. Smart Column Mapping Card */}
+                          {importRawRows.length > 0 && currentImportSchema && (
+                            <div className="border border-slate-200 rounded-2xl p-6 bg-white space-y-4 shadow-xs animate-in fade-in duration-150">
+                              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
+                                <div>
+                                  <div className="flex items-center gap-2">
+                                    <h3 className="font-bold text-sm text-slate-900">
+                                      3. Mapeo Inteligente de Columnas
+                                    </h3>
+                                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-orange-50 text-[#f6821f] border border-orange-200">
+                                      Auto-detección activa
+                                    </span>
+                                  </div>
+                                  <p className="text-xs text-slate-500 mt-0.5">
+                                    Asocia cada campo de Wayne ERP con la columna correspondiente de tu archivo. Los campos con (<span className="text-rose-500 font-bold">*</span>) son obligatorios.
+                                  </p>
+                                </div>
+
+                                <div className="text-[11px] font-bold text-slate-600 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200 shrink-0">
+                                  {Object.values(importColumnMapping).filter((v) => v !== undefined && v >= 0).length} de {currentImportSchema.fields.length} campos asignados
+                                </div>
+                              </div>
+
+                              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5 pt-1">
+                                {currentImportSchema.fields.map((field: any) => {
+                                  const selectedIdx = importColumnMapping[field.key] ?? -1;
+                                  const isMapped = selectedIdx >= 0;
+                                  return (
+                                    <div
+                                      key={field.key}
+                                      className={`p-3 rounded-xl border transition ${
+                                        isMapped
+                                          ? "bg-slate-50/80 border-slate-200"
+                                          : field.required
+                                          ? "bg-rose-50/40 border-rose-200"
+                                          : "bg-white border-slate-200"
+                                      }`}
+                                    >
+                                      <div className="flex items-center justify-between mb-1">
+                                        <label className="text-xs font-bold text-slate-800 flex items-center gap-1">
+                                          <span>{field.label}</span>
+                                          {field.required && (
+                                            <span className="text-rose-500 font-bold text-sm" title="Campo obligatorio">*</span>
+                                          )}
+                                        </label>
+                                        {field.required ? (
+                                          <span className="text-[9px] font-bold uppercase tracking-wider text-rose-600 bg-rose-50 px-1.5 py-0.2 rounded">
+                                            Requerido
+                                          </span>
+                                        ) : (
+                                          <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400">
+                                            Opcional
+                                          </span>
+                                        )}
+                                      </div>
+
+                                      <p className="text-[10px] text-slate-500 mb-2 truncate" title={field.hint}>
+                                        {field.hint}
+                                      </p>
+
+                                      <select
+                                        value={selectedIdx}
+                                        onChange={(e) => {
+                                          const val = parseInt(e.target.value, 10);
+                                          setImportColumnMapping((prev) => ({
+                                            ...prev,
+                                            [field.key]: val,
+                                          }));
+                                        }}
+                                        className={`w-full px-2.5 py-1.5 text-xs rounded-lg border font-medium transition cursor-pointer ${
+                                          isMapped
+                                            ? "bg-white border-slate-300 text-slate-800 focus:border-[#f6821f]"
+                                            : field.required
+                                            ? "bg-white border-rose-300 text-rose-900 focus:border-rose-500"
+                                            : "bg-white border-slate-200 text-slate-500"
+                                        }`}
+                                      >
+                                        <option value={-1}>-- Omitir / Sin mapear --</option>
+                                        {importDetectedHeaders.map((headerName, hIdx) => {
+                                          const sampleVal = importRawRows[0]?.[hIdx] ? ` (Ej: "${importRawRows[0][hIdx]}")` : "";
+                                          return (
+                                            <option key={hIdx} value={hIdx}>
+                                              Col {hIdx + 1}: {headerName || `Columna ${hIdx + 1}`}{sampleVal}
+                                            </option>
+                                          );
+                                        })}
+                                      </select>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* 4. Live Validated Preview Table */}
+                          {importRawRows.length > 0 && currentImportSchema && (
+                            <div className="border border-slate-200 rounded-2xl p-6 bg-white space-y-4 shadow-xs animate-in fade-in duration-150">
+                              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
+                                <div>
+                                  <h3 className="font-bold text-sm text-slate-900">
+                                    4. Vista Previa y Validación de Registros
+                                  </h3>
+                                  <p className="text-xs text-slate-500 mt-0.5">
+                                    Verifica la calidad y consistencia de los datos antes de guardarlos definitivamente en la base de datos.
+                                  </p>
+                                </div>
+
+                                <div className="flex items-center gap-2">
+                                  <span className="px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 flex items-center gap-1">
+                                    <Check className="w-3.5 h-3.5" />
+                                    <span>
+                                      {validatedImportRows.filter((r) => r.isValid).length} listos
+                                    </span>
+                                  </span>
+                                  {validatedImportRows.filter((r) => !r.isValid).length > 0 && (
+                                    <span className="px-3 py-1 rounded-full text-xs font-bold bg-rose-100 text-rose-800 flex items-center gap-1">
+                                      <AlertCircle className="w-3.5 h-3.5" />
+                                      <span>
+                                        {validatedImportRows.filter((r) => !r.isValid).length} incompletos
+                                      </span>
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+
+                              <div className="max-h-72 overflow-y-auto border border-slate-200 rounded-xl overflow-x-auto shadow-inner">
+                                <table className="w-full text-left text-xs">
+                                  <thead>
+                                    <tr className="bg-slate-100/80 border-b border-slate-200 text-slate-700 font-bold sticky top-0 backdrop-blur-xs">
+                                      <th className="p-2.5 text-center w-12 text-slate-500">#</th>
+                                      {currentImportSchema.fields.map((field: any) => {
+                                        const colIdx = importColumnMapping[field.key];
+                                        const isMapped = colIdx !== undefined && colIdx >= 0;
+                                        return (
+                                          <th key={field.key} className="p-2.5 whitespace-nowrap">
+                                            <div className="flex flex-col">
+                                              <span className="flex items-center gap-1 text-slate-800">
+                                                {field.label}
+                                                {field.required && <span className="text-rose-500">*</span>}
+                                              </span>
+                                              <span className="text-[10px] font-normal text-slate-400">
+                                                {isMapped
+                                                  ? `Col: ${importDetectedHeaders[colIdx] || colIdx + 1}`
+                                                  : "(Sin vincular)"}
+                                              </span>
+                                            </div>
+                                          </th>
+                                        );
+                                      })}
+                                      <th className="p-2.5 text-right whitespace-nowrap">Estado</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody className="divide-y divide-slate-100">
+                                    {validatedImportRows.slice(0, 10).map((item) => {
+                                      return (
+                                        <tr
+                                          key={item.idx}
+                                          className={`hover:bg-slate-50/70 transition ${
+                                            !item.isValid ? "bg-rose-50/20" : ""
+                                          }`}
+                                        >
+                                          <td className="p-2.5 text-center text-slate-400 font-mono text-[11px]">
+                                            {item.idx + 1}
+                                          </td>
+                                          {currentImportSchema.fields.map((field: any) => {
+                                            const colIdx = importColumnMapping[field.key];
+                                            const val = colIdx !== undefined && colIdx >= 0 ? item.row[colIdx] : "";
+                                            const isMissing = field.required && (!val || val.trim().length === 0);
+                                            return (
+                                              <td
+                                                key={field.key}
+                                                className={`p-2.5 font-sans whitespace-nowrap max-w-xs truncate ${
+                                                  isMissing
+                                                    ? "text-rose-600 bg-rose-50/50 font-bold"
+                                                    : "text-slate-800"
+                                                }`}
+                                                title={val}
+                                              >
+                                                {val || (field.required ? "(Requerido vacío)" : "-")}
+                                              </td>
+                                            );
+                                          })}
+                                          <td className="p-2.5 text-right whitespace-nowrap">
+                                            {item.isValid ? (
+                                              <span className="px-2.5 py-0.5 text-[10px] font-bold text-emerald-700 bg-emerald-100/80 rounded-full inline-flex items-center gap-1">
+                                                <Check className="w-3 h-3" />
+                                                <span>Válido</span>
+                                              </span>
+                                            ) : (
+                                              <span
+                                                className="px-2.5 py-0.5 text-[10px] font-bold text-rose-700 bg-rose-100 rounded-full inline-flex items-center gap-1 cursor-help"
+                                                title={`Falta: ${item.missingFields.join(", ")}`}
+                                              >
+                                                <AlertCircle className="w-3 h-3" />
+                                                <span>Falta dato</span>
+                                              </span>
+                                            )}
+                                          </td>
+                                        </tr>
+                                      );
+                                    })}
+                                  </tbody>
+                                </table>
+                              </div>
+
+                              {validatedImportRows.length > 10 && (
+                                <p className="text-[11px] text-slate-500 italic text-center">
+                                  Mostrando las primeras 10 filas de {validatedImportRows.length} registros detectados. Todos serán procesados al importar.
+                                </p>
+                              )}
+                            </div>
+                          )}
+
+                          {/* 5. Execution Action Bar & Detailed Report */}
+                          <div className="border border-slate-200 rounded-2xl p-6 bg-white shadow-xs space-y-4">
+                            {/* Execution Result Box */}
+                            {importResultReport && (
+                              <div
+                                className={`p-4 rounded-xl border text-xs space-y-2 animate-in fade-in duration-150 ${
+                                  importResultReport.errorCount === 0
+                                    ? "bg-emerald-50 border-emerald-200 text-emerald-900"
+                                    : "bg-amber-50 border-amber-200 text-amber-900"
+                                }`}
+                              >
+                                <div className="flex items-center justify-between font-bold">
+                                  <div className="flex items-center gap-2">
+                                    {importResultReport.errorCount === 0 ? (
+                                      <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                                    ) : (
+                                      <AlertCircle className="w-5 h-5 text-amber-600" />
+                                    )}
+                                    <span>
+                                      Resultado de la importación: {importResultReport.successCount} guardados con éxito
+                                      {importResultReport.errorCount > 0 ? `, ${importResultReport.errorCount} con advertencias` : ""}.
+                                    </span>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => setImportResultReport(null)}
+                                    className="text-slate-400 hover:text-slate-700 cursor-pointer"
+                                  >
+                                    ✕
+                                  </button>
+                                </div>
+
+                                {importResultReport.errors.length > 0 && (
+                                  <div className="p-3 rounded-lg bg-white/70 border border-amber-200 space-y-1 text-[11px] max-h-36 overflow-y-auto font-mono text-slate-700">
+                                    <span className="font-bold font-sans text-slate-800 block">Detalle de observaciones:</span>
+                                    {importResultReport.errors.map((err, errIdx) => (
+                                      <p key={errIdx}>• {err}</p>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            )}
+
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                              <div>
+                                <span className="font-bold text-xs text-slate-900 block">
+                                  {validatedImportRows.length > 0
+                                    ? `${validatedImportRows.filter((r) => r.isValid).length} registros listos para insertar en ${currentImportSchema?.title || selectedImportCategory}.`
+                                    : "Ingresa datos en el paso 2 para comenzar la importación."}
+                                </span>
+                                <p className="text-[11px] text-slate-500 mt-0.5">
+                                  Los datos se almacenarán directamente en la base de datos PostgreSQL de {companySettings.nombreLegal || companySettings.nombre || "Wayne Trademark"}.
+                                </p>
+                              </div>
+
+                              <button
+                                type="button"
+                                disabled={
+                                  validatedImportRows.length === 0 ||
+                                  validatedImportRows.filter((r) => r.isValid).length === 0 ||
+                                  isImporting
+                                }
+                                onClick={handleExecuteRealImport}
+                                className="px-6 py-2.5 rounded-xl bg-[#f6821f] hover:bg-[#e07216] text-white text-xs font-bold transition cursor-pointer shadow-md disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 self-start sm:self-auto shrink-0"
+                              >
+                                {isImporting ? (
                                   <>
-                                    <CheckCircle2 className="w-3 h-3 text-[#0066cc]" />
-                                    <span>Seleccionado</span>
+                                    <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                    <span>Importando a la base de datos...</span>
                                   </>
                                 ) : (
-                                  <span>Seleccionar</span>
+                                  <>
+                                    <span>
+                                      Importar {validatedImportRows.filter((r) => r.isValid).length > 0 ? `(${validatedImportRows.filter((r) => r.isValid).length})` : ""} a la Base de Datos →
+                                    </span>
+                                  </>
                                 )}
-                              </span>
-                            </button>
-                          );
-                        })}
-                      </div>
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
 
-                      {/* 2. Upload / Paste Container */}
-                      <div className="border border-slate-200 rounded-2xl p-6 bg-white space-y-5 shadow-xs">
-                        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                      {/* ================= MODE: EXPORTAR ================= */}
+                      {dataExchangeMode === "export" && (
+                        <div className="space-y-6 animate-in fade-in duration-150">
+                          {/* 1. Selection Cards */}
                           <div>
-                            <h3 className="font-bold text-sm text-slate-900 capitalize">
-                              Importar {selectedImportCategory === "productos" ? "Productos para inventario" : selectedImportCategory}
+                            <span className="text-xs font-bold text-slate-700 block mb-2">1. Selecciona la tabla o entidad a exportar:</span>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
+                              {[
+                                {
+                                  id: "clientes",
+                                  title: "Clientes",
+                                  desc: "Nombres, RTN, correos, teléfonos, direcciones y moneda",
+                                  Icon: Users,
+                                  color: "bg-blue-50 text-blue-700 border-blue-200",
+                                },
+                                {
+                                  id: "proveedores",
+                                  title: "Proveedores",
+                                  desc: "Proveedores de materias primas, insumos y servicios",
+                                  Icon: Factory,
+                                  color: "bg-amber-50 text-amber-700 border-amber-200",
+                                },
+                                {
+                                  id: "productos",
+                                  title: "Productos e Inventario",
+                                  desc: "Catálogo de productos, SKU, stock actual, costo y precios",
+                                  Icon: Package,
+                                  color: "bg-emerald-50 text-emerald-700 border-emerald-200",
+                                },
+                                {
+                                  id: "cuentas",
+                                  title: "Catálogo Contable",
+                                  desc: "Plan de cuentas, código contable, tipo de cuenta y saldo",
+                                  Icon: BookOpen,
+                                  color: "bg-purple-50 text-purple-700 border-purple-200",
+                                },
+                                {
+                                  id: "facturas_venta",
+                                  title: "Facturas de Venta",
+                                  desc: "Historial de facturación de clientes, montos y estados de cobro",
+                                  Icon: FileText,
+                                  color: "bg-indigo-50 text-indigo-700 border-indigo-200",
+                                },
+                                {
+                                  id: "facturas_compra",
+                                  title: "Facturas de Compra",
+                                  desc: "Facturas de proveedores, órdenes vinculadas y pagos",
+                                  Icon: CreditCard,
+                                  color: "bg-teal-50 text-teal-700 border-teal-200",
+                                },
+                                {
+                                  id: "pedidos_venta",
+                                  title: "Pedidos de Venta",
+                                  desc: "Órdenes de clientes (Sales Orders), fechas y estados",
+                                  Icon: Boxes,
+                                  color: "bg-orange-50 text-orange-700 border-orange-200",
+                                },
+                                {
+                                  id: "cotizaciones",
+                                  title: "Cotizaciones",
+                                  desc: "Propuestas comerciales a clientes con validez y vendedor",
+                                  Icon: Tag,
+                                  color: "bg-rose-50 text-rose-700 border-rose-200",
+                                },
+                                {
+                                  id: "asientos",
+                                  title: "Asientos Contables",
+                                  desc: "Libro de diario general, números de póliza y referencias",
+                                  Icon: Layers,
+                                  color: "bg-violet-50 text-violet-700 border-violet-200",
+                                },
+                              ].map((cat) => {
+                                const isSelected = selectedExportCategory === cat.id;
+                                const IconComp = cat.Icon;
+                                return (
+                                  <button
+                                    key={cat.id}
+                                    type="button"
+                                    onClick={() => setSelectedExportCategory(cat.id as any)}
+                                    className={`p-3.5 rounded-2xl border text-left transition cursor-pointer flex flex-col justify-between h-32 ${
+                                      isSelected
+                                        ? `${cat.color} ring-2 ring-[#f6821f] font-semibold shadow-xs`
+                                        : "bg-white border-slate-200 hover:border-slate-300 text-slate-700"
+                                    }`}
+                                  >
+                                    <div>
+                                      <div className="flex items-center justify-between mb-1.5">
+                                        <IconComp className="w-5 h-5 stroke-[2]" />
+                                        {isSelected && <CheckCircle2 className="w-4 h-4 text-[#f6821f]" />}
+                                      </div>
+                                      <h3 className="font-bold text-xs text-slate-900">{cat.title}</h3>
+                                      <p className="text-[11px] text-slate-500 mt-0.5 line-clamp-2">{cat.desc}</p>
+                                    </div>
+                                    <span className="text-[10px] font-bold uppercase tracking-wider text-[#f6821f]">
+                                      {isSelected ? "Seleccionada" : "Seleccionar"}
+                                    </span>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+
+                          {/* 2. Format & Configuration Options */}
+                          <div className="border border-slate-200 rounded-2xl p-6 bg-white space-y-5 shadow-xs">
+                            <h3 className="font-bold text-sm text-slate-900 border-b border-slate-100 pb-3">
+                              2. Formato y configuración de salida
                             </h3>
-                            <p className="text-xs text-slate-500">Pega los datos copiados desde Excel o carga tu archivo en formato CSV / TSV.</p>
-                          </div>
 
-                          <button
-                            type="button"
-                            onClick={() => {
-                              let sampleCsv = "";
-                              if (selectedImportCategory === "clientes") {
-                                sampleCsv = "Nombre,RTN,Correo,Telefono,Dirección\nTextiles Búfalo S.A.,08019012345678,compras@bufalo.hn,+504 2550-1122,Zip Búfalo Nave 4\nEmpaques del Norte,05019009876543,ventas@empaques.hn,+504 9988-7766,San Pedro Sula";
-                              } else if (selectedImportCategory === "proveedores") {
-                                sampleCsv = "Proveedor,RTN,Correo,Telefono,Categoria\nInsumos Flexográficos S.A.,08019998877665,contacto@insumosflexo.com,+504 2233-4455,Tintas Flexo\nPapelera Hondureña,05018887766554,pedidos@papelera.hn,+504 2550-9900,Cartón y Papel";
-                              } else if (selectedImportCategory === "productos") {
-                                sampleCsv = "SKU,Nombre,Categoria,Precio,Stock\nFLEX-1001,Cajas Flexo 12x12,Empaque Flexográfico,25.50,500\nETIQ-2002,Etiquetas Adhesivas Rollos,Etiquetas Industriales,8.75,1200";
-                              } else {
-                                sampleCsv = "Codigo,Cuenta,Tipo,Subcuenta\n1000,Caja y Bancos,Activo,No\n1010,Banco Ficohsa USD,Activo,Sí\n4000,Ingresos por Ventas Flexo,Ingreso,No";
-                              }
-
-                              const blob = new Blob([sampleCsv], { type: "text/csv;charset=utf-8;" });
-                              const url = URL.createObjectURL(blob);
-                              const link = document.createElement("a");
-                              link.setAttribute("href", url);
-                              link.setAttribute("download", `Plantilla_Ejemplo_${selectedImportCategory}.csv`);
-                              document.body.appendChild(link);
-                              link.click();
-                              document.body.removeChild(link);
-                            }}
-                            className="px-3.5 py-1.5 rounded-xl border border-slate-300 bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-semibold transition cursor-pointer flex items-center gap-1.5"
-                          >
-                            <svg className="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                            </svg>
-                            <span>Descargar plantilla CSV</span>
-                          </button>
-                        </div>
-
-                        {/* Textarea or File Parser */}
-                        <div className="space-y-3">
-                          <label className="block text-xs font-semibold text-slate-700">
-                            Pega aquí las filas de tu hoja de cálculo (Excel / Google Sheets) o CSV:
-                          </label>
-                          <textarea
-                            rows={5}
-                            value={importPasteText}
-                            onChange={(e) => {
-                              const val = e.target.value;
-                              setImportPasteText(val);
-                              // Auto parse lines
-                              const lines = val.trim().split("\n").filter((l) => l.trim().length > 0);
-                              if (lines.length > 0) {
-                                const parsed = lines.map((line, idx) => {
-                                  const cols = line.includes("\t") ? line.split("\t") : line.split(",");
-                                  return { id: idx, cols };
-                                });
-                                setImportPreviewRows(parsed);
-                              } else {
-                                setImportPreviewRows([]);
-                              }
-                            }}
-                            placeholder={
-                              selectedImportCategory === "clientes"
-                                ? "Ejemplo:\nTextiles Búfalo S.A., 08019012345678, compras@bufalo.hn, +504 2550-1122, Zip Búfalo\nEmpaques del Norte, 05019009876543, ventas@empaques.hn, +504 9988-7766, San Pedro Sula"
-                                : "Pega las filas de tu tabla separadas por coma o tabulación..."
-                            }
-                            className="w-full p-3.5 text-xs font-mono rounded-xl border border-slate-300 bg-slate-50/70 text-slate-900 focus:outline-none focus:border-[#f6821f]"
-                          />
-                        </div>
-
-                        {/* Interactive Data Preview Table */}
-                        {importPreviewRows.length > 0 && (
-                          <div className="space-y-3 pt-2 animate-in fade-in duration-150">
-                            <div className="flex items-center justify-between">
-                              <span className="text-xs font-bold text-slate-800">
-                                Vista previa ({importPreviewRows.length} registros detectados)
-                              </span>
-                              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
-                                ✓ Formato detectado correctamente
-                              </span>
-                            </div>
-
-                            <div className="max-h-60 overflow-y-auto border border-slate-200 rounded-xl overflow-x-auto">
-                              <table className="w-full text-left text-xs">
-                                <thead>
-                                  <tr className="bg-slate-100 border-b border-slate-200 text-slate-700 font-bold">
-                                    <th className="p-2.5 text-center w-10">#</th>
-                                    {importPreviewRows[0]?.cols.map((_: any, i: number) => (
-                                      <th key={i} className="p-2.5">Columna {i + 1}</th>
-                                    ))}
-                                    <th className="p-2.5 text-right">Estado</th>
-                                  </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-100 font-mono">
-                                  {importPreviewRows.slice(0, 10).map((row, idx) => (
-                                    <tr key={idx} className="hover:bg-slate-50">
-                                      <td className="p-2.5 text-center text-slate-400 font-sans">{idx + 1}</td>
-                                      {row.cols.map((col: string, cIdx: number) => (
-                                        <td key={cIdx} className="p-2.5 text-slate-800 font-sans">{col.trim()}</td>
-                                      ))}
-                                      <td className="p-2.5 text-right font-sans">
-                                        <span className="px-2 py-0.5 text-[10px] font-semibold text-emerald-700 bg-emerald-50 rounded-full">
-                                          Listo
-                                        </span>
-                                      </td>
-                                    </tr>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                              {/* Format selection */}
+                              <div className="space-y-2">
+                                <label className="text-xs font-semibold text-slate-700 block">
+                                  Formato de archivo:
+                                </label>
+                                <div className="grid grid-cols-3 gap-2">
+                                  {[
+                                    { id: "csv", label: "CSV Estándar", ext: ".csv" },
+                                    { id: "excel", label: "Excel CSV", ext: ".csv" },
+                                    { id: "json", label: "JSON Raw", ext: ".json" },
+                                  ].map((fmt) => (
+                                    <button
+                                      key={fmt.id}
+                                      type="button"
+                                      onClick={() => setExportFormat(fmt.id as any)}
+                                      className={`p-3 rounded-xl border text-center transition cursor-pointer ${
+                                        exportFormat === fmt.id
+                                          ? "border-[#f6821f] bg-orange-50/50 text-[#f6821f] font-bold ring-1 ring-[#f6821f]"
+                                          : "border-slate-200 hover:border-slate-300 text-slate-700 bg-white"
+                                      }`}
+                                    >
+                                      <span className="block text-xs font-bold">{fmt.label}</span>
+                                      <span className="text-[10px] text-slate-400">{fmt.ext}</span>
+                                    </button>
                                   ))}
-                                </tbody>
-                              </table>
+                                </div>
+                              </div>
+
+                              {/* Delimiter (for CSV) */}
+                              <div className="space-y-2">
+                                <label className="text-xs font-semibold text-slate-700 block">
+                                  Separador de columnas (delimitador):
+                                </label>
+                                <div className="grid grid-cols-3 gap-2">
+                                  {[
+                                    { id: ",", label: "Coma (,)" },
+                                    { id: ";", label: "Punto y coma (;)" },
+                                    { id: "\t", label: "Tabulación (TSV)" },
+                                  ].map((delim) => (
+                                    <button
+                                      key={delim.id}
+                                      type="button"
+                                      disabled={exportFormat === "json" || exportFormat === "excel"}
+                                      onClick={() => setExportDelimiter(delim.id as any)}
+                                      className={`p-3 rounded-xl border text-center transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${
+                                        exportDelimiter === delim.id && exportFormat !== "json" && exportFormat !== "excel"
+                                          ? "border-[#f6821f] bg-orange-50/50 text-[#f6821f] font-bold ring-1 ring-[#f6821f]"
+                                          : "border-slate-200 hover:border-slate-300 text-slate-700 bg-white"
+                                      }`}
+                                    >
+                                      <span className="block text-xs font-bold">{delim.label}</span>
+                                      <span className="text-[10px] text-slate-400">
+                                        {exportFormat === "excel" ? "Auto (;)" : exportFormat === "json" ? "N/A" : "Personalizado"}
+                                      </span>
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Export destination notice */}
+                            <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-600 flex items-start gap-3">
+                              <Database className="w-5 h-5 text-[#f6821f] shrink-0 mt-0.5" />
+                              <div className="space-y-1">
+                                <span className="font-bold text-slate-800">Exportación directa desde PostgreSQL</span>
+                                <p className="text-[11px] text-slate-500 leading-relaxed">
+                                  La consulta leerá los datos en vivo de la base de datos de {companySettings.nombreLegal || companySettings.nombre || "Wayne Trademark"}. El archivo resultante se descargará instantáneamente en tu navegador.
+                                </p>
+                              </div>
+                            </div>
+
+                            {/* Execute button */}
+                            <div className="pt-2 flex items-center justify-between border-t border-slate-100">
+                              <span className="text-xs text-slate-500">
+                                Entidad a descargar: <strong className="capitalize text-slate-800">{selectedExportCategory.replace(/_/g, " ")}</strong>
+                              </span>
+                              <button
+                                type="button"
+                                disabled={isExporting}
+                                onClick={() => handleExportData()}
+                                className="px-6 py-2.5 rounded-xl bg-[#f6821f] hover:bg-[#e07216] text-white text-xs font-bold transition cursor-pointer shadow-md disabled:opacity-50 flex items-center gap-2"
+                              >
+                                {isExporting ? (
+                                  <>
+                                    <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                    <span>Generando archivo de exportación...</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Download className="w-4 h-4" />
+                                    <span>Descargar {exportFormat.toUpperCase()} ahora →</span>
+                                  </>
+                                )}
+                              </button>
                             </div>
                           </div>
-                        )}
-
-                        {/* Execute Button */}
-                        <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
-                          <span className="text-xs text-slate-500">
-                            {importPreviewRows.length > 0 ? `${importPreviewRows.length} registros listos para importación.` : "Ingresa o pega filas para continuar."}
-                          </span>
-                          <button
-                            type="button"
-                            disabled={importPreviewRows.length === 0 || isImporting}
-                            onClick={() => {
-                              setIsImporting(true);
-                              setTimeout(() => {
-                                setIsImporting(false);
-                                const count = importPreviewRows.length;
-                                const catName = selectedImportCategory === "productos" ? "Productos de inventario" : selectedImportCategory;
-                                setImportNotification(`¡Se han importado exitosamente ${count} registros en la tabla de ${catName}!`);
-                                setImportPasteText("");
-                                setImportPreviewRows([]);
-                              }, 1000);
-                            }}
-                            className="px-6 py-2.5 rounded-xl bg-[#f6821f] hover:bg-[#e07216] text-white text-xs font-bold transition cursor-pointer shadow-md disabled:opacity-50 flex items-center gap-2"
-                          >
-                            {isImporting ? (
-                              <>
-                                <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                                <span>Procesando importación...</span>
-                              </>
-                            ) : (
-                              <span>Importar a la Base de Datos →</span>
-                            )}
-                          </button>
                         </div>
-                      </div>
+                      )}
                     </div>
                   )}
                 </div>
