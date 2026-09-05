@@ -92,7 +92,7 @@ model CompanySettings {
   id               String   @id @default("default")
   nombre           String   @default("WAYNE TRADEMARK PRINTING AND PACKAGING DE HONDURAS S DE RL")
   direccion        String   @default("ZIP Búfalo, Villanueva, Cortés 21100")
-  email            String   @default("R.mondragon@waynetrademarkhn.com")
+  email            String   @default("contabilidad@waynetrademarkhn.com")
   telefono         String   @default("+50494522666")
   sitioWeb         String   @default("Ninguno indicado")
   sector           String   @default("Manufactura y Producción Industrial (Manufacturing)")
@@ -103,8 +103,14 @@ model CompanySettings {
   fechaLimiteEmision  String   @default("Ninguno indicado")
   tipoEmpresa         String   @default("Sociedad anónima (pequeña empresa) con dos o más propietarios")
   domicilioLegal   String   @default("Zip Búfalo Edificio 1B, Villanueva, Cortés 21101")
-  emailCliente     String   @default("R.mondragon@waynetrademarkhn.com")
+  emailCliente     String   @default("contabilidad@waynetrademarkhn.com")
   direccionCliente String   @default("Ninguno indicado")
+  // Información del Contador General
+  contadorNombre      String?  @default("")
+  contadorTitulo      String?  @default("Contador General")
+  contadorColegiacion String?  @default("")
+  contadorTelefono    String?  @default("")
+  contadorEmail       String?  @default("")
   logoUrl          String?  @db.Text
   updatedAt        DateTime @updatedAt
 }
@@ -127,6 +133,7 @@ model BankAccount {
   updatedAt     DateTime          @updatedAt
   transactions  BankTransaction[]
   vendorPayments VendorPayment[]
+  reconciliations BankReconciliation[]
 }
 
 model BankTransaction {
@@ -437,6 +444,7 @@ model SalesInvoice {
   journalEntryId      String?
   lines               SalesInvoiceLine[]
   quotes              Quote[]
+  salesOrders         SalesOrder[]
   createdAt           DateTime           @default(now())
   updatedAt           DateTime           @updatedAt
 }
@@ -456,34 +464,35 @@ model SalesInvoiceLine {
 }
 
 model Quote {
-  id               String       @id @default(cuid())
-  quoteNumber      String       @unique // e.g. "COT-2026-0001"
+  id               String        @id @default(cuid())
+  quoteNumber      String        @unique // e.g. "COT-2026-0001"
   customerId       String?
-  customerName     String       @default("Cliente Contado")
+  customerName     String        @default("Cliente Contado")
   customerRtn      String?
   customerAddress  String?
   customerEmail    String?
   customerPhone    String?
-  quoteDate        String       // e.g. "2026-09-04"
-  validUntil       String       // e.g. "2026-10-04"
-  paymentTerms     String       @default("Neto 30 días")
-  currency         String       @default("USD")
+  quoteDate        String        // e.g. "2026-09-04"
+  validUntil       String        // e.g. "2026-10-04"
+  paymentTerms     String        @default("Neto 30 días")
+  currency         String        @default("USD")
   salesRepId       String?
   salesRepName     String?
   notes            String?
   termsConditions  String?
-  discount         Float        @default(0)
-  subtotal         Float        @default(0)
-  taxRate          Float        @default(15) // ISV % (15% o 18%)
-  tax              Float        @default(0)  // ISV calculado
-  total            Float        @default(0)
-  status           String       @default("Borrador") // "Borrador" | "Enviada" | "Aprobada" | "Facturada" | "Rechazada"
-  invoiceNumber    String?      // Reference to created invoice number
-  salesInvoiceId   String?      // Reference to SalesInvoice ID
+  discount         Float         @default(0)
+  subtotal         Float         @default(0)
+  taxRate          Float         @default(15) // ISV % (15% o 18%)
+  tax              Float         @default(0)  // ISV calculado
+  total            Float         @default(0)
+  status           String        @default("Borrador") // "Borrador" | "Enviada" | "Aprobada" | "Facturada" | "Rechazada"
+  invoiceNumber    String?       // Reference to created invoice number
+  salesInvoiceId   String?       // Reference to SalesInvoice ID
   salesInvoice     SalesInvoice? @relation(fields: [salesInvoiceId], references: [id], onDelete: SetNull)
   lines            QuoteLine[]
-  createdAt        DateTime     @default(now())
-  updatedAt        DateTime     @updatedAt
+  salesOrders      SalesOrder[]
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
 }
 
 model QuoteLine {
@@ -498,6 +507,60 @@ model QuoteLine {
   amount      Float    @default(0)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+}
+
+model SalesOrder {
+  id                   String           @id @default(cuid())
+  orderNumber          String           @unique // e.g. "PV-2026-0001"
+  quoteId              String?
+  quote                Quote?           @relation(fields: [quoteId], references: [id], onDelete: SetNull)
+  quoteNumber          String?          // Reference to source quote e.g. "COT-2026-0001"
+  customerPoNumber     String?          // e.g. "OC-CLI-9821" (Orden de compra del cliente)
+  customerId           String?
+  customerName         String           @default("Cliente Contado")
+  customerRtn          String?
+  customerAddress      String?
+  customerEmail        String?
+  customerPhone        String?
+  orderDate            String           // e.g. "2026-09-04"
+  expectedDeliveryDate String?          // e.g. "2026-09-18"
+  paymentTerms         String           @default("Neto 30 días")
+  currency             String           @default("USD")
+  salesRepId           String?
+  salesRepName         String?
+  warehouse            String           @default("Bodega Principal Zip Búfalo")
+  notes                String?
+  shippingNotes        String?
+  discount             Float            @default(0)
+  subtotal             Float            @default(0)
+  taxRate              Float            @default(15)
+  tax                  Float            @default(0)
+  total                Float            @default(0)
+  status               String           @default("BORRADOR") // "BORRADOR" | "CONFIRMADO" | "EN_PREPARACION" | "DESPACHADO" | "FACTURADO" | "CANCELADO"
+  salesInvoiceId       String?
+  salesInvoice         SalesInvoice?    @relation(fields: [salesInvoiceId], references: [id], onDelete: SetNull)
+  invoiceNumber        String?          // Reference to generated invoice e.g. "000-001-01-00036802"
+  items                SalesOrderItem[]
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
+}
+
+model SalesOrderItem {
+  id                String     @id @default(cuid())
+  salesOrderId      String
+  salesOrder        SalesOrder @relation(fields: [salesOrderId], references: [id], onDelete: Cascade)
+  productName       String
+  sku               String?
+  description       String?
+  quantityOrdered   Float      @default(1)
+  quantityCommitted Float      @default(1)
+  quantityShipped   Float      @default(0)
+  quantityInvoiced  Float      @default(0)
+  rate              Float      @default(0)
+  amount            Float      @default(0)
+  notes             String?
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
 }
 
 model TaxRetention {
@@ -594,4 +657,55 @@ model PurchaseOrderItem {
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
 }
+
+model BankReconciliation {
+  id                        String                   @id @default(cuid())
+  reconciliationNumber      String                   @unique // e.g. "REC-FIC-2026-08"
+  bankAccountId             String
+  bankAccount               BankAccount              @relation(fields: [bankAccountId], references: [id], onDelete: Cascade)
+  period                    String                   // e.g. "2026-08", "Agosto 2026"
+  statementDate             String                   // Corte del extracto e.g. "2026-08-31"
+  startDate                 String                   // e.g. "2026-08-01"
+  endDate                   String                   // e.g. "2026-08-31"
+  statementBeginningBalance  Float                    @default(0.0)
+  statementEndingBalance     Float                    @default(0.0)
+  clearedDepositsCount      Int                      @default(0)
+  clearedDepositsAmount     Float                    @default(0.0)
+  clearedChecksCount        Int                      @default(0)
+  clearedChecksAmount       Float                    @default(0.0)
+  clearedBalance            Float                    @default(0.0) // beginning + deposits - checks
+  difference                Float                    @default(0.0) // statementEndingBalance - clearedBalance
+  status                    String                   @default("EN_PROCESO") // "EN_PROCESO" | "CONCILIADA_CUADRADA" | "CERRADA"
+  closedAt                  DateTime?
+  closedBy                  String?
+  notes                     String?
+  createdAt                 DateTime                 @default(now())
+  updatedAt                 DateTime                 @updatedAt
+  items                     BankReconciliationItem[]
+
+  @@index([bankAccountId])
+  @@index([period])
+  @@index([status])
+}
+
+model BankReconciliationItem {
+  id               String             @id @default(cuid())
+  reconciliationId String
+  reconciliation   BankReconciliation @relation(fields: [reconciliationId], references: [id], onDelete: Cascade)
+  transactionId    String?
+  sourceType       String             @default("BANK_TRANSACTION") // "BANK_TRANSACTION" | "JOURNAL_ENTRY" | "MANUAL_ADJUSTMENT"
+  date             String             // "2026-08-15"
+  reference        String?            // "TRF-9812", "CHQ-104"
+  description      String
+  payee            String?
+  type             String             // "DEPOSIT" | "CHECK" | "FEE" | "INTEREST"
+  amount           Float              @default(0.0)
+  isCleared        Boolean            @default(false)
+  clearedAt        DateTime?
+  notes            String?
+
+  @@index([reconciliationId])
+  @@index([isCleared])
+}
+
 

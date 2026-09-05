@@ -248,7 +248,7 @@ export default function TaxRetentionsModule({
     nombreLegal: companySettings?.nombreLegal || "WAYNE TRADEMARK PRINTING AND PACKAGING DE HONDURAS S DE RL",
     direccion: companySettings?.direccion || "Zip Búfalo Edificio 1B, Villanueva, Cortés 21101",
     telefono: companySettings?.telefono || "+504 9452-2666",
-    email: companySettings?.email || "R.mondragon@waynetrademarkhn.com",
+    email: companySettings?.email || "contabilidad@waynetrademarkhn.com",
     taxId: companySettings?.taxId || "05019008183490",
     cai: companySettings?.cai || "2B8F44-96DF4A-3240BE-A33190-67B7A9-1E",
     rangoAutorizado: companySettings?.rangoAutorizado || "000-001-05-00000001 a 000-001-05-00005000",

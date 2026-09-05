@@ -1217,7 +1217,7 @@ export default function VendorPaymentsModule({
                     RTN: {companySettings?.taxId || "05019008183490"} | {companySettings?.direccion || "ZIP Búfalo, Villanueva, Cortés"}
                   </p>
                   <p className="text-[11px] text-slate-500">
-                    Tel: {companySettings?.telefono || "+504 9452-2666"} | {companySettings?.email || "R.mondragon@waynetrademarkhn.com"}
+                    Tel: {companySettings?.telefono || "+504 9452-2666"} | {companySettings?.email || "contabilidad@waynetrademarkhn.com"}
                   </p>
                 </div>
                 <div className="text-right">

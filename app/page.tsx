@@ -11,6 +11,8 @@ import VendorAgingReportModule from "@/components/VendorAgingReportModule";
 import QuotesModule from "@/components/QuotesModule";
 import TaxRetentionsModule from "@/components/TaxRetentionsModule";
 import VendorPaymentsModule from "@/components/VendorPaymentsModule";
+import BankReconciliationModule from "@/components/BankReconciliationModule";
+import SalesOrdersModule from "@/components/SalesOrdersModule";
 
 
 
@@ -196,7 +198,7 @@ type PurchaseInvoice = {
   createdAt?: string;
 };
 
-type NavItem = "dashboard" | "plan-cuentas" | "transacciones" | "macola-sync" | "caja-chica" | "clientes" | "cotizaciones" | "proveedores" | "vendedores" | "comisiones" | "inventario" | "lotes" | "series" | "notas-credito-debito" | "reportes" | "configuracion" | "factura-editor" | "lista-facturas" | "lista-ordenes-compra" | "orden-compra-editor" | "factura-compra-lista" | "factura-compra-editor" | "deposito-bancario" | "recibir-pago" | "agregar-gasto" | "pagar-proveedor" | "pagos-proveedores" | "devoluciones-proveedor" | "antiguedad-saldos" | "antiguedad-saldos-proveedores" | "estado-cuenta-cliente" | "retenciones-isv";
+type NavItem = "dashboard" | "plan-cuentas" | "transacciones" | "conciliacion-bancaria" | "macola-sync" | "caja-chica" | "clientes" | "cotizaciones" | "pedidos-venta" | "proveedores" | "vendedores" | "comisiones" | "inventario" | "lotes" | "series" | "notas-credito-debito" | "reportes" | "configuracion" | "factura-editor" | "lista-facturas" | "lista-ordenes-compra" | "orden-compra-editor" | "factura-compra-lista" | "factura-compra-editor" | "deposito-bancario" | "recibir-pago" | "agregar-gasto" | "pagar-proveedor" | "pagos-proveedores" | "devoluciones-proveedor" | "antiguedad-saldos" | "antiguedad-saldos-proveedores" | "estado-cuenta-cliente" | "retenciones-isv";
 
 
 
@@ -1340,7 +1342,7 @@ export default function AdminDashboard() {
           setCompanySettings({
             nombre: res.data.nombre || "WAYNE TRADEMARK PRINTING AND PACKAGING DE HONDURAS S DE RL",
             direccion: res.data.direccion || "ZIP Búfalo, Villanueva, Cortés 21100",
-            email: res.data.email || "R.mondragon@waynetrademarkhn.com",
+            email: res.data.email || "contabilidad@waynetrademarkhn.com",
             telefono: res.data.telefono || "+50494522666",
             sitioWeb: res.data.sitioWeb || "Ninguno indicado",
             sector: res.data.sector || "Manufactura y Producción Industrial (Manufacturing)",
@@ -1351,8 +1353,13 @@ export default function AdminDashboard() {
             fechaLimiteEmision: res.data.fechaLimiteEmision || "Ninguno indicado",
             tipoEmpresa: res.data.tipoEmpresa || "Sociedad anónima (pequeña empresa) con dos o más propietarios",
             domicilioLegal: res.data.domicilioLegal || "Zip Búfalo Edificio 1B, Villanueva, Cortés 21101",
-            emailCliente: res.data.emailCliente || "R.mondragon@waynetrademarkhn.com",
+            emailCliente: res.data.emailCliente || "contabilidad@waynetrademarkhn.com",
             direccionCliente: res.data.direccionCliente || "Ninguno indicado",
+            contadorNombre: res.data.contadorNombre || "",
+            contadorTitulo: res.data.contadorTitulo || "Contador General",
+            contadorColegiacion: res.data.contadorColegiacion || "Ninguno indicado",
+            contadorTelefono: res.data.contadorTelefono || "Ninguno indicado",
+            contadorEmail: res.data.contadorEmail || "Ninguno indicado",
           });
 
           if (res.data.logoUrl) {
@@ -1520,7 +1527,7 @@ export default function AdminDashboard() {
   const [companySettings, setCompanySettings] = useState({
     nombre: "WAYNE TRADEMARK PRINTING AND PACKAGING DE HONDURAS S DE RL",
     direccion: "ZIP Búfalo, Villanueva, Cortés 21100",
-    email: "R.mondragon@waynetrademarkhn.com",
+    email: "contabilidad@waynetrademarkhn.com",
     telefono: "+50494522666",
     sitioWeb: "Ninguno indicado",
     sector: "Manufactura y Producción Industrial (Manufacturing)",
@@ -1533,8 +1540,14 @@ export default function AdminDashboard() {
     tipoEmpresa: "Sociedad anónima (pequeña empresa) con dos o más propietarios",
     domicilioLegal: "Zip Búfalo Edificio 1B, Villanueva, Cortés 21101",
     // Contacto del cliente
-    emailCliente: "R.mondragon@waynetrademarkhn.com",
+    emailCliente: "contabilidad@waynetrademarkhn.com",
     direccionCliente: "Ninguno indicado",
+    // Información del Contador General
+    contadorNombre: "",
+    contadorTitulo: "Contador General",
+    contadorColegiacion: "Ninguno indicado",
+    contadorTelefono: "Ninguno indicado",
+    contadorEmail: "Ninguno indicado",
   });
 
   // Report customization state (Configuración -> Reportes)
@@ -5689,7 +5702,7 @@ export default function AdminDashboard() {
             <button
               onClick={() => setContabilidadOpen(!contabilidadOpen)}
               className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl transition cursor-pointer text-slate-700 hover:bg-slate-100 ${
-                currentView.includes("cuentas") || currentView === "transacciones" || currentView === "macola-sync" || currentView === "caja-chica"
+                currentView.includes("cuentas") || currentView === "transacciones" || currentView === "macola-sync" || currentView === "caja-chica" || currentView === "conciliacion-bancaria"
                   ? "font-semibold text-slate-900"
                   : ""
               }`}
@@ -5736,6 +5749,17 @@ export default function AdminDashboard() {
                   }`}
                 >
                   Transacciones bancarias
+                </button>
+                <button
+                  onClick={() => setCurrentView("conciliacion-bancaria")}
+                  className={`w-full text-left px-2.5 py-1.5 rounded-lg transition cursor-pointer flex items-center justify-between ${
+                    currentView === "conciliacion-bancaria"
+                      ? "bg-[#fff7ed] text-[#f6821f] font-semibold"
+                      : "text-slate-500 hover:text-slate-900 hover:bg-slate-50"
+                  }`}
+                >
+                  <span>Conciliación extractos</span>
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 font-bold">NIIF</span>
                 </button>
                 <button
                   onClick={() => setCurrentView("macola-sync")}
@@ -5824,6 +5848,18 @@ export default function AdminDashboard() {
                   }`}
                 >
                   <span>Cotizaciones</span>
+                </button>
+
+                {/* 2.1 Pedidos de Venta */}
+                <button
+                  onClick={() => setCurrentView("pedidos-venta")}
+                  className={`w-full text-left px-2.5 py-1.5 rounded-lg transition cursor-pointer ${
+                    currentView === "pedidos-venta"
+                      ? "bg-[#fff7ed] text-[#f6821f] font-semibold"
+                      : "text-slate-500 hover:text-slate-900 hover:bg-slate-50"
+                  }`}
+                >
+                  <span>Pedidos de Venta</span>
                 </button>
 
                 {/* 3. Facturas */}
@@ -6165,8 +6201,10 @@ export default function AdminDashboard() {
                   {currentView === "transacciones" && "Contabilidad / Transacciones Bancarias"}
                   {currentView === "macola-sync" && "Contabilidad / Transacciones de Integración"}
                   {currentView === "caja-chica" && "Contabilidad / Arqueo & Control de Caja Chica"}
+                  {currentView === "conciliacion-bancaria" && "Contabilidad / Conciliación de Extracto Mensual"}
                   {currentView === "clientes" && "Directorio de Clientes"}
                   {currentView === "cotizaciones" && "Ventas / Cotizaciones & Presupuestos"}
+                  {currentView === "pedidos-venta" && "Ventas / Pedidos de Venta (Sales Orders)"}
                   {currentView === "lista-facturas" && "Gestión de Facturas"}
                   {currentView === "notas-credito-debito" && "Notas de Crédito / Débito"}
                   {currentView === "proveedores" && "Directorio de Proveedores"}
@@ -6702,6 +6740,17 @@ export default function AdminDashboard() {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
                     </svg>
                     <span>Reglas de automatización</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setCurrentView("conciliacion-bancaria")}
+                    className="px-3.5 py-1.5 rounded-xl border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer shadow-xs"
+                  >
+                    <svg className="w-3.5 h-3.5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span>Cierre & Conciliación Extractos</span>
                   </button>
 
                   <button
@@ -7318,6 +7367,15 @@ export default function AdminDashboard() {
               onBackToDashboard={() => setCurrentView("dashboard")}
               connectedBanks={connectedBanks}
               accounts={accounts}
+            />
+          )}
+
+          {/* ================= VIEW: CONCILIACIÓN DE EXTRACTO MENSUAL ================= */}
+          {currentView === "conciliacion-bancaria" && (
+            <BankReconciliationModule
+              onBack={() => setCurrentView("transacciones")}
+              formatCurrency={formatCurrency}
+              companySettings={companySettings}
             />
           )}
 
@@ -10946,6 +11004,91 @@ export default function AdminDashboard() {
                           </div>
                         </div>
                       </div>
+
+                      {/* Card 2: Información del Contador General */}
+                      <div className="border border-slate-200 rounded-xl p-5 bg-white shadow-xs">
+                        <div className="mb-4">
+                          <h2 className="font-bold text-sm text-slate-900">Información del Contador General</h2>
+                          <p className="text-xs text-slate-500 mt-0.5">
+                            Datos oficiales del responsable contable y financiero utilizados para firmas de cierres, conciliaciones y cédulas fiscales.
+                          </p>
+                        </div>
+
+                        <div className="divide-y divide-slate-100 text-xs">
+                          {/* Nombre del Contador */}
+                          <div className="py-3 flex items-start justify-between gap-4">
+                            <span className="w-80 font-semibold text-slate-800 shrink-0 text-left">Nombre del Contador General</span>
+                            <span className={`flex-1 font-medium ${!companySettings.contadorNombre ? "text-slate-400 italic" : "text-slate-700"}`}>
+                              {companySettings.contadorNombre || "Sin asignar (Haga clic en editar para registrar)"}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => startEditConfig("contadorNombre", "Nombre del Contador General")}
+                              className="text-xs font-semibold text-[#f6821f] hover:underline cursor-pointer shrink-0"
+                            >
+                              Editar
+                            </button>
+                          </div>
+
+                          {/* Cargo / Título Profesional */}
+                          <div className="py-3 flex items-start justify-between gap-4">
+                            <span className="w-80 font-semibold text-slate-800 shrink-0 text-left">Cargo / Título Profesional</span>
+                            <span className="flex-1 text-slate-700 font-medium">{companySettings.contadorTitulo || "Contador General"}</span>
+                            <button
+                              type="button"
+                              onClick={() => startEditConfig("contadorTitulo", "Cargo o Título Profesional del Contador")}
+                              className="text-xs font-semibold text-[#f6821f] hover:underline cursor-pointer shrink-0"
+                            >
+                              Editar
+                            </button>
+                          </div>
+
+                          {/* N.º de Colegiación */}
+                          <div className="py-3 flex items-start justify-between gap-4">
+                            <span className="w-80 font-semibold text-slate-800 shrink-0 text-left">N.º de Colegiación / Registro</span>
+                            <span className={`flex-1 font-medium font-mono ${companySettings.contadorColegiacion === "Ninguno indicado" || !companySettings.contadorColegiacion ? "text-slate-400 italic font-sans" : "text-slate-700"}`}>
+                              {companySettings.contadorColegiacion || "Ninguno indicado"}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => startEditConfig("contadorColegiacion", "Número de Colegiación / Registro Profesional")}
+                              className="text-xs font-semibold text-[#f6821f] hover:underline cursor-pointer shrink-0"
+                            >
+                              Editar
+                            </button>
+                          </div>
+
+                          {/* Teléfono */}
+                          <div className="py-3 flex items-start justify-between gap-4">
+                            <span className="w-80 font-semibold text-slate-800 shrink-0 text-left">Teléfono del Contador</span>
+                            <span className={`flex-1 font-medium font-mono ${companySettings.contadorTelefono === "Ninguno indicado" || !companySettings.contadorTelefono ? "text-slate-400 italic font-sans" : "text-slate-700"}`}>
+                              {companySettings.contadorTelefono || "Ninguno indicado"}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => startEditConfig("contadorTelefono", "Teléfono de contacto del Contador")}
+                              className="text-xs font-semibold text-[#f6821f] hover:underline cursor-pointer shrink-0"
+                            >
+                              Editar
+                            </button>
+                          </div>
+
+                          {/* Correo Electrónico */}
+                          <div className="py-3 flex items-start justify-between gap-4">
+                            <span className="w-80 font-semibold text-slate-800 shrink-0 text-left">Correo Electrónico del Contador</span>
+                            <span className={`flex-1 font-medium ${companySettings.contadorEmail === "Ninguno indicado" || !companySettings.contadorEmail ? "text-slate-400 italic" : "text-slate-700"}`}>
+                              {companySettings.contadorEmail || "Ninguno indicado"}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => startEditConfig("contadorEmail", "Correo electrónico del Contador")}
+                              className="text-xs font-semibold text-[#f6821f] hover:underline cursor-pointer shrink-0"
+                            >
+                              Editar
+                            </button>
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   )}
 
@@ -13667,6 +13810,7 @@ export default function AdminDashboard() {
                   openInvoiceEditor(prefilled);
                 }}
                 onNavigateToInvoices={() => setCurrentView("lista-facturas")}
+                onNavigateToSalesOrders={() => setCurrentView("pedidos-venta")}
                 onNavigateToAccounting={() => {
                   fetch("/api/accounts")
                     .then((r) => r.json())
@@ -13675,6 +13819,22 @@ export default function AdminDashboard() {
                     });
                   setCurrentView("plan-cuentas");
                 }}
+              />
+            </div>
+          )}
+
+          {/* ================= VIEW: PEDIDOS DE VENTA (SALES ORDERS) ================= */}
+          {currentView === "pedidos-venta" && (
+            <div className="animate-in fade-in duration-150 p-6">
+              <SalesOrdersModule
+                customers={customers}
+                inventory={inventory}
+                salesReps={salesReps}
+                companySettings={companySettings}
+                onBack={() => setCurrentView("dashboard")}
+                onOpenInvoiceEditor={(prefilled) => openInvoiceEditor(prefilled)}
+                onNavigateToInvoices={() => setCurrentView("lista-facturas")}
+                onNavigateToQuotes={() => setCurrentView("cotizaciones")}
               />
             </div>
           )}

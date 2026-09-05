@@ -5,7 +5,7 @@ const DEFAULT_COMPANY_DATA = {
   id: "default",
   nombre: "WAYNE TRADEMARK PRINTING AND PACKAGING DE HONDURAS S DE RL",
   direccion: "ZIP Búfalo, Villanueva, Cortés 21100",
-  email: "R.mondragon@waynetrademarkhn.com",
+  email: "contabilidad@waynetrademarkhn.com",
   telefono: "+50494522666",
   sitioWeb: "Ninguno indicado",
   sector: "Manufactura y Producción Industrial (Manufacturing)",
@@ -16,8 +16,14 @@ const DEFAULT_COMPANY_DATA = {
   fechaLimiteEmision: "Ninguno indicado",
   tipoEmpresa: "Sociedad anónima (pequeña empresa) con dos o más propietarios",
   domicilioLegal: "Zip Búfalo Edificio 1B, Villanueva, Cortés 21101",
-  emailCliente: "R.mondragon@waynetrademarkhn.com",
+  emailCliente: "contabilidad@waynetrademarkhn.com",
   direccionCliente: "Ninguno indicado",
+  // Información del Contador General
+  contadorNombre: "",
+  contadorTitulo: "Contador General",
+  contadorColegiacion: "Ninguno indicado",
+  contadorTelefono: "Ninguno indicado",
+  contadorEmail: "Ninguno indicado",
 };
 
 // GET /api/company - Retrieve official company settings
@@ -64,6 +70,11 @@ export async function PUT(request: NextRequest) {
       "domicilioLegal",
       "emailCliente",
       "direccionCliente",
+      "contadorNombre",
+      "contadorTitulo",
+      "contadorColegiacion",
+      "contadorTelefono",
+      "contadorEmail",
       "logoUrl",
     ];
 

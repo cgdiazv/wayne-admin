@@ -27,6 +27,7 @@ import {
   Check,
   Percent,
   Info,
+  PackageCheck,
 } from "lucide-react";
 
 interface QuoteLine {
@@ -83,6 +84,7 @@ interface QuotesModuleProps {
   onOpenInvoiceEditor?: (prefilledData: any) => void;
   onNavigateToAccounting?: () => void;
   onNavigateToInvoices?: () => void;
+  onNavigateToSalesOrders?: () => void;
   customers?: Array<{
     id: string;
     name: string;
@@ -112,6 +114,7 @@ export default function QuotesModule({
   onOpenInvoiceEditor,
   onNavigateToAccounting,
   onNavigateToInvoices,
+  onNavigateToSalesOrders,
   customers = [],
   inventory = [],
   salesReps = [],
@@ -631,6 +634,63 @@ export default function QuotesModule({
           amount: l.amount,
         })),
       });
+    }
+  };
+
+  // Convertir cotización en Pedido de Venta (Sales Order)
+  const handleConvertToSalesOrder = async (quote: Quote) => {
+    try {
+      const res = await fetch("/api/sales-orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          quoteId: quote.id,
+          quoteNumber: quote.quoteNumber,
+          customerPoNumber: "",
+          customerId: quote.customerId,
+          customerName: quote.customerName,
+          customerRtn: quote.customerRtn,
+          customerAddress: quote.customerAddress,
+          customerEmail: quote.customerEmail,
+          customerPhone: quote.customerPhone,
+          orderDate: new Date().toISOString().split("T")[0],
+          expectedDeliveryDate: quote.validUntil,
+          paymentTerms: quote.paymentTerms,
+          currency: quote.currency,
+          salesRepId: quote.salesRepId,
+          salesRepName: quote.salesRepName,
+          warehouse: "Bodega Principal Zip Búfalo",
+          notes: `Generado a partir de la Cotización ${quote.quoteNumber}. ${quote.notes || ""}`,
+          discount: quote.discount,
+          subtotal: quote.subtotal,
+          taxRate: quote.taxRate,
+          tax: quote.tax,
+          total: quote.total,
+          status: "CONFIRMADO",
+          items: quote.lines.map((l) => ({
+            productName: l.productName,
+            sku: l.sku,
+            description: l.description,
+            quantityOrdered: l.quantity,
+            quantityCommitted: l.quantity,
+            rate: l.rate,
+            amount: l.amount,
+          })),
+        }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        setSuccessAlert(`¡Pedido de Venta ${json.data?.orderNumber || ""} creado exitosamente para almacén!`);
+        fetchQuotes();
+        if (onNavigateToSalesOrders) {
+          onNavigateToSalesOrders();
+        }
+      } else {
+        setErrorAlert(json.error || "No se pudo crear el pedido de venta.");
+      }
+    } catch (err: any) {
+      console.error("Error al convertir a pedido:", err);
+      setErrorAlert("Ocurrió un error al generar el pedido de venta.");
     }
   };
 
@@ -1170,6 +1230,18 @@ export default function QuotesModule({
                       {/* Acciones */}
                       <td className="py-3.5 px-4 text-right">
                         <div className="flex items-center justify-end gap-1.5">
+                          {/* Botón de Pedido de Venta (Sales Order) */}
+                          {quote.status !== "Facturada" && (
+                            <button
+                              onClick={() => handleConvertToSalesOrder(quote)}
+                              className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold text-slate-700 bg-orange-50 hover:bg-orange-100 border border-orange-200 rounded-lg transition shadow-2xs cursor-pointer"
+                              title="Convertir esta cotización en un Pedido de Venta para Almacén"
+                            >
+                              <PackageCheck className="w-3.5 h-3.5 text-[#f6821f]" />
+                              Pedido
+                            </button>
+                          )}
+
                           {/* Botón de Conversión a Factura */}
                           {quote.status !== "Facturada" ? (
                             <button

@@ -2470,7 +2470,7 @@ export default function CajaChicaModule({
                   <input
                     type="text"
                     required
-                    placeholder="Ej. Lic. Ruben Mondragón"
+                    placeholder="Ej. Lic. Custodio de Caja"
                     value={fundForm.custodianName}
                     onChange={(e) => setFundForm({ ...fundForm, custodianName: e.target.value })}
                     className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#f6821f]"
