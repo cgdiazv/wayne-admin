@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from "react";
+import { Skeleton, TableRowsSkeleton, TableCardSkeleton } from "@/components/Skeleton";
 import { BookOpen, FileText, Layers, Scale, Search, RefreshCw, Download, Printer, CheckCircle, ArrowLeft, Eye, ExternalLink } from "lucide-react";
 
 interface Account {
@@ -444,8 +445,22 @@ export default function AccountingBooksModule({
           {/* Journal Entries List */}
           <div className="space-y-3">
             {journalLoading ? (
-              <div className="p-8 text-center text-slate-500 text-xs bg-white rounded-2xl border border-slate-200">
-                Cargando asientos contables del Libro Diario...
+              <div className="space-y-3">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <Skeleton className="h-4 w-28 rounded" />
+                        <Skeleton className="h-4 w-40 rounded" />
+                      </div>
+                      <Skeleton className="h-5 w-24 rounded-full" />
+                    </div>
+                    <div className="space-y-2 pt-2 border-t border-slate-100">
+                      <Skeleton className="h-3.5 w-full rounded" />
+                      <Skeleton className="h-3.5 w-5/6 rounded" />
+                    </div>
+                  </div>
+                ))}
               </div>
             ) : filteredJournalEntries.length === 0 ? (
               <div className="p-8 text-center text-slate-400 text-xs bg-white rounded-2xl border border-slate-200">
@@ -573,8 +588,23 @@ export default function AccountingBooksModule({
           {/* Ledger Accounts View */}
           <div className="space-y-6">
             {ledgerLoading ? (
-              <div className="p-8 text-center text-slate-500 text-xs bg-white rounded-2xl border border-slate-200">
-                Cargando movimientos del Libro Mayor...
+              <div className="space-y-4">
+                {[1, 2].map((i) => (
+                  <div key={i} className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs space-y-4">
+                    <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                      <div className="flex items-center gap-3">
+                        <Skeleton className="h-5 w-20 rounded" />
+                        <Skeleton className="h-5 w-48 rounded" />
+                      </div>
+                      <Skeleton className="h-5 w-28 rounded" />
+                    </div>
+                    <div className="space-y-2">
+                      <Skeleton className="h-4 w-full rounded" />
+                      <Skeleton className="h-4 w-full rounded" />
+                      <Skeleton className="h-4 w-full rounded" />
+                    </div>
+                  </div>
+                ))}
               </div>
             ) : filteredLedgerAccounts.length === 0 ? (
               <div className="p-8 text-center text-slate-400 text-xs bg-white rounded-2xl border border-slate-200">
@@ -656,7 +686,9 @@ export default function AccountingBooksModule({
       {/* ================= TAB 4: BALANCE DE COMPROBACIÓN ================= */}
       {activeTab === "balance" && (
         <div className="space-y-4">
-          {trialBalanceData && (
+          {trialBalanceLoading ? (
+            <TableCardSkeleton rows={8} cols={7} title="Balance de Comprobación de Sumas y Saldos" />
+          ) : trialBalanceData ? (
             <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-200 gap-3 mb-4">
                 <div>
@@ -738,7 +770,7 @@ export default function AccountingBooksModule({
                 </table>
               </div>
             </div>
-          )}
+          ) : null}
         </div>
       )}
 

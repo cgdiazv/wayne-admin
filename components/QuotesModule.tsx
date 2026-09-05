@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useRef } from "react";
+import { CardSkeleton, TableRowsSkeleton } from "@/components/Skeleton";
 import {
   FileText,
   Plus,
@@ -994,83 +995,95 @@ export default function QuotesModule({
       </div>
 
       {/* Tarjetas de Métricas (KPIs) */}
+      {/* Tarjetas de Métricas (KPIs) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Total Cotizado */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs relative overflow-hidden">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-slate-500">Total Cotizado</span>
-            <div className="w-8 h-8 rounded-xl bg-orange-50 text-[#f6821f] flex items-center justify-center">
-              <DollarSign className="w-4 h-4" />
+        {loading ? (
+          <>
+            <CardSkeleton />
+            <CardSkeleton />
+            <CardSkeleton />
+            <CardSkeleton />
+          </>
+        ) : (
+          <>
+            {/* Total Cotizado */}
+            <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs relative overflow-hidden">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium text-slate-500">Total Cotizado</span>
+                <div className="w-8 h-8 rounded-xl bg-orange-50 text-[#f6821f] flex items-center justify-center">
+                  <DollarSign className="w-4 h-4" />
+                </div>
+              </div>
+              <div className="mt-2 flex items-baseline gap-2">
+                <span className="text-2xl font-black text-slate-900 tracking-tight">
+                  ${metrics.totalQuoted.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-400 mt-1">
+                {quotes.length} cotizaciones generadas
+              </p>
+              <div className="absolute bottom-0 left-0 right-0 h-1 bg-[#f6821f]" />
             </div>
-          </div>
-          <div className="mt-2 flex items-baseline gap-2">
-            <span className="text-2xl font-black text-slate-900 tracking-tight">
-              ${metrics.totalQuoted.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </span>
-          </div>
-          <p className="text-[11px] text-slate-400 mt-1">
-            {quotes.length} cotizaciones generadas
-          </p>
-          <div className="absolute bottom-0 left-0 right-0 h-1 bg-[#f6821f]" />
-        </div>
 
-        {/* Total Aprobado */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs relative overflow-hidden">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-slate-500">Monto Aprobado</span>
-            <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
-              <CheckCircle2 className="w-4 h-4" />
+            {/* Total Aprobado */}
+            <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs relative overflow-hidden">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium text-slate-500">Monto Aprobado</span>
+                <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                  <CheckCircle2 className="w-4 h-4" />
+                </div>
+              </div>
+              <div className="mt-2 flex items-baseline gap-2">
+                <span className="text-2xl font-black text-slate-900 tracking-tight">
+                  ${metrics.totalApproved.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-400 mt-1">
+                Listas o procesadas para despacho
+              </p>
+              <div className="absolute bottom-0 left-0 right-0 h-1 bg-emerald-500" />
             </div>
-          </div>
-          <div className="mt-2 flex items-baseline gap-2">
-            <span className="text-2xl font-black text-slate-900 tracking-tight">
-              ${metrics.totalApproved.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </span>
-          </div>
-          <p className="text-[11px] text-slate-400 mt-1">
-            Listas o procesadas para despacho
-          </p>
-          <div className="absolute bottom-0 left-0 right-0 h-1 bg-emerald-500" />
-        </div>
 
-        {/* Facturadas / Conectadas a Libros */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs relative overflow-hidden">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-slate-500">Convertidas a Factura</span>
-            <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
-              <BookOpen className="w-4 h-4" />
+            {/* Facturadas / Conectadas a Libros */}
+            <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs relative overflow-hidden">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium text-slate-500">Convertidas a Factura</span>
+                <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                  <BookOpen className="w-4 h-4" />
+                </div>
+              </div>
+              <div className="mt-2 flex items-baseline gap-2">
+                <span className="text-2xl font-black text-slate-900 tracking-tight">
+                  {metrics.facturadasCount}
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-400 mt-1 flex items-center gap-1">
+                <Check className="w-3 h-3 text-blue-500" />
+                Contabilizadas en Libro Diario
+              </p>
+              <div className="absolute bottom-0 left-0 right-0 h-1 bg-blue-500" />
             </div>
-          </div>
-          <div className="mt-2 flex items-baseline gap-2">
-            <span className="text-2xl font-black text-slate-900 tracking-tight">
-              {metrics.facturadasCount}
-            </span>
-          </div>
-          <p className="text-[11px] text-slate-400 mt-1 flex items-center gap-1">
-            <Check className="w-3 h-3 text-blue-500" />
-            Contabilizadas en Libro Diario
-          </p>
-          <div className="absolute bottom-0 left-0 right-0 h-1 bg-blue-500" />
-        </div>
 
-        {/* En Proceso / Borrador */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs relative overflow-hidden">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-slate-500">En Seguimiento</span>
-            <div className="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
-              <Clock className="w-4 h-4" />
+            {/* En Proceso / Borrador */}
+            <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs relative overflow-hidden">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium text-slate-500">En Seguimiento</span>
+                <div className="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
+                  <Clock className="w-4 h-4" />
+                </div>
+              </div>
+              <div className="mt-2 flex items-baseline gap-2">
+                <span className="text-2xl font-black text-slate-900 tracking-tight">
+                  {metrics.pendingCount}
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-400 mt-1">
+                Borrador o enviadas a cliente
+              </p>
+              <div className="absolute bottom-0 left-0 right-0 h-1 bg-amber-500" />
             </div>
-          </div>
-          <div className="mt-2 flex items-baseline gap-2">
-            <span className="text-2xl font-black text-slate-900 tracking-tight">
-              {metrics.pendingCount}
-            </span>
-          </div>
-          <p className="text-[11px] text-slate-400 mt-1">
-            Borrador o enviadas a cliente
-          </p>
-          <div className="absolute bottom-0 left-0 right-0 h-1 bg-amber-500" />
-        </div>
+          </>
+        )}
       </div>
 
       {/* Barra de Búsqueda y Filtros */}
@@ -1128,12 +1141,7 @@ export default function QuotesModule({
             </thead>
             <tbody className="divide-y divide-slate-100">
               {loading ? (
-                <tr>
-                  <td colSpan={8} className="text-center py-12 text-slate-400">
-                    <RefreshCw className="w-6 h-6 animate-spin mx-auto text-[#f6821f] mb-2" />
-                    Cargando cotizaciones...
-                  </td>
-                </tr>
+                <TableRowsSkeleton rows={6} cols={8} />
               ) : filteredQuotes.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="text-center py-12 text-slate-400">

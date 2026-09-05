@@ -13,6 +13,7 @@ import TaxRetentionsModule from "@/components/TaxRetentionsModule";
 import VendorPaymentsModule from "@/components/VendorPaymentsModule";
 import BankReconciliationModule from "@/components/BankReconciliationModule";
 import SalesOrdersModule from "@/components/SalesOrdersModule";
+import { Skeleton, CardSkeleton, TableRowsSkeleton } from "@/components/Skeleton";
 
 
 
@@ -6338,87 +6339,98 @@ export default function AdminDashboard() {
 
               {/* Metric Cards Row */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 w-full">
-                {/* Plan de cuentas */}
-                <div
-                  onClick={() => setCurrentView("plan-cuentas")}
-                  className="bg-white p-5 rounded-2xl border border-slate-200/80 hover:border-[#f6821f]/50 transition-all cursor-pointer shadow-xs hover:shadow-md relative overflow-hidden group"
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-medium text-slate-500">Plan de Cuentas</span>
-                    <div className="w-8 h-8 rounded-xl bg-orange-50 text-[#f6821f] flex items-center justify-center group-hover:scale-110 transition-transform">
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                      </svg>
+                {loading ? (
+                  <>
+                    <CardSkeleton />
+                    <CardSkeleton />
+                    <CardSkeleton />
+                    <CardSkeleton />
+                  </>
+                ) : (
+                  <>
+                    {/* Plan de cuentas */}
+                    <div
+                      onClick={() => setCurrentView("plan-cuentas")}
+                      className="bg-white p-5 rounded-2xl border border-slate-200/80 hover:border-[#f6821f]/50 transition-all cursor-pointer shadow-xs hover:shadow-md relative overflow-hidden group"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-medium text-slate-500">Plan de Cuentas</span>
+                        <div className="w-8 h-8 rounded-xl bg-orange-50 text-[#f6821f] flex items-center justify-center group-hover:scale-110 transition-transform">
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                          </svg>
+                        </div>
+                      </div>
+                      <div className="mt-2">
+                        <span className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">{accounts.length}</span>
+                      </div>
+                      <p className="text-[11px] text-slate-400 mt-1">Cuentas contables activas</p>
+                      <div className="absolute bottom-0 left-0 right-0 h-1 bg-[#f6821f]" />
                     </div>
-                  </div>
-                  <div className="mt-2">
-                    <span className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">{accounts.length}</span>
-                  </div>
-                  <p className="text-[11px] text-slate-400 mt-1">Cuentas contables activas</p>
-                  <div className="absolute bottom-0 left-0 right-0 h-1 bg-[#f6821f]" />
-                </div>
 
-                {/* Clientes */}
-                <div
-                  onClick={() => setCurrentView("clientes")}
-                  className="bg-white p-5 rounded-2xl border border-slate-200/80 hover:border-blue-300 transition-all cursor-pointer shadow-xs hover:shadow-md relative overflow-hidden group"
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-medium text-slate-500">Clientes</span>
-                    <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center group-hover:scale-110 transition-transform">
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                      </svg>
+                    {/* Clientes */}
+                    <div
+                      onClick={() => setCurrentView("clientes")}
+                      className="bg-white p-5 rounded-2xl border border-slate-200/80 hover:border-blue-300 transition-all cursor-pointer shadow-xs hover:shadow-md relative overflow-hidden group"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-medium text-slate-500">Clientes</span>
+                        <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                          </svg>
+                        </div>
+                      </div>
+                      <div className="mt-2">
+                        <span className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">{customers.length}</span>
+                      </div>
+                      <p className="text-[11px] text-slate-400 mt-1">Con códigos de Macola</p>
+                      <div className="absolute bottom-0 left-0 right-0 h-1 bg-blue-500" />
                     </div>
-                  </div>
-                  <div className="mt-2">
-                    <span className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">{customers.length}</span>
-                  </div>
-                  <p className="text-[11px] text-slate-400 mt-1">Con códigos de Macola</p>
-                  <div className="absolute bottom-0 left-0 right-0 h-1 bg-blue-500" />
-                </div>
 
-                {/* Proveedores */}
-                <div
-                  onClick={() => setCurrentView("proveedores")}
-                  className="bg-white p-5 rounded-2xl border border-slate-200/80 hover:border-purple-300 transition-all cursor-pointer shadow-xs hover:shadow-md relative overflow-hidden group"
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-medium text-slate-500">Proveedores</span>
-                    <div className="w-8 h-8 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center group-hover:scale-110 transition-transform">
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                      </svg>
+                    {/* Proveedores */}
+                    <div
+                      onClick={() => setCurrentView("proveedores")}
+                      className="bg-white p-5 rounded-2xl border border-slate-200/80 hover:border-purple-300 transition-all cursor-pointer shadow-xs hover:shadow-md relative overflow-hidden group"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-medium text-slate-500">Proveedores</span>
+                        <div className="w-8 h-8 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                          </svg>
+                        </div>
+                      </div>
+                      <div className="mt-2">
+                        <span className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">{vendors.length}</span>
+                      </div>
+                      <p className="text-[11px] text-slate-400 mt-1">Socios comerciales registrados</p>
+                      <div className="absolute bottom-0 left-0 right-0 h-1 bg-purple-600" />
                     </div>
-                  </div>
-                  <div className="mt-2">
-                    <span className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">{vendors.length}</span>
-                  </div>
-                  <p className="text-[11px] text-slate-400 mt-1">Socios comerciales registrados</p>
-                  <div className="absolute bottom-0 left-0 right-0 h-1 bg-purple-600" />
-                </div>
 
-                {/* Valoración Inventario */}
-                <div
-                  onClick={() => setCurrentView("inventario")}
-                  className="bg-white p-5 rounded-2xl border border-slate-200/80 hover:border-emerald-300 transition-all cursor-pointer shadow-xs hover:shadow-md relative overflow-hidden group"
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-medium text-slate-500">Valoración Inventario</span>
-                    <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center group-hover:scale-110 transition-transform">
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-                      </svg>
+                    {/* Valoración Inventario */}
+                    <div
+                      onClick={() => setCurrentView("inventario")}
+                      className="bg-white p-5 rounded-2xl border border-slate-200/80 hover:border-emerald-300 transition-all cursor-pointer shadow-xs hover:shadow-md relative overflow-hidden group"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-medium text-slate-500">Valoración Inventario</span>
+                        <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                          </svg>
+                        </div>
+                      </div>
+                      <div className="mt-2">
+                        <span className="text-2xl sm:text-3xl font-black text-emerald-600 tracking-tight">
+                          {formatCurrency(totalInventoryValuation)}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-400 mt-1">{totalInventoryUnits} unidades en stock</p>
+                      <div className="absolute bottom-0 left-0 right-0 h-1 bg-emerald-500" />
                     </div>
-                  </div>
-                  <div className="mt-2">
-                    <span className="text-2xl sm:text-3xl font-black text-emerald-600 tracking-tight">
-                      {formatCurrency(totalInventoryValuation)}
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-slate-400 mt-1">{totalInventoryUnits} unidades en stock</p>
-                  <div className="absolute bottom-0 left-0 right-0 h-1 bg-emerald-500" />
-                </div>
+                  </>
+                )}
               </div>
 
               {/* ================= SECTION: RESUMEN DE LA EMPRESA ================= */}
@@ -7007,84 +7019,90 @@ export default function AdminDashboard() {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
-                        {bankTransactions
-                          .filter((t) => t.status === "porRevisar")
-                          .filter((t) => selectedBankId === "all" || t.bankAccountId === selectedBankId || (t as unknown as { bankId?: string }).bankId === selectedBankId)
-                          .filter((t) => !bankSearch || t.description.toLowerCase().includes(bankSearch.toLowerCase()) || t.payee.toLowerCase().includes(bankSearch.toLowerCase()))
-                          .map((tx) => {
-                            const matchedBank = connectedBanks.find((b) => b.id === (tx.bankAccountId || (tx as unknown as { bankId?: string }).bankId));
-                            return (
-                              <tr key={tx.id} className="hover:bg-[#fff7ed]/40 transition">
-                                <td className="py-3 px-4 font-medium text-slate-800 whitespace-nowrap">{tx.date}</td>
-                                <td className="py-3 px-4">
-                                  <div className="font-semibold text-slate-900">{tx.description}</div>
-                                  <div className="text-[11px] text-slate-400">
-                                    {tx.bankAccount?.name || matchedBank?.name || "Banco"} ({tx.bankAccount?.accountNumber || matchedBank?.accountNumber || ""})
+                        {loading ? (
+                          <TableRowsSkeleton rows={6} cols={7} />
+                        ) : (
+                          <>
+                            {bankTransactions
+                              .filter((t) => t.status === "porRevisar")
+                              .filter((t) => selectedBankId === "all" || t.bankAccountId === selectedBankId || (t as unknown as { bankId?: string }).bankId === selectedBankId)
+                              .filter((t) => !bankSearch || t.description.toLowerCase().includes(bankSearch.toLowerCase()) || t.payee.toLowerCase().includes(bankSearch.toLowerCase()))
+                              .map((tx) => {
+                                const matchedBank = connectedBanks.find((b) => b.id === (tx.bankAccountId || (tx as unknown as { bankId?: string }).bankId));
+                                return (
+                                  <tr key={tx.id} className="hover:bg-[#fff7ed]/40 transition">
+                                    <td className="py-3 px-4 font-medium text-slate-800 whitespace-nowrap">{tx.date}</td>
+                                    <td className="py-3 px-4">
+                                      <div className="font-semibold text-slate-900">{tx.description}</div>
+                                      <div className="text-[11px] text-slate-400">
+                                        {tx.bankAccount?.name || matchedBank?.name || "Banco"} ({tx.bankAccount?.accountNumber || matchedBank?.accountNumber || ""})
+                                      </div>
+                                    </td>
+                                    <td className="py-3 px-4 font-medium text-slate-700">{tx.payee}</td>
+                                    <td className="py-3 px-4 text-right font-mono font-bold text-emerald-600">
+                                      {tx.type === "deposit" ? `+${formatCurrency(tx.amount)}` : "—"}
+                                    </td>
+                                    <td className="py-3 px-4 text-right font-mono font-bold text-slate-800">
+                                      {tx.type === "expense" ? `-${formatCurrency(tx.amount)}` : "—"}
+                                    </td>
+                                    <td className="py-3 px-4">
+                                      <div className="space-y-1">
+                                        <span className="font-medium text-slate-800 block">{tx.suggestedAccount}</span>
+                                        {tx.ruleApplied ? (
+                                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                                            ⚡ {tx.ruleApplied}
+                                          </span>
+                                        ) : (
+                                          <span className="text-[10px] text-slate-400 italic">Sugerencia inteligente</span>
+                                        )}
+                                      </div>
+                                    </td>
+                                    <td className="py-3 px-4">
+                                      <div className="flex items-center justify-center gap-2">
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            handleUpdateTransactionStatus(
+                                              tx.id,
+                                              "categorizadas",
+                                              `Transacción "${tx.description.slice(0, 28)}..." coincidente y registrada en DB.`
+                                            );
+                                          }}
+                                          className="px-3 py-1.5 rounded-lg bg-[#f6821f] hover:bg-[#e07216] text-white font-semibold text-xs transition shadow-2xs cursor-pointer whitespace-nowrap"
+                                        >
+                                          Coincidir / Agregar
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            handleUpdateTransactionStatus(
+                                              tx.id,
+                                              "excluidas",
+                                              "Transacción excluida del feed bancario."
+                                            );
+                                          }}
+                                          className="px-2.5 py-1.5 rounded-lg border border-slate-200 text-slate-500 hover:text-slate-800 hover:bg-slate-100 text-xs font-medium transition cursor-pointer"
+                                        >
+                                          Excluir
+                                        </button>
+                                      </div>
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+
+                            {bankTransactions.filter((t) => t.status === "porRevisar" && (selectedBankId === "all" || t.bankAccountId === selectedBankId || (t as unknown as { bankId?: string }).bankId === selectedBankId)).length === 0 && (
+                              <tr>
+                                <td colSpan={7} className="py-12 text-center text-slate-400">
+                                  <div className="w-12 h-12 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto mb-2 font-bold text-xl">
+                                    ✓
                                   </div>
-                                </td>
-                                <td className="py-3 px-4 font-medium text-slate-700">{tx.payee}</td>
-                                <td className="py-3 px-4 text-right font-mono font-bold text-emerald-600">
-                                  {tx.type === "deposit" ? `+${formatCurrency(tx.amount)}` : "—"}
-                                </td>
-                                <td className="py-3 px-4 text-right font-mono font-bold text-slate-800">
-                                  {tx.type === "expense" ? `-${formatCurrency(tx.amount)}` : "—"}
-                                </td>
-                                <td className="py-3 px-4">
-                                  <div className="space-y-1">
-                                    <span className="font-medium text-slate-800 block">{tx.suggestedAccount}</span>
-                                    {tx.ruleApplied ? (
-                                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
-                                        ⚡ {tx.ruleApplied}
-                                      </span>
-                                    ) : (
-                                      <span className="text-[10px] text-slate-400 italic">Sugerencia inteligente</span>
-                                    )}
-                                  </div>
-                                </td>
-                                <td className="py-3 px-4">
-                                  <div className="flex items-center justify-center gap-2">
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        handleUpdateTransactionStatus(
-                                          tx.id,
-                                          "categorizadas",
-                                          `Transacción "${tx.description.slice(0, 28)}..." coincidente y registrada en DB.`
-                                        );
-                                      }}
-                                      className="px-3 py-1.5 rounded-lg bg-[#f6821f] hover:bg-[#e07216] text-white font-semibold text-xs transition shadow-2xs cursor-pointer whitespace-nowrap"
-                                    >
-                                      Coincidir / Agregar
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        handleUpdateTransactionStatus(
-                                          tx.id,
-                                          "excluidas",
-                                          "Transacción excluida del feed bancario."
-                                        );
-                                      }}
-                                      className="px-2.5 py-1.5 rounded-lg border border-slate-200 text-slate-500 hover:text-slate-800 hover:bg-slate-100 text-xs font-medium transition cursor-pointer"
-                                    >
-                                      Excluir
-                                    </button>
-                                  </div>
+                                  <p className="font-semibold text-slate-700 text-sm">¡Estás al día!</p>
+                                  <p className="text-xs text-slate-500 mt-1">No hay transacciones bancarias pendientes de revisión.</p>
                                 </td>
                               </tr>
-                            );
-                          })}
-
-                        {bankTransactions.filter((t) => t.status === "porRevisar" && (selectedBankId === "all" || t.bankAccountId === selectedBankId || (t as unknown as { bankId?: string }).bankId === selectedBankId)).length === 0 && (
-                          <tr>
-                            <td colSpan={7} className="py-12 text-center text-slate-400">
-                              <div className="w-12 h-12 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto mb-2 font-bold text-xl">
-                                ✓
-                              </div>
-                              <p className="font-semibold text-slate-700 text-sm">¡Estás al día!</p>
-                              <p className="text-xs text-slate-500 mt-1">No hay transacciones bancarias pendientes de revisión.</p>
-                            </td>
-                          </tr>
+                            )}
+                          </>
                         )}
                       </tbody>
                     </table>
@@ -7514,64 +7532,70 @@ export default function AdminDashboard() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                      {filteredCustomers.map((c) => (
-                        <tr key={c.id} className="hover:bg-slate-50/80 transition">
-                          <td className="p-3.5 font-mono">
-                            <button
-                              type="button"
-                              onClick={() => handleOpenEditCustomer(c)}
-                              className="text-[#f6821f] font-semibold hover:underline cursor-pointer flex items-center gap-1.5 group"
-                              title="Haz clic para editar cliente"
-                            >
-                              <span>{c.macolaCode || `#${c.id.slice(0, 6)}`}</span>
-                              <svg className="w-3 h-3 text-[#f6821f] opacity-70 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                              </svg>
-                            </button>
-                          </td>
-                          <td className="p-3.5 font-medium text-slate-900">
-                            <button
-                              type="button"
-                              onClick={() => handleOpenEditCustomer(c)}
-                              className="hover:text-[#f6821f] hover:underline cursor-pointer text-left font-medium"
-                              title="Haz clic para editar cliente"
-                            >
-                              {c.name}
-                            </button>
-                          </td>
-                          <td className="p-3.5 text-slate-500">{c.email || "—"}</td>
-                          <td className="p-3.5 text-slate-500">{c.phone || "—"}</td>
-                          <td className="p-3.5 text-slate-500 truncate max-w-xs">{c.address || "—"}</td>
-                          <td className="p-3.5 font-medium">{c.currency}</td>
-                          <td className="p-3.5 text-right">
-                            <div className="flex items-center justify-end gap-1.5">
-                              <button
-                                type="button"
-                                onClick={() => openCustomerStatement(c.id)}
-                                className="px-2.5 py-1 rounded-lg bg-[#fff7ed] hover:bg-[#ffedd5] text-[#f6821f] font-semibold cursor-pointer transition text-[11px] inline-flex items-center gap-1 border border-[#fed7aa]"
-                                title="Ver Estado de Cuenta del cliente"
-                              >
-                                <FileText className="w-3 h-3" />
-                                <span>Estado de Cuenta</span>
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleOpenEditCustomer(c)}
-                                className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold cursor-pointer transition text-[11px] inline-flex items-center gap-1 border border-slate-200"
-                              >
-                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                                </svg>
-                                <span>Editar</span>
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                      {filteredCustomers.length === 0 && (
-                        <tr>
-                          <td colSpan={7} className="p-8 text-center text-slate-400">No se encontraron clientes</td>
-                        </tr>
+                      {loading ? (
+                        <TableRowsSkeleton rows={6} cols={7} />
+                      ) : (
+                        <>
+                          {filteredCustomers.map((c) => (
+                            <tr key={c.id} className="hover:bg-slate-50/80 transition">
+                              <td className="p-3.5 font-mono">
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenEditCustomer(c)}
+                                  className="text-[#f6821f] font-semibold hover:underline cursor-pointer flex items-center gap-1.5 group"
+                                  title="Haz clic para editar cliente"
+                                >
+                                  <span>{c.macolaCode || `#${c.id.slice(0, 6)}`}</span>
+                                  <svg className="w-3 h-3 text-[#f6821f] opacity-70 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                  </svg>
+                                </button>
+                              </td>
+                              <td className="p-3.5 font-medium text-slate-900">
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenEditCustomer(c)}
+                                  className="hover:text-[#f6821f] hover:underline cursor-pointer text-left font-medium"
+                                  title="Haz clic para editar cliente"
+                                >
+                                  {c.name}
+                                </button>
+                              </td>
+                              <td className="p-3.5 text-slate-500">{c.email || "—"}</td>
+                              <td className="p-3.5 text-slate-500">{c.phone || "—"}</td>
+                              <td className="p-3.5 text-slate-500 truncate max-w-xs">{c.address || "—"}</td>
+                              <td className="p-3.5 font-medium">{c.currency}</td>
+                              <td className="p-3.5 text-right">
+                                <div className="flex items-center justify-end gap-1.5">
+                                  <button
+                                    type="button"
+                                    onClick={() => openCustomerStatement(c.id)}
+                                    className="px-2.5 py-1 rounded-lg bg-[#fff7ed] hover:bg-[#ffedd5] text-[#f6821f] font-semibold cursor-pointer transition text-[11px] inline-flex items-center gap-1 border border-[#fed7aa]"
+                                    title="Ver Estado de Cuenta del cliente"
+                                  >
+                                    <FileText className="w-3 h-3" />
+                                    <span>Estado de Cuenta</span>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenEditCustomer(c)}
+                                    className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold cursor-pointer transition text-[11px] inline-flex items-center gap-1 border border-slate-200"
+                                  >
+                                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                    </svg>
+                                    <span>Editar</span>
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                          {filteredCustomers.length === 0 && (
+                            <tr>
+                              <td colSpan={7} className="p-8 text-center text-slate-400">No se encontraron clientes</td>
+                            </tr>
+                          )}
+                        </>
                       )}
                     </tbody>
                   </table>
@@ -7726,64 +7750,70 @@ export default function AdminDashboard() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                      {filteredVendors.map((v) => (
-                        <tr key={v.id} className="hover:bg-slate-50/80 transition">
-                          <td className="p-3.5 font-mono">
-                            <button
-                              type="button"
-                              onClick={() => handleOpenEditVendor(v)}
-                              className="text-[#f6821f] font-semibold hover:underline cursor-pointer flex items-center gap-1.5 group"
-                              title="Haz clic para editar proveedor"
-                            >
-                              <span>{v.macolaCode || `#${v.id.slice(0, 6)}`}</span>
-                              <svg className="w-3 h-3 text-[#f6821f] opacity-70 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                              </svg>
-                            </button>
-                          </td>
-                          <td className="p-3.5 font-medium text-slate-900">
-                            <button
-                              type="button"
-                              onClick={() => handleOpenEditVendor(v)}
-                              className="hover:text-[#f6821f] hover:underline cursor-pointer text-left font-medium"
-                              title="Haz clic para editar proveedor"
-                            >
-                              {v.name}
-                            </button>
-                          </td>
-                          <td className="p-3.5 text-slate-500">{v.email || "—"}</td>
-                          <td className="p-3.5 text-slate-500">{v.phone || "—"}</td>
-                          <td className="p-3.5 text-slate-500 truncate max-w-xs">{v.address || "—"}</td>
-                          <td className="p-3.5 font-medium">{v.currency}</td>
-                          <td className="p-3.5 text-right space-x-1.5">
-                            <button
-                              type="button"
-                              onClick={() => openPagarProveedorView(v.name)}
-                              className="px-2.5 py-1 rounded-lg bg-[#fff7ed] hover:bg-orange-100 text-[#ea580c] font-semibold cursor-pointer transition text-[11px] inline-flex items-center gap-1 border border-[#ffedd5]"
-                              title="Pagar facturas de este proveedor"
-                            >
-                              <CreditCard className="w-3 h-3" />
-                              <span>Pagar</span>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleOpenEditVendor(v)}
-                              className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-[#fff7ed] hover:text-[#f6821f] text-slate-700 font-semibold cursor-pointer transition text-[11px] inline-flex items-center gap-1 border border-slate-200"
-                            >
-                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                              </svg>
-                              <span>Editar</span>
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    {filteredVendors.length === 0 && (
-                      <tr>
-                        <td colSpan={7} className="p-8 text-center text-slate-400">No se encontraron proveedores</td>
-                      </tr>
-                    )}
-                  </tbody>
+                      {loading ? (
+                        <TableRowsSkeleton rows={6} cols={7} />
+                      ) : (
+                        <>
+                          {filteredVendors.map((v) => (
+                            <tr key={v.id} className="hover:bg-slate-50/80 transition">
+                              <td className="p-3.5 font-mono">
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenEditVendor(v)}
+                                  className="text-[#f6821f] font-semibold hover:underline cursor-pointer flex items-center gap-1.5 group"
+                                  title="Haz clic para editar proveedor"
+                                >
+                                  <span>{v.macolaCode || `#${v.id.slice(0, 6)}`}</span>
+                                  <svg className="w-3 h-3 text-[#f6821f] opacity-70 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                  </svg>
+                                </button>
+                              </td>
+                              <td className="p-3.5 font-medium text-slate-900">
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenEditVendor(v)}
+                                  className="hover:text-[#f6821f] hover:underline cursor-pointer text-left font-medium"
+                                  title="Haz clic para editar proveedor"
+                                >
+                                  {v.name}
+                                </button>
+                              </td>
+                              <td className="p-3.5 text-slate-500">{v.email || "—"}</td>
+                              <td className="p-3.5 text-slate-500">{v.phone || "—"}</td>
+                              <td className="p-3.5 text-slate-500 truncate max-w-xs">{v.address || "—"}</td>
+                              <td className="p-3.5 font-medium">{v.currency}</td>
+                              <td className="p-3.5 text-right space-x-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => openPagarProveedorView(v.name)}
+                                  className="px-2.5 py-1 rounded-lg bg-[#fff7ed] hover:bg-orange-100 text-[#ea580c] font-semibold cursor-pointer transition text-[11px] inline-flex items-center gap-1 border border-[#ffedd5]"
+                                  title="Pagar facturas de este proveedor"
+                                >
+                                  <CreditCard className="w-3 h-3" />
+                                  <span>Pagar</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenEditVendor(v)}
+                                  className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-[#fff7ed] hover:text-[#f6821f] text-slate-700 font-semibold cursor-pointer transition text-[11px] inline-flex items-center gap-1 border border-slate-200"
+                                >
+                                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                  </svg>
+                                  <span>Editar</span>
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                          {filteredVendors.length === 0 && (
+                            <tr>
+                              <td colSpan={7} className="p-8 text-center text-slate-400">No se encontraron proveedores</td>
+                            </tr>
+                          )}
+                        </>
+                      )}
+                    </tbody>
                 </table>
               </div>
             </div>
@@ -7927,110 +7957,116 @@ export default function AdminDashboard() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                      {filteredInventory.map((item) => (
-                        <tr key={item.id} className="hover:bg-slate-50/80 transition">
-                          <td className="p-3.5 font-mono text-[#f6821f] font-semibold">
-                            <button
-                              type="button"
-                              onClick={() => handleOpenEditProduct(item)}
-                              className="hover:underline cursor-pointer flex items-center gap-1.5 group"
-                              title="Haz clic para editar producto"
-                            >
-                              <span>{item.sku}</span>
-                              <svg className="w-3 h-3 text-[#f6821f] opacity-70 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                              </svg>
-                            </button>
-                          </td>
-                          <td className="p-3.5 font-medium text-slate-900">
-                            <button
-                              type="button"
-                              onClick={() => handleOpenEditProduct(item)}
-                              className="hover:text-[#f6821f] hover:underline cursor-pointer text-left font-medium"
-                              title="Haz clic para editar producto"
-                            >
-                              {item.description}
-                            </button>
-                          </td>
-                          <td className="p-3.5">
-                            {item.trackingType === "LOT" ? (
-                              <button
-                                type="button"
-                                onClick={() => openLotManagementModal(item)}
-                                className="px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200 font-semibold text-[11px] hover:bg-amber-100 transition cursor-pointer flex items-center gap-1.5 w-fit"
-                              >
-                                <Package className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-                                <span>Por Lote</span>
-                                <span className="bg-amber-200 text-amber-900 px-1.5 py-0.2 text-[10px] rounded-full font-bold">
-                                  {item.lots?.length || 0}
-                                </span>
-                              </button>
-                            ) : item.trackingType === "SERIAL" ? (
-                              <button
-                                type="button"
-                                onClick={() => openSerialManagementModal(item)}
-                                className="px-2.5 py-1 rounded-full bg-purple-50 text-purple-700 border border-purple-200 font-semibold text-[11px] hover:bg-purple-100 transition cursor-pointer flex items-center gap-1.5 w-fit"
-                              >
-                                <Tag className="w-3.5 h-3.5 text-purple-600 shrink-0" />
-                                <span>Por N.º Serie</span>
-                                <span className="bg-purple-200 text-purple-900 px-1.5 py-0.2 text-[10px] rounded-full font-bold">
-                                  {item.serials?.length || 0}
-                                </span>
-                              </button>
-
-                            ) : (
-                              <span className="px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-500 font-medium text-[11px]">
-                                Sin rastreo
-                              </span>
-                            )}
-                          </td>
-                          <td className="p-3.5 text-right font-mono font-medium">{item.quantity}</td>
-                          <td className="p-3.5 text-right font-mono font-medium">{formatCurrency(item.cost)}</td>
-                          <td className="p-3.5 text-right font-mono font-medium">{formatCurrency(item.price)}</td>
-                          <td className="p-3.5 text-right font-mono text-slate-900 font-bold">
-                            {formatCurrency(item.quantity * item.cost)}
-                          </td>
-                          <td className="p-3.5 text-right font-sans">
-                            <div className="flex items-center justify-end gap-1.5">
-                              {item.trackingType === "LOT" ? (
+                      {loading ? (
+                        <TableRowsSkeleton rows={6} cols={8} />
+                      ) : (
+                        <>
+                          {filteredInventory.map((item) => (
+                            <tr key={item.id} className="hover:bg-slate-50/80 transition">
+                              <td className="p-3.5 font-mono text-[#f6821f] font-semibold">
                                 <button
                                   type="button"
-                                  onClick={() => openLotManagementModal(item)}
-                                  className="px-2.5 py-1 rounded-lg bg-amber-500 hover:bg-amber-600 text-white font-semibold cursor-pointer transition text-[11px] inline-flex items-center gap-1 shadow-xs"
-                                  title="Gestionar Lotes y Vencimientos"
+                                  onClick={() => handleOpenEditProduct(item)}
+                                  className="hover:underline cursor-pointer flex items-center gap-1.5 group"
+                                  title="Haz clic para editar producto"
                                 >
-                                  <span>Lotes</span>
+                                  <span>{item.sku}</span>
+                                  <svg className="w-3 h-3 text-[#f6821f] opacity-70 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                  </svg>
                                 </button>
-                              ) : item.trackingType === "SERIAL" ? (
+                              </td>
+                              <td className="p-3.5 font-medium text-slate-900">
                                 <button
                                   type="button"
-                                  onClick={() => openSerialManagementModal(item)}
-                                  className="px-2.5 py-1 rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-semibold cursor-pointer transition text-[11px] inline-flex items-center gap-1 shadow-xs"
-                                  title="Gestionar Números de Serie"
+                                  onClick={() => handleOpenEditProduct(item)}
+                                  className="hover:text-[#f6821f] hover:underline cursor-pointer text-left font-medium"
+                                  title="Haz clic para editar producto"
                                 >
-                                  <span>Series</span>
+                                  {item.description}
                                 </button>
-                              ) : null}
+                              </td>
+                              <td className="p-3.5">
+                                {item.trackingType === "LOT" ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => openLotManagementModal(item)}
+                                    className="px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200 font-semibold text-[11px] hover:bg-amber-100 transition cursor-pointer flex items-center gap-1.5 w-fit"
+                                  >
+                                    <Package className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                                    <span>Por Lote</span>
+                                    <span className="bg-amber-200 text-amber-900 px-1.5 py-0.2 text-[10px] rounded-full font-bold">
+                                      {item.lots?.length || 0}
+                                    </span>
+                                  </button>
+                                ) : item.trackingType === "SERIAL" ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => openSerialManagementModal(item)}
+                                    className="px-2.5 py-1 rounded-full bg-purple-50 text-purple-700 border border-purple-200 font-semibold text-[11px] hover:bg-purple-100 transition cursor-pointer flex items-center gap-1.5 w-fit"
+                                  >
+                                    <Tag className="w-3.5 h-3.5 text-purple-600 shrink-0" />
+                                    <span>Por N.º Serie</span>
+                                    <span className="bg-purple-200 text-purple-900 px-1.5 py-0.2 text-[10px] rounded-full font-bold">
+                                      {item.serials?.length || 0}
+                                    </span>
+                                  </button>
 
-                              <button
-                                type="button"
-                                onClick={() => handleOpenEditProduct(item)}
-                                className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-[#fff7ed] hover:text-[#f6821f] text-slate-700 font-semibold cursor-pointer transition text-[11px] inline-flex items-center gap-1 border border-slate-200"
-                                title="Haz clic para editar producto"
-                              >
-                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                                </svg>
-                                <span>Editar</span>
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                      {filteredInventory.length === 0 && (
-                        <tr>
-                          <td colSpan={8} className="p-8 text-center text-slate-400">No se encontraron artículos en inventario</td>
-                        </tr>
+                                ) : (
+                                  <span className="px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-500 font-medium text-[11px]">
+                                    Sin rastreo
+                                  </span>
+                                )}
+                              </td>
+                              <td className="p-3.5 text-right font-mono font-medium">{item.quantity}</td>
+                              <td className="p-3.5 text-right font-mono font-medium">{formatCurrency(item.cost)}</td>
+                              <td className="p-3.5 text-right font-mono font-medium">{formatCurrency(item.price)}</td>
+                              <td className="p-3.5 text-right font-mono text-slate-900 font-bold">
+                                {formatCurrency(item.quantity * item.cost)}
+                              </td>
+                              <td className="p-3.5 text-right font-sans">
+                                <div className="flex items-center justify-end gap-1.5">
+                                  {item.trackingType === "LOT" ? (
+                                    <button
+                                      type="button"
+                                      onClick={() => openLotManagementModal(item)}
+                                      className="px-2.5 py-1 rounded-lg bg-amber-500 hover:bg-amber-600 text-white font-semibold cursor-pointer transition text-[11px] inline-flex items-center gap-1 shadow-xs"
+                                      title="Gestionar Lotes y Vencimientos"
+                                    >
+                                      <span>Lotes</span>
+                                    </button>
+                                  ) : item.trackingType === "SERIAL" ? (
+                                    <button
+                                      type="button"
+                                      onClick={() => openSerialManagementModal(item)}
+                                      className="px-2.5 py-1 rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-semibold cursor-pointer transition text-[11px] inline-flex items-center gap-1 shadow-xs"
+                                      title="Gestionar Números de Serie"
+                                    >
+                                      <span>Series</span>
+                                    </button>
+                                  ) : null}
+
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenEditProduct(item)}
+                                    className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-[#fff7ed] hover:text-[#f6821f] text-slate-700 font-semibold cursor-pointer transition text-[11px] inline-flex items-center gap-1 border border-slate-200"
+                                    title="Haz clic para editar producto"
+                                  >
+                                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                    </svg>
+                                    <span>Editar</span>
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                          {filteredInventory.length === 0 && (
+                            <tr>
+                              <td colSpan={8} className="p-8 text-center text-slate-400">No se encontraron artículos en inventario</td>
+                            </tr>
+                          )}
+                        </>
                       )}
                     </tbody>
                   </table>
@@ -13999,47 +14035,51 @@ export default function AdminDashboard() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 font-mono">
-                      {invoicesList.map((fact) => (
-                        <tr key={fact.num} className="hover:bg-slate-50 transition">
-                          <td className="py-3.5 px-4 font-bold text-slate-900 font-mono">#{fact.num}</td>
-                          <td className="py-3.5 px-4 font-sans text-slate-600">{fact.date}</td>
-                          <td className="py-3.5 px-4 font-bold font-sans text-slate-900">{fact.customer}</td>
-                          <td className="py-3.5 px-4 font-sans text-slate-500">{fact.due}</td>
-                          <td className="py-3.5 px-4 text-right font-bold text-slate-900">${fact.total.toFixed(2)} USD</td>
-                          <td className="py-3.5 px-4 text-center font-sans">
-                            <select
-                              value={fact.status}
-                              onChange={(e) => handleUpdateInvoiceStatus(fact.num, e.target.value)}
-                              className={`px-2.5 py-1 rounded-full text-[10px] font-bold cursor-pointer appearance-none outline-none border transition ${
-                                fact.status === "Cobrada"
-                                  ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100"
-                                  : "bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100"
-                              }`}
-                            >
-                              <option value="Pendiente">Pendiente</option>
-                              <option value="Cobrada">Cobrada</option>
-                            </select>
-                          </td>
-                          <td className="py-3.5 px-4 text-right font-sans">
-                            <div className="flex items-center justify-end gap-2">
-                              <button
-                                type="button"
-                                onClick={() => openInvoiceEditor(fact)}
-                                className="px-3 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold cursor-pointer transition text-[11px]"
+                      {loading ? (
+                        <TableRowsSkeleton rows={6} cols={7} />
+                      ) : (
+                        invoicesList.map((fact) => (
+                          <tr key={fact.num} className="hover:bg-slate-50 transition">
+                            <td className="py-3.5 px-4 font-bold text-slate-900 font-mono">#{fact.num}</td>
+                            <td className="py-3.5 px-4 font-sans text-slate-600">{fact.date}</td>
+                            <td className="py-3.5 px-4 font-bold font-sans text-slate-900">{fact.customer}</td>
+                            <td className="py-3.5 px-4 font-sans text-slate-500">{fact.due}</td>
+                            <td className="py-3.5 px-4 text-right font-bold text-slate-900">${fact.total.toFixed(2)} USD</td>
+                            <td className="py-3.5 px-4 text-center font-sans">
+                              <select
+                                value={fact.status}
+                                onChange={(e) => handleUpdateInvoiceStatus(fact.num, e.target.value)}
+                                className={`px-2.5 py-1 rounded-full text-[10px] font-bold cursor-pointer appearance-none outline-none border transition ${
+                                  fact.status === "Cobrada"
+                                    ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100"
+                                    : "bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100"
+                                }`}
                               >
-                                Editar / Ver
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => window.print()}
-                                className="px-3 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-semibold cursor-pointer transition text-[11px]"
-                              >
-                                Imprimir
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
+                                <option value="Pendiente">Pendiente</option>
+                                <option value="Cobrada">Cobrada</option>
+                              </select>
+                            </td>
+                            <td className="py-3.5 px-4 text-right font-sans">
+                              <div className="flex items-center justify-end gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => openInvoiceEditor(fact)}
+                                  className="px-3 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold cursor-pointer transition text-[11px]"
+                                >
+                                  Editar / Ver
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => window.print()}
+                                  className="px-3 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-semibold cursor-pointer transition text-[11px]"
+                                >
+                                  Imprimir
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))
+                      )}
                     </tbody>
                   </table>
                 </div>
@@ -14219,7 +14259,9 @@ export default function AdminDashboard() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 font-mono">
-                      {(() => {
+                      {loading ? (
+                        <TableRowsSkeleton rows={6} cols={7} />
+                      ) : (() => {
                         const filteredPOs = purchaseOrders.filter((po) =>
                           !search ||
                           po.num.toLowerCase().includes(search.toLowerCase()) ||
@@ -14501,66 +14543,72 @@ export default function AdminDashboard() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                      {filteredPurchaseInvoices.map((inv) => (
-                        <tr key={inv.id} className="hover:bg-slate-50 transition">
-                          <td className="py-3.5 px-4 font-mono font-bold text-slate-900">
-                            {inv.invoiceNumber}
-                          </td>
-                          <td className="py-3.5 px-4 font-mono text-slate-600">
-                            {inv.purchaseOrderNumber || "—"}
-                          </td>
-                          <td className="py-3.5 px-4 font-bold text-slate-900">
-                            {inv.vendorName}
-                          </td>
-                          <td className="py-3.5 px-4 text-slate-600">
-                            {inv.issueDate}
-                          </td>
-                          <td className="py-3.5 px-4 text-right font-bold text-slate-900">
-                            ${(inv.total || 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}
-                          </td>
-                          <td className="py-3.5 px-4 text-center">
-                            <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
-                              inv.paymentStatus === "PAGADA" ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"
-                            }`}>
-                              {inv.paymentStatus}
-                            </span>
-                          </td>
-                          <td className="py-3.5 px-4 text-center">
-                            <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center justify-center gap-1 w-fit mx-auto">
-                              <CheckCircle2 className="w-3 h-3" />
-                              <span>STOCK INGRESADO</span>
-                            </span>
-                          </td>
-                          <td className="py-3.5 px-4 text-right space-x-1.5">
-                            {inv.paymentStatus !== "PAGADA" && (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setSelectedPaymentVendor(inv.vendorName);
-                                  setCurrentView("pagos-proveedores");
-                                }}
-                                className="px-2.5 py-1 rounded-lg bg-[#fff7ed] hover:bg-orange-100 text-[#ea580c] font-semibold cursor-pointer transition text-[11px] border border-[#ffedd5]"
-                                title="Registrar abono o cancelación de esta factura"
-                              >
-                                Pagar / Abonar
-                              </button>
-                            )}
-                            <button
-                              type="button"
-                              onClick={() => setSelectedDetailPurchaseInvoice(inv)}
-                              className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold cursor-pointer transition text-[11px] border border-slate-200"
-                            >
-                              Ver Detalle
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                      {filteredPurchaseInvoices.length === 0 && (
-                        <tr>
-                          <td colSpan={8} className="p-8 text-center text-slate-400">
-                            No se encontraron facturas de compra registradas.
-                          </td>
-                        </tr>
+                      {loading ? (
+                        <TableRowsSkeleton rows={6} cols={8} />
+                      ) : (
+                        <>
+                          {filteredPurchaseInvoices.map((inv) => (
+                            <tr key={inv.id} className="hover:bg-slate-50 transition">
+                              <td className="py-3.5 px-4 font-mono font-bold text-slate-900">
+                                {inv.invoiceNumber}
+                              </td>
+                              <td className="py-3.5 px-4 font-mono text-slate-600">
+                                {inv.purchaseOrderNumber || "—"}
+                              </td>
+                              <td className="py-3.5 px-4 font-bold text-slate-900">
+                                {inv.vendorName}
+                              </td>
+                              <td className="py-3.5 px-4 text-slate-600">
+                                {inv.issueDate}
+                              </td>
+                              <td className="py-3.5 px-4 text-right font-bold text-slate-900">
+                                ${(inv.total || 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                              </td>
+                              <td className="py-3.5 px-4 text-center">
+                                <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
+                                  inv.paymentStatus === "PAGADA" ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"
+                                }`}>
+                                  {inv.paymentStatus}
+                                </span>
+                              </td>
+                              <td className="py-3.5 px-4 text-center">
+                                <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center justify-center gap-1 w-fit mx-auto">
+                                  <CheckCircle2 className="w-3 h-3" />
+                                  <span>STOCK INGRESADO</span>
+                                </span>
+                              </td>
+                              <td className="py-3.5 px-4 text-right space-x-1.5">
+                                {inv.paymentStatus !== "PAGADA" && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setSelectedPaymentVendor(inv.vendorName);
+                                      setCurrentView("pagos-proveedores");
+                                    }}
+                                    className="px-2.5 py-1 rounded-lg bg-[#fff7ed] hover:bg-orange-100 text-[#ea580c] font-semibold cursor-pointer transition text-[11px] border border-[#ffedd5]"
+                                    title="Registrar abono o cancelación de esta factura"
+                                  >
+                                    Pagar / Abonar
+                                  </button>
+                                )}
+                                <button
+                                  type="button"
+                                  onClick={() => setSelectedDetailPurchaseInvoice(inv)}
+                                  className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold cursor-pointer transition text-[11px] border border-slate-200"
+                                >
+                                  Ver Detalle
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                          {filteredPurchaseInvoices.length === 0 && (
+                            <tr>
+                              <td colSpan={8} className="p-8 text-center text-slate-400">
+                                No se encontraron facturas de compra registradas.
+                              </td>
+                            </tr>
+                          )}
+                        </>
                       )}
                     </tbody>
                   </table>

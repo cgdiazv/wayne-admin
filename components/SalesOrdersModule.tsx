@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useRef } from "react";
+import { CardSkeleton, TableRowsSkeleton } from "@/components/Skeleton";
 import {
   PackageCheck,
   Plus,
@@ -670,77 +671,88 @@ export default function SalesOrdersModule({
 
       {/* ================= KPI CARDS ================= */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Card 1: Total Pedidos */}
-        <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs flex items-center justify-between">
-          <div>
-            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
-              Total Pedidos Activos
-            </span>
-            <h3 className="text-xl font-black text-slate-900 mt-1">
-              ${metrics.montoTotal.toLocaleString("es-HN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </h3>
-            <span className="text-xs text-slate-500 mt-0.5 block">
-              {metrics.totalCount} pedidos registrados
-            </span>
-          </div>
-          <div className="w-12 h-12 rounded-xl bg-orange-50 border border-orange-100 flex items-center justify-center text-[#f6821f]">
-            <ShoppingBag className="w-6 h-6" />
-          </div>
-        </div>
+        {loading ? (
+          <>
+            <CardSkeleton />
+            <CardSkeleton />
+            <CardSkeleton />
+            <CardSkeleton />
+          </>
+        ) : (
+          <>
+            {/* Card 1: Total Pedidos */}
+            <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs flex items-center justify-between">
+              <div>
+                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
+                  Total Pedidos Activos
+                </span>
+                <h3 className="text-xl font-black text-slate-900 mt-1">
+                  ${metrics.montoTotal.toLocaleString("es-HN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </h3>
+                <span className="text-xs text-slate-500 mt-0.5 block">
+                  {metrics.totalCount} pedidos registrados
+                </span>
+              </div>
+              <div className="w-12 h-12 rounded-xl bg-orange-50 border border-orange-100 flex items-center justify-center text-[#f6821f]">
+                <ShoppingBag className="w-6 h-6" />
+              </div>
+            </div>
 
-        {/* Card 2: En Preparación Almacén */}
-        <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs flex items-center justify-between">
-          <div>
-            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
-              En Almacén / Surtido
-            </span>
-            <h3 className="text-xl font-black text-amber-600 mt-1">
-              {metrics.enBodega} pedidos
-            </h3>
-            <span className="text-xs text-slate-500 mt-0.5 block">
-              Preparando empaque en bodega
-            </span>
-          </div>
-          <div className="w-12 h-12 rounded-xl bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-600">
-            <Boxes className="w-6 h-6" />
-          </div>
-        </div>
+            {/* Card 2: En Preparación Almacén */}
+            <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs flex items-center justify-between">
+              <div>
+                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
+                  En Almacén / Surtido
+                </span>
+                <h3 className="text-xl font-black text-amber-600 mt-1">
+                  {metrics.enBodega} pedidos
+                </h3>
+                <span className="text-xs text-slate-500 mt-0.5 block">
+                  Preparando empaque en bodega
+                </span>
+              </div>
+              <div className="w-12 h-12 rounded-xl bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-600">
+                <Boxes className="w-6 h-6" />
+              </div>
+            </div>
 
-        {/* Card 3: Despachados Listos para Facturar */}
-        <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs flex items-center justify-between">
-          <div>
-            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
-              Despachados sin Facturar
-            </span>
-            <h3 className="text-xl font-black text-indigo-600 mt-1">
-              ${metrics.montoDespachadoSinFacturar.toLocaleString("es-HN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </h3>
-            <span className="text-xs text-slate-500 mt-0.5 block">
-              {metrics.despachados} con remisión entregada
-            </span>
-          </div>
-          <div className="w-12 h-12 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600">
-            <Truck className="w-6 h-6" />
-          </div>
-        </div>
+            {/* Card 3: Despachados Listos para Facturar */}
+            <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs flex items-center justify-between">
+              <div>
+                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
+                  Despachados sin Facturar
+                </span>
+                <h3 className="text-xl font-black text-indigo-600 mt-1">
+                  ${metrics.montoDespachadoSinFacturar.toLocaleString("es-HN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </h3>
+                <span className="text-xs text-slate-500 mt-0.5 block">
+                  {metrics.despachados} con remisión entregada
+                </span>
+              </div>
+              <div className="w-12 h-12 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600">
+                <Truck className="w-6 h-6" />
+              </div>
+            </div>
 
-        {/* Card 4: Facturados */}
-        <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs flex items-center justify-between">
-          <div>
-            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
-              Facturados y Cerrados
-            </span>
-            <h3 className="text-xl font-black text-emerald-600 mt-1">
-              {metrics.facturados} pedidos
-            </h3>
-            <span className="text-xs text-slate-500 mt-0.5 block">
-              Con Factura SAR emitida
-            </span>
-          </div>
-          <div className="w-12 h-12 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600">
-            <FileCheck className="w-6 h-6" />
-          </div>
-        </div>
+            {/* Card 4: Facturados */}
+            <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs flex items-center justify-between">
+              <div>
+                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
+                  Facturados y Cerrados
+                </span>
+                <h3 className="text-xl font-black text-emerald-600 mt-1">
+                  {metrics.facturados} pedidos
+                </h3>
+                <span className="text-xs text-slate-500 mt-0.5 block">
+                  Con Factura SAR emitida
+                </span>
+              </div>
+              <div className="w-12 h-12 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600">
+                <FileCheck className="w-6 h-6" />
+              </div>
+            </div>
+          </>
+        )}
       </div>
 
       {/* ================= BARRA DE FILTROS & BÚSQUEDA ================= */}
@@ -794,9 +806,25 @@ export default function SalesOrdersModule({
       {/* ================= TABLA DE PEDIDOS ================= */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
         {loading ? (
-          <div className="py-20 text-center space-y-3">
-            <RefreshCw className="w-8 h-8 text-[#f6821f] animate-spin mx-auto" />
-            <p className="text-xs text-slate-500 font-medium">Cargando pedidos de venta...</p>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse text-xs">
+              <thead>
+                <tr className="border-b border-slate-200 bg-slate-50/75 text-slate-500 font-bold tracking-wider uppercase text-[10px]">
+                  <th className="py-3 px-4">Pedido / O.C. Cliente</th>
+                  <th className="py-3 px-4">Cliente</th>
+                  <th className="py-3 px-4">Fecha Emisión</th>
+                  <th className="py-3 px-4">Fecha Prometida</th>
+                  <th className="py-3 px-4">Almacén</th>
+                  <th className="py-3 px-4 text-center">Ítems</th>
+                  <th className="py-3 px-4 text-right">Total</th>
+                  <th className="py-3 px-4 text-center">Estado</th>
+                  <th className="py-3 px-4 text-right">Acciones</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 text-slate-700">
+                <TableRowsSkeleton rows={6} cols={9} />
+              </tbody>
+            </table>
           </div>
         ) : filteredOrders.length === 0 ? (
           <div className="py-16 text-center space-y-3">

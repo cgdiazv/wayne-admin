@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
+import { Skeleton, CardSkeleton, TableCardSkeleton } from "@/components/Skeleton";
 import { numberToSpanishWords } from "@/lib/numberToWords";
 import { ArrowLeft, RefreshCw, Plus } from "lucide-react";
 
@@ -644,6 +645,24 @@ export default function CajaChicaModule({
       return matchSearch && matchCat && matchReimb;
     });
   }, [fundTransactions, expenseSearch, categoryFilter, reimbursementFilter]);
+
+  if (loading && !currentFund) {
+    return (
+      <div className="space-y-4 animate-in fade-in duration-150">
+        <div className="flex justify-between items-center">
+          <Skeleton className="h-6 w-48 rounded-lg" />
+          <Skeleton className="h-8 w-36 rounded-xl" />
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <CardSkeleton />
+          <CardSkeleton />
+          <CardSkeleton />
+          <CardSkeleton />
+        </div>
+        <TableCardSkeleton rows={6} cols={6} title="Movimientos de Caja Chica" />
+      </div>
+    );
+  }
 
   if (!currentFund && !loading) {
     return (

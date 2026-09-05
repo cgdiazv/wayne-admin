@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from "react";
+import { CardSkeleton, TableRowsSkeleton } from "@/components/Skeleton";
 import {
   ArrowLeft,
   RefreshCw,
@@ -644,86 +645,97 @@ export default function TaxRetentionsModule({
 
       {/* KPI Metrics Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Total Retenido */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs relative overflow-hidden">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-slate-500">Total Retenido (Período)</span>
-            <div className="w-8 h-8 rounded-xl bg-orange-50 text-[#f6821f] flex items-center justify-center">
-              <Receipt className="w-4 h-4" />
+        {loading ? (
+          <>
+            <CardSkeleton />
+            <CardSkeleton />
+            <CardSkeleton />
+            <CardSkeleton />
+          </>
+        ) : (
+          <>
+            {/* Total Retenido */}
+            <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs relative overflow-hidden">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium text-slate-500">Total Retenido (Período)</span>
+                <div className="w-8 h-8 rounded-xl bg-orange-50 text-[#f6821f] flex items-center justify-center">
+                  <Receipt className="w-4 h-4" />
+                </div>
+              </div>
+              <div className="mt-2 flex items-baseline gap-2">
+                <span className="text-2xl font-black text-slate-900 tracking-tight">
+                  {formatCurrency(metrics.totalRetained)}
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-400 mt-1">
+                Base Imponible Total: <span className="font-semibold text-slate-600">{formatCurrency(metrics.totalBase)}</span>
+              </p>
+              <div className="absolute bottom-0 left-0 right-0 h-1 bg-[#f6821f]" />
             </div>
-          </div>
-          <div className="mt-2 flex items-baseline gap-2">
-            <span className="text-2xl font-black text-slate-900 tracking-tight">
-              {formatCurrency(metrics.totalRetained)}
-            </span>
-          </div>
-          <p className="text-[11px] text-slate-400 mt-1">
-            Base Imponible Total: <span className="font-semibold text-slate-600">{formatCurrency(metrics.totalBase)}</span>
-          </p>
-          <div className="absolute bottom-0 left-0 right-0 h-1 bg-[#f6821f]" />
-        </div>
 
-        {/* Retenciones ISV */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs relative overflow-hidden">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-slate-500">Retenciones ISV (1% y 100%)</span>
-            <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
-              <Percent className="w-4 h-4" />
+            {/* Retenciones ISV */}
+            <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs relative overflow-hidden">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium text-slate-500">Retenciones ISV (1% y 100%)</span>
+                <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                  <Percent className="w-4 h-4" />
+                </div>
+              </div>
+              <div className="mt-2 flex items-baseline gap-2">
+                <span className="text-2xl font-black text-slate-900 tracking-tight">
+                  {formatCurrency(metrics.isvRetained)}
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-400 mt-1">
+                Enterar al SAR en Formulario de ISV
+              </p>
+              <div className="absolute bottom-0 left-0 right-0 h-1 bg-blue-500" />
             </div>
-          </div>
-          <div className="mt-2 flex items-baseline gap-2">
-            <span className="text-2xl font-black text-slate-900 tracking-tight">
-              {formatCurrency(metrics.isvRetained)}
-            </span>
-          </div>
-          <p className="text-[11px] text-slate-400 mt-1">
-            Enterar al SAR en Formulario de ISV
-          </p>
-          <div className="absolute bottom-0 left-0 right-0 h-1 bg-blue-500" />
-        </div>
 
-        {/* Retenciones ISR */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs relative overflow-hidden">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-slate-500">Retenciones ISR (12.5% / 10%)</span>
-            <div className="w-8 h-8 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center">
-              <Building2 className="w-4 h-4" />
+            {/* Retenciones ISR */}
+            <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs relative overflow-hidden">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium text-slate-500">Retenciones ISR (12.5% / 10%)</span>
+                <div className="w-8 h-8 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center">
+                  <Building2 className="w-4 h-4" />
+                </div>
+              </div>
+              <div className="mt-2 flex items-baseline gap-2">
+                <span className="text-2xl font-black text-slate-900 tracking-tight">
+                  {formatCurrency(metrics.isrRetained)}
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-400 mt-1">
+                Honorarios Profesionales y Alquileres
+              </p>
+              <div className="absolute bottom-0 left-0 right-0 h-1 bg-purple-500" />
             </div>
-          </div>
-          <div className="mt-2 flex items-baseline gap-2">
-            <span className="text-2xl font-black text-slate-900 tracking-tight">
-              {formatCurrency(metrics.isrRetained)}
-            </span>
-          </div>
-          <p className="text-[11px] text-slate-400 mt-1">
-            Honorarios Profesionales y Alquileres
-          </p>
-          <div className="absolute bottom-0 left-0 right-0 h-1 bg-purple-500" />
-        </div>
 
-        {/* Comprobantes Emitidos */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs relative overflow-hidden">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-slate-500">Comprobantes Emitidos</span>
-            <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
-              <CheckCircle2 className="w-4 h-4" />
+            {/* Comprobantes Emitidos */}
+            <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs relative overflow-hidden">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium text-slate-500">Comprobantes Emitidos</span>
+                <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                  <CheckCircle2 className="w-4 h-4" />
+                </div>
+              </div>
+              <div className="mt-2 flex items-baseline gap-2">
+                <span className="text-2xl font-black text-slate-900 tracking-tight">
+                  {metrics.activeCount}
+                </span>
+                {metrics.voidedCount > 0 && (
+                  <span className="text-xs text-rose-500 font-medium">
+                    ({metrics.voidedCount} anulados)
+                  </span>
+                )}
+              </div>
+              <p className="text-[11px] text-slate-400 mt-1">
+                Correlativos SAR Vigentes
+              </p>
+              <div className="absolute bottom-0 left-0 right-0 h-1 bg-emerald-500" />
             </div>
-          </div>
-          <div className="mt-2 flex items-baseline gap-2">
-            <span className="text-2xl font-black text-slate-900 tracking-tight">
-              {metrics.activeCount}
-            </span>
-            {metrics.voidedCount > 0 && (
-              <span className="text-xs text-rose-500 font-medium">
-                ({metrics.voidedCount} anulados)
-              </span>
-            )}
-          </div>
-          <p className="text-[11px] text-slate-400 mt-1">
-            Correlativos SAR Vigentes
-          </p>
-          <div className="absolute bottom-0 left-0 right-0 h-1 bg-emerald-500" />
-        </div>
+          </>
+        )}
       </div>
 
       {/* Filter & Search Toolbar */}
@@ -825,12 +837,7 @@ export default function TaxRetentionsModule({
             </thead>
             <tbody className="divide-y divide-slate-100">
               {loading ? (
-                <tr>
-                  <td colSpan={10} className="text-center py-12 text-slate-400">
-                    <RefreshCw className="w-6 h-6 animate-spin mx-auto text-[#f6821f] mb-2" />
-                    Cargando comprobantes de retención...
-                  </td>
-                </tr>
+                <TableRowsSkeleton rows={6} cols={10} />
               ) : filteredRetentions.length === 0 ? (
                 <tr>
                   <td colSpan={10} className="text-center py-12 text-slate-400">

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from "react";
+import { DocumentSkeleton } from "@/components/Skeleton";
 import {
   ArrowLeft,
   Printer,
@@ -379,10 +380,7 @@ export default function CustomerStatementModule({
 
       {/* ================= FORMAL STATEMENT DOCUMENT (LETTERHEAD) ================= */}
       {loading ? (
-        <div className="bg-white border border-slate-200 rounded-2xl p-16 text-center text-slate-500 shadow-xs">
-          <RefreshCw className="w-6 h-6 animate-spin text-[#f6821f] mx-auto mb-3" />
-          <p className="font-bold text-slate-700">Cargando estado de cuenta cronológico...</p>
-        </div>
+        <DocumentSkeleton />
       ) : !statement ? (
         <div className="bg-white border border-slate-200 rounded-2xl p-16 text-center text-slate-500 shadow-xs">
           <AlertCircle className="w-8 h-8 text-amber-500 mx-auto mb-2" />

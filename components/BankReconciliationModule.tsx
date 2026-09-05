@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from "react";
+import { CardSkeleton, TableRowsSkeleton } from "@/components/Skeleton";
 import {
   CheckCircle2,
   AlertTriangle,
@@ -603,7 +604,16 @@ export default function BankReconciliationModule({
 
       {/* ================= 4 KPI CARDS ================= */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Card 1: Saldo Inicial de Extracto */}
+        {loading ? (
+          <>
+            <CardSkeleton />
+            <CardSkeleton />
+            <CardSkeleton />
+            <CardSkeleton />
+          </>
+        ) : (
+          <>
+            {/* Card 1: Saldo Inicial de Extracto */}
         <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs relative overflow-hidden transition-all hover:shadow-md">
           <div className="flex items-center justify-between">
             <span className="text-xs font-medium text-slate-500">Saldo Inicial Extracto</span>
@@ -704,6 +714,8 @@ export default function BankReconciliationModule({
             </div>
           );
         })()}
+          </>
+        )}
       </div>
 
       {/* ================= CONTROLS BAR (ACCOUNT & PERIOD SELECTOR) ================= */}
@@ -1018,7 +1030,9 @@ export default function BankReconciliationModule({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 font-mono">
-                {filteredDeposits.length === 0 ? (
+                {loading ? (
+                  <TableRowsSkeleton rows={5} cols={7} />
+                ) : filteredDeposits.length === 0 ? (
                   <tr>
                     <td colSpan={7} className="py-8 text-center text-slate-400 font-sans">
                       No hay depósitos para mostrar en este período.
@@ -1119,7 +1133,9 @@ export default function BankReconciliationModule({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 font-mono">
-                {filteredChecks.length === 0 ? (
+                {loading ? (
+                  <TableRowsSkeleton rows={5} cols={7} />
+                ) : filteredChecks.length === 0 ? (
                   <tr>
                     <td colSpan={7} className="py-8 text-center text-slate-400 font-sans">
                       No hay cheques o pagos para mostrar en este período.

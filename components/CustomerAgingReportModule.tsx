@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from "react";
+import { CardSkeleton, TableRowsSkeleton } from "@/components/Skeleton";
 import {
   ArrowLeft,
   RefreshCw,
@@ -307,7 +308,16 @@ export default function CustomerAgingReportModule({
       </div>
 
       {/* ================= EXECUTIVE KPI SUMMARY CARDS ================= */}
-      {summary && (
+      {loading ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3.5">
+          <CardSkeleton />
+          <CardSkeleton />
+          <CardSkeleton />
+          <CardSkeleton />
+          <CardSkeleton />
+          <CardSkeleton />
+        </div>
+      ) : summary ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3.5">
           {/* Card 1: Total Cuentas por Cobrar */}
           <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs relative overflow-hidden">
@@ -451,7 +461,7 @@ export default function CustomerAgingReportModule({
             <div className="absolute bottom-0 left-0 right-0 h-1 bg-purple-700" />
           </div>
         </div>
-      )}
+      ) : null}
 
       {/* Visual Risk Distribution Bar */}
       {summary && summary.totalReceivables > 0 && (
@@ -636,14 +646,7 @@ export default function CustomerAgingReportModule({
             </thead>
             <tbody className="divide-y divide-slate-200 text-slate-700">
               {loading ? (
-                <tr>
-                  <td colSpan={10} className="py-12 text-center text-slate-500">
-                    <div className="flex items-center justify-center gap-2">
-                      <RefreshCw className="w-4 h-4 animate-spin text-[#f6821f]" />
-                      <span>Calculando antigüedad de saldos y vencimientos...</span>
-                    </div>
-                  </td>
-                </tr>
+                <TableRowsSkeleton rows={6} cols={10} />
               ) : filteredCustomers.length === 0 ? (
                 <tr>
                   <td colSpan={10} className="py-12 text-center text-slate-500">

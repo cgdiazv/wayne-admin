@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from "react";
+import { CardSkeleton, TableRowsSkeleton, Skeleton } from "@/components/Skeleton";
 import {
   ArrowLeft,
   RefreshCw,
@@ -554,81 +555,92 @@ export default function VendorPaymentsModule({
 
       {/* KPI METRIC CARDS */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Total Desembolsado */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs relative overflow-hidden">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-slate-500">Total Desembolsado (Período)</span>
-            <div className="w-8 h-8 rounded-xl bg-orange-50 text-[#f6821f] flex items-center justify-center">
-              <DollarSign className="w-4 h-4" />
+        {loading ? (
+          <>
+            <CardSkeleton />
+            <CardSkeleton />
+            <CardSkeleton />
+            <CardSkeleton />
+          </>
+        ) : (
+          <>
+            {/* Total Desembolsado */}
+            <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs relative overflow-hidden">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium text-slate-500">Total Desembolsado (Período)</span>
+                <div className="w-8 h-8 rounded-xl bg-orange-50 text-[#f6821f] flex items-center justify-center">
+                  <DollarSign className="w-4 h-4" />
+                </div>
+              </div>
+              <div className="mt-2 flex items-baseline gap-2">
+                <span className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+                  {formatCurrency(metrics.totalPaid, "USD")}
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-400 mt-1">
+                {metrics.countActive} pagos activos aplicados
+              </p>
+              <div className="absolute bottom-0 left-0 right-0 h-1 bg-[#f6821f]" />
             </div>
-          </div>
-          <div className="mt-2 flex items-baseline gap-2">
-            <span className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
-              {formatCurrency(metrics.totalPaid, "USD")}
-            </span>
-          </div>
-          <p className="text-[11px] text-slate-400 mt-1">
-            {metrics.countActive} pagos activos aplicados
-          </p>
-          <div className="absolute bottom-0 left-0 right-0 h-1 bg-[#f6821f]" />
-        </div>
 
-        {/* Transferencias ACH */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs relative overflow-hidden">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-slate-500">Transferencias ACH</span>
-            <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
-              <CreditCard className="w-4 h-4" />
+            {/* Transferencias ACH */}
+            <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs relative overflow-hidden">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium text-slate-500">Transferencias ACH</span>
+                <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                  <CreditCard className="w-4 h-4" />
+                </div>
+              </div>
+              <div className="mt-2 flex items-baseline gap-2">
+                <span className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+                  {formatCurrency(metrics.transfersTotal, "USD")}
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-400 mt-1">
+                {metrics.transfersCount} transacciones bancarias
+              </p>
+              <div className="absolute bottom-0 left-0 right-0 h-1 bg-blue-500" />
             </div>
-          </div>
-          <div className="mt-2 flex items-baseline gap-2">
-            <span className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
-              {formatCurrency(metrics.transfersTotal, "USD")}
-            </span>
-          </div>
-          <p className="text-[11px] text-slate-400 mt-1">
-            {metrics.transfersCount} transacciones bancarias
-          </p>
-          <div className="absolute bottom-0 left-0 right-0 h-1 bg-blue-500" />
-        </div>
 
-        {/* Cheques Emitidos */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs relative overflow-hidden">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-slate-500">Cheques Emitidos</span>
-            <div className="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
-              <FileText className="w-4 h-4" />
+            {/* Cheques Emitidos */}
+            <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs relative overflow-hidden">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium text-slate-500">Cheques Emitidos</span>
+                <div className="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
+                  <FileText className="w-4 h-4" />
+                </div>
+              </div>
+              <div className="mt-2 flex items-baseline gap-2">
+                <span className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+                  {formatCurrency(metrics.checksTotal, "USD")}
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-400 mt-1">
+                {metrics.checksCount} cheques corporativos
+              </p>
+              <div className="absolute bottom-0 left-0 right-0 h-1 bg-amber-500" />
             </div>
-          </div>
-          <div className="mt-2 flex items-baseline gap-2">
-            <span className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
-              {formatCurrency(metrics.checksTotal, "USD")}
-            </span>
-          </div>
-          <p className="text-[11px] text-slate-400 mt-1">
-            {metrics.checksCount} cheques corporativos
-          </p>
-          <div className="absolute bottom-0 left-0 right-0 h-1 bg-amber-500" />
-        </div>
 
-        {/* Efectivo / Caja */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs relative overflow-hidden">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-slate-500">Efectivo / Caja</span>
-            <div className="w-8 h-8 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center">
-              <Building2 className="w-4 h-4" />
+            {/* Efectivo / Caja */}
+            <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs relative overflow-hidden">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium text-slate-500">Efectivo / Caja</span>
+                <div className="w-8 h-8 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center">
+                  <Building2 className="w-4 h-4" />
+                </div>
+              </div>
+              <div className="mt-2 flex items-baseline gap-2">
+                <span className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+                  {formatCurrency(metrics.cashTotal, "USD")}
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-400 mt-1">
+                {metrics.cashCount} egresos de caja registrados
+              </p>
+              <div className="absolute bottom-0 left-0 right-0 h-1 bg-purple-500" />
             </div>
-          </div>
-          <div className="mt-2 flex items-baseline gap-2">
-            <span className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
-              {formatCurrency(metrics.cashTotal, "USD")}
-            </span>
-          </div>
-          <p className="text-[11px] text-slate-400 mt-1">
-            {metrics.cashCount} egresos de caja registrados
-          </p>
-          <div className="absolute bottom-0 left-0 right-0 h-1 bg-purple-500" />
-        </div>
+          </>
+        )}
       </div>
 
       {/* FILTERS TOOLBAR */}
@@ -716,9 +728,25 @@ export default function VendorPaymentsModule({
       {/* PAYMENTS TABLE */}
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
         {loading ? (
-          <div className="py-20 text-center space-y-3">
-            <RefreshCw className="w-8 h-8 animate-spin text-[#f6821f] mx-auto" />
-            <p className="text-xs text-slate-500 font-medium">Cargando pagos a proveedores...</p>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs border-collapse">
+              <thead>
+                <tr className="bg-slate-50/80 border-b border-slate-200/80 text-slate-500 font-semibold uppercase tracking-wider text-[10px]">
+                  <th className="py-3.5 px-4">N° Comprobante</th>
+                  <th className="py-3.5 px-4">Fecha</th>
+                  <th className="py-3.5 px-4">Proveedor</th>
+                  <th className="py-3.5 px-4">Método &amp; Ref.</th>
+                  <th className="py-3.5 px-4">Cuenta de Pago</th>
+                  <th className="py-3.5 px-4">Facturas Aplicadas</th>
+                  <th className="py-3.5 px-4 text-right">Monto Pagado</th>
+                  <th className="py-3.5 px-4 text-center">Estado</th>
+                  <th className="py-3.5 px-4 text-right">Acciones</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                <TableRowsSkeleton rows={6} cols={9} />
+              </tbody>
+            </table>
           </div>
         ) : filteredPayments.length === 0 ? (
           <div className="py-16 text-center space-y-3 max-w-sm mx-auto">
@@ -1018,9 +1046,16 @@ export default function VendorPaymentsModule({
                 </div>
 
                 {loadingInvoices ? (
-                  <div className="p-8 text-center bg-slate-50 rounded-2xl border border-slate-200">
-                    <RefreshCw className="w-6 h-6 animate-spin text-[#f6821f] mx-auto mb-2" />
-                    <span className="text-xs text-slate-500">Cargando facturas pendientes...</span>
+                  <div className="space-y-2.5 p-3 bg-slate-50 rounded-2xl border border-slate-200">
+                    {[1, 2, 3].map((i) => (
+                      <div key={i} className="p-3 bg-white rounded-xl border border-slate-200/80 flex items-center justify-between">
+                        <div className="space-y-1.5">
+                          <Skeleton className="h-3.5 w-32 rounded" />
+                          <Skeleton className="h-3 w-48 rounded" />
+                        </div>
+                        <Skeleton className="h-5 w-20 rounded" />
+                      </div>
+                    ))}
                   </div>
                 ) : !selectedVendorName ? (
                   <div className="p-8 text-center bg-slate-50 rounded-2xl border border-slate-200 text-xs text-slate-500">

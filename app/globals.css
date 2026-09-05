@@ -27,6 +27,29 @@ body {
   min-height: 100vh;
 }
 
+/* Shimmer Loading Animation */
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.animate-shimmer {
+  background: linear-gradient(
+    90deg,
+    #f1f5f9 0%,
+    #e2e8f0 20%,
+    #ffffff 45%,
+    #e2e8f0 70%,
+    #f1f5f9 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.8s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
 /* Prevent auto-zoom on iPhone / iOS Safari when focusing form inputs */
 @media screen and (max-width: 768px) {
   input,
