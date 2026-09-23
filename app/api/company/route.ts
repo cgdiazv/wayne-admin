@@ -25,6 +25,12 @@ const DEFAULT_COMPANY_DATA = {
   contadorTelefono: "Ninguno indicado",
   contadorEmail: "Ninguno indicado",
   monedaPrincipal: "USD ($) Dólar estadounidense",
+  // Parámetros Contables
+  primerMesFiscal: "Enero",
+  primerMesImpuesto: "Igual que el ejercicio fiscal (Enero)",
+  metodoContabilidad: "Criterio de devengo",
+  cierreLibros: "Desactivado (Periodo 2026 abierto)",
+  numerosCuenta: "Activado",
 };
 
 // GET /api/company - Retrieve official company settings
@@ -78,6 +84,11 @@ export async function PUT(request: NextRequest) {
       "contadorEmail",
       "monedaPrincipal",
       "logoUrl",
+      "primerMesFiscal",
+      "primerMesImpuesto",
+      "metodoContabilidad",
+      "cierreLibros",
+      "numerosCuenta",
     ];
 
     const updateData: Record<string, string | null> = {};

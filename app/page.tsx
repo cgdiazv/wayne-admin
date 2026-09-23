@@ -1408,6 +1408,16 @@ export default function AdminDashboard() {
             monedaPrincipal: res.data.monedaPrincipal || "USD ($) Dólar estadounidense",
           });
 
+          if (res.data.primerMesFiscal || res.data.metodoContabilidad) {
+            setContabilidadSettings({
+              primerMesFiscal: res.data.primerMesFiscal || "Enero",
+              primerMesImpuesto: res.data.primerMesImpuesto || "Igual que el ejercicio fiscal (Enero)",
+              metodoContabilidad: res.data.metodoContabilidad || "Criterio de devengo",
+              cierreLibros: res.data.cierreLibros || "Desactivado (Periodo 2026 abierto)",
+              numerosCuenta: res.data.numerosCuenta || "Activado",
+            });
+          }
+
           if (res.data.monedaPrincipal) {
             setMonedasSettings((prev) => ({
               ...prev,
@@ -1892,6 +1902,25 @@ export default function AdminDashboard() {
     cierreLibros: "Desactivado (Periodo 2026 abierto)",
     numerosCuenta: "Activado",
   });
+  const [contabilidadSavedNotification, setContabilidadSavedNotification] = useState(false);
+
+  const handleSaveContabilidadParam = async (field: string, value: string) => {
+    setContabilidadSettings((prev) => ({ ...prev, [field]: value }));
+    try {
+      const res = await fetch("/api/company", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ [field]: value }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setContabilidadSavedNotification(true);
+        setTimeout(() => setContabilidadSavedNotification(false), 3500);
+      }
+    } catch (err) {
+      console.error("Error saving accounting parameter to DB:", err);
+    }
+  };
 
   const [horasSettings, setHorasSettings] = useState({
     primerDia: "Lunes",
@@ -11731,6 +11760,23 @@ export default function AdminDashboard() {
                   {/* SUBTAB 4: CONTABILIDAD */}
                   {configSubTab === "contabilidad" && (
                     <div className="max-w-3xl space-y-6">
+                      {/* Notification banner */}
+                      {contabilidadSavedNotification && (
+                        <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs rounded-xl flex items-center justify-between animate-in fade-in duration-200">
+                          <div className="flex items-center gap-2">
+                            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                            <span className="font-semibold">Parámetros contables guardados y actualizados exitosamente en la base de datos.</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setContabilidadSavedNotification(false)}
+                            className="text-emerald-500 hover:text-emerald-700 cursor-pointer font-bold ml-2"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      )}
+
                       <div className="border border-slate-200 rounded-xl p-5 bg-white shadow-xs">
                         <h2 className="font-bold text-sm text-slate-900 mb-1">Ejercicio Fiscal y Parámetros Contables</h2>
                         <p className="text-xs text-slate-500 mb-4">Definición de periodos, cierre de libros y codificación de cuentas.</p>
@@ -11747,7 +11793,7 @@ export default function AdminDashboard() {
                                   label: "Primer mes del ejercicio fiscal",
                                   value: contabilidadSettings.primerMesFiscal,
                                   options: ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"],
-                                  onSave: (val) => setContabilidadSettings((prev) => ({ ...prev, primerMesFiscal: val })),
+                                  onSave: (val) => handleSaveContabilidadParam("primerMesFiscal", val),
                                 })
                               }
                               className="text-[#f6821f] font-semibold hover:underline cursor-pointer shrink-0"
@@ -11766,7 +11812,7 @@ export default function AdminDashboard() {
                                   label: "Primer mes del año del impuesto sobre la renta",
                                   value: contabilidadSettings.primerMesImpuesto,
                                   options: ["Igual que el ejercicio fiscal (Enero)", "Enero", "Julio", "Octubre"],
-                                  onSave: (val) => setContabilidadSettings((prev) => ({ ...prev, primerMesImpuesto: val })),
+                                  onSave: (val) => handleSaveContabilidadParam("primerMesImpuesto", val),
                                 })
                               }
                               className="text-[#f6821f] font-semibold hover:underline cursor-pointer shrink-0"
@@ -11785,7 +11831,7 @@ export default function AdminDashboard() {
                                   label: "Método de contabilidad",
                                   value: contabilidadSettings.metodoContabilidad,
                                   options: ["Criterio de devengo", "Base de efectivo"],
-                                  onSave: (val) => setContabilidadSettings((prev) => ({ ...prev, metodoContabilidad: val })),
+                                  onSave: (val) => handleSaveContabilidadParam("metodoContabilidad", val),
                                 })
                               }
                               className="text-[#f6821f] font-semibold hover:underline cursor-pointer shrink-0"
@@ -11804,7 +11850,7 @@ export default function AdminDashboard() {
                                   label: "Estado de cierre de libros",
                                   value: contabilidadSettings.cierreLibros,
                                   options: ["Desactivado (Periodo 2026 abierto)", "Activado (Periodo cerrado)"],
-                                  onSave: (val) => setContabilidadSettings((prev) => ({ ...prev, cierreLibros: val })),
+                                  onSave: (val) => handleSaveContabilidadParam("cierreLibros", val),
                                 })
                               }
                               className="text-[#f6821f] font-semibold hover:underline cursor-pointer shrink-0"
@@ -11823,7 +11869,7 @@ export default function AdminDashboard() {
                                   label: "Activar números de cuenta contable",
                                   value: contabilidadSettings.numerosCuenta,
                                   options: ["Activado", "Desactivado"],
-                                  onSave: (val) => setContabilidadSettings((prev) => ({ ...prev, numerosCuenta: val })),
+                                  onSave: (val) => handleSaveContabilidadParam("numerosCuenta", val),
                                 })
                               }
                               className="text-[#f6821f] font-semibold hover:underline cursor-pointer shrink-0"

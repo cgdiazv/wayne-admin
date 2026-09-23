@@ -112,6 +112,12 @@ model CompanySettings {
   contadorTelefono    String?  @default("")
   contadorEmail       String?  @default("")
   monedaPrincipal     String?  @default("USD ($) Dólar estadounidense")
+  // Parámetros Contables y Ejercicio Fiscal
+  primerMesFiscal     String?  @default("Enero")
+  primerMesImpuesto   String?  @default("Igual que el ejercicio fiscal (Enero)")
+  metodoContabilidad  String?  @default("Criterio de devengo")
+  cierreLibros        String?  @default("Desactivado (Periodo 2026 abierto)")
+  numerosCuenta       String?  @default("Activado")
   logoUrl          String?  @db.Text
   updatedAt        DateTime @updatedAt
 }

@@ -50,9 +50,13 @@ export const prisma: PrismaClient = new Proxy({} as PrismaClient, {
     const hasMoneda = (globalForPrisma.prisma as any)?._runtimeDataModel?.models?.CompanySettings?.fields?.some(
       (f: any) => f.name === "monedaPrincipal"
     );
+    const hasAccounting = (globalForPrisma.prisma as any)?._runtimeDataModel?.models?.CompanySettings?.fields?.some(
+      (f: any) => f.name === "primerMesFiscal"
+    );
     if (
       !globalForPrisma.prisma ||
       !hasMoneda ||
+      !hasAccounting ||
       !(globalForPrisma.prisma as any).taxRetention ||
       !(globalForPrisma.prisma as any).user ||
       !(globalForPrisma.prisma as any).pettyCashFund ||
