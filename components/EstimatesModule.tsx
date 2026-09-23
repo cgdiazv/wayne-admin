@@ -472,56 +472,73 @@ export default function EstimatesModule({
         </div>
       )}
 
-      {/* Screen Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 rounded-3xl border border-slate-200/80 shadow-xs">
+      {/* ================= SCREEN HEADER ================= */}
+      <div className="space-y-4 print:hidden">
+        {/* Breadcrumbs */}
         <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#fff7ed] to-orange-100 text-[#f6821f] border border-orange-200 flex items-center justify-center shadow-xs">
-            <Calculator className="w-6 h-6 stroke-[2.2]" />
-          </div>
+          {onBackToDashboard && (
+            <button
+              type="button"
+              onClick={onBackToDashboard}
+              className="text-xs font-semibold text-slate-600 hover:text-slate-900 transition flex items-center gap-1.5 cursor-pointer w-fit"
+            >
+              <svg className="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
+              </svg>
+              <span>Regresar a Dashboard</span>
+            </button>
+          )}
+          <span className="text-slate-300">/</span>
+          <span className="text-xs font-semibold text-slate-500">Cotizaciones</span>
+          <span className="text-slate-300">/</span>
+          <span className="text-xs font-bold text-slate-900">Estimaciones</span>
+        </div>
+
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-lg font-black text-slate-900 tracking-tight">
-                Estimaciones &amp; Cotizaciones a Clientes
-              </h1>
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#fff7ed] text-[#f6821f] border border-orange-200">
-                Cotizaciones Clientes
+              <h2 className="text-xl font-bold text-slate-900">
+                Estimaciones
+              </h2>
+              <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-[#fff7ed] text-[#f6821f] border border-[#ffedd5]">
+                Cotizaciones a Clientes
               </span>
             </div>
             <p className="text-xs text-slate-500 mt-0.5">
-              Crea cotizaciones y presupuestos para clientes calculando insumos, mano de obra y margen comercial, con enlace directo al Plan Contable y emisión a Producción.
+              Control y cálculo de costos de producción, insumos, mano de obra y margen comercial para cotizar a clientes.
             </p>
           </div>
-        </div>
 
-        <div className="flex items-center gap-2 flex-wrap">
-          {onNavigateToAccounts && (
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
+            {onNavigateToAccounts && (
+              <button
+                type="button"
+                onClick={onNavigateToAccounts}
+                className="px-3.5 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 shadow-2xs"
+              >
+                <BookOpen className="w-3.5 h-3.5 text-slate-500" />
+                <span>Plan de Cuentas</span>
+              </button>
+            )}
+
             <button
               type="button"
-              onClick={onNavigateToAccounts}
-              className="px-3.5 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 shadow-2xs"
+              onClick={() => loadEstimates()}
+              className="p-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 transition cursor-pointer shadow-2xs"
+              title="Refrescar lista"
             >
-              <BookOpen className="w-3.5 h-3.5 text-slate-500" />
-              <span>Ver Plan de Cuentas</span>
+              <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin text-[#f6821f]" : ""}`} />
             </button>
-          )}
 
-          <button
-            type="button"
-            onClick={() => loadEstimates()}
-            className="p-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 transition cursor-pointer shadow-2xs"
-            title="Refrescar lista"
-          >
-            <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin text-[#f6821f]" : ""}`} />
-          </button>
-
-          <button
-            type="button"
-            onClick={openNewModal}
-            className="px-4 py-2 rounded-xl bg-[#f6821f] hover:bg-[#e07216] text-white text-xs font-bold transition flex items-center gap-1.5 shadow-md shadow-[#f6821f]/20 cursor-pointer"
-          >
-            <Plus className="w-4 h-4 stroke-[2.5]" />
-            <span>Nueva Estimación</span>
-          </button>
+            <button
+              type="button"
+              onClick={openNewModal}
+              className="px-4 py-2 rounded-xl bg-[#f6821f] hover:bg-[#e07216] text-white text-xs font-bold transition flex items-center gap-1.5 shadow-md shadow-[#f6821f]/20 cursor-pointer"
+            >
+              <span className="text-sm leading-none">+</span>
+              <span>Crear estimación</span>
+            </button>
+          </div>
         </div>
       </div>
 
