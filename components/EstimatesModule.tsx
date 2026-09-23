@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import {
-  Calculator,
+  FileSpreadsheet,
   Plus,
   Search,
   RefreshCw,
@@ -686,7 +686,7 @@ export default function EstimatesModule({
               ) : filteredEstimates.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="p-8 text-center text-slate-400">
-                    <Calculator className="w-8 h-8 text-slate-300 mx-auto mb-2 stroke-[1.5]" />
+                    <FileSpreadsheet className="w-8 h-8 text-slate-300 mx-auto mb-2 stroke-[1.5]" />
                     <p className="font-semibold text-slate-600">No se encontraron estimaciones</p>
                     <p className="text-[11px] text-slate-400 mt-0.5">
                       Crea tu primera estimación técnica con desglose de materiales, MOD y CIF.
@@ -824,7 +824,7 @@ export default function EstimatesModule({
             <div className="bg-white border-b border-slate-200 p-6 flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-2xl bg-orange-50 text-[#f6821f] border border-orange-200 flex items-center justify-center shadow-xs">
-                  <Calculator className="w-5 h-5" />
+                  <FileSpreadsheet className="w-5 h-5" />
                 </div>
                 <div>
                   <h2 className="text-lg font-bold text-slate-900">
@@ -1337,7 +1337,7 @@ export default function EstimatesModule({
             <div className="bg-white border-b border-slate-200 p-6 flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-2xl bg-orange-50 text-[#f6821f] border border-orange-200 flex items-center justify-center shadow-xs">
-                  <Calculator className="w-5 h-5" />
+                  <FileSpreadsheet className="w-5 h-5" />
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
