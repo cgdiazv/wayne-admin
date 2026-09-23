@@ -849,15 +849,36 @@ model Estimate {
   id                    String         @id @default(cuid())
   estimateNumber        String         @unique // e.g. "EST-2026-0001"
   title                 String         @default("Estimación Técnica de Costos")
-  customerId            String?
-  customerName          String         @default("Cliente General")
-  customerRtn           String?
-  customerEmail         String?
-  customerPhone         String?
+  // Document Header
   date                  String         // e.g. "2026-09-23"
+  dueDate               String?        // e.g. "2026-10-23"
+  fromJobNo             String?        // e.g. "338958"
+  openedDate            String?        // e.g. "2026-09-23"
+  statusCode            String?        @default("Open") // "Open" | "Closed" dependiente de si el job cerro o sigue abierto
+  completionStatus      String?        @default("Incomplete") // "Incomplete" | "Complete"
+  division              String?        @default("HH") // Division (e.g. "HH")
   validUntil            String?        // e.g. "2026-10-23"
   currency              String         @default("USD")
   status                String         @default("BORRADOR") // "BORRADOR" | "APROBADA" | "EN_PRODUCCION" | "RECHAZADA"
+
+  // Datos del Cliente y Contacto
+  customerId            String?
+  customerCode          String?        // e.g. "VFS200"
+  customerName          String         @default("Cliente General")
+  customerAddress1      String?        // e.g. "DREAM PLAZA, PISO 8 OFICINA 811 AVE"
+  customerAddress2      String?        // e.g. "CENTENARIO COSTA del ESTE"
+  customerCity          String?        // e.g. "CUIDAD de PANAMA"
+  customerState         String?        // e.g. "PA"
+  customerZip           String?        // Zip / Postal code
+  customerRtn           String?
+  contactName           String?        // e.g. "GISSELLE ANDERSON"
+  customerPhone         String?        // e.g. "507-831-2374"
+  phoneExt              String?        // Ext / X
+  customerFax           String?        // Fax o teléfono secundario
+  customerEmail         String?
+  salespersonCode       String?        // e.g. "005"
+  salespersonName       String?        // e.g. "HOUSE"
+  isBroker              Boolean?       @default(false)
   
   // Producto terminado / trabajo a fabricar
   productId             String?

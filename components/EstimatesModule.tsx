@@ -27,6 +27,14 @@ import {
   ChevronRight,
   X,
   BookOpen,
+  MapPin,
+  User,
+  Phone,
+  Mail,
+  Hash,
+  Edit2,
+  Pin,
+  Briefcase,
 } from "lucide-react";
 import { CardSkeleton, TableRowsSkeleton } from "@/components/Skeleton";
 
@@ -44,15 +52,39 @@ export interface Estimate {
   id: string;
   estimateNumber: string;
   title: string;
-  customerId?: string | null;
-  customerName: string;
-  customerRtn?: string | null;
-  customerEmail?: string | null;
-  customerPhone?: string | null;
+  
+  // Document Header
   date: string;
+  dueDate?: string | null;
+  fromJobNo?: string | null;
+  openedDate?: string | null;
+  statusCode?: string | null;
+  completionStatus?: "Incomplete" | "Complete" | string | null;
+  division?: string | null;
   validUntil?: string | null;
   currency: string;
   status: "BORRADOR" | "APROBADA" | "EN_PRODUCCION" | "RECHAZADA" | string;
+
+  // Customer Data & Contact
+  customerId?: string | null;
+  customerCode?: string | null;
+  customerName: string;
+  customerAddress1?: string | null;
+  customerAddress2?: string | null;
+  customerCity?: string | null;
+  customerState?: string | null;
+  customerZip?: string | null;
+  customerRtn?: string | null;
+  contactName?: string | null;
+  customerPhone?: string | null;
+  phoneExt?: string | null;
+  customerFax?: string | null;
+  customerEmail?: string | null;
+  salespersonCode?: string | null;
+  salespersonName?: string | null;
+  isBroker?: boolean;
+
+  // Product & Production
   productId?: string | null;
   productSku: string;
   productName: string;
@@ -142,15 +174,40 @@ export default function EstimatesModule({
   const [form, setForm] = useState({
     estimateNumber: "",
     title: "",
-    customerId: "",
-    customerName: "",
-    customerRtn: "",
-    customerEmail: "",
-    customerPhone: "",
+    
+    // Document Header Fields
     date: new Date().toISOString().split("T")[0],
+    dueDate: "",
+    fromJobNo: "",
+    openedDate: "",
+    statusCode: "Open",
+    completionStatus: "Incomplete",
+    division: "HH",
     validUntil: new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString().split("T")[0],
     currency: "USD",
     status: "BORRADOR",
+
+    // Customer & Contact Fields
+    customerId: "",
+    customerCode: "",
+    customerName: "",
+    customerAddress1: "",
+    customerAddress2: "",
+    customerCity: "",
+    customerState: "PA",
+    customerZip: "",
+    customerRtn: "",
+    contactName: "",
+    customerPhone: "",
+    phoneExt: "",
+    customerFax: "",
+    customerEmail: "",
+    salespersonCode: "005",
+    salespersonName: "HOUSE",
+    notes: "",
+    isBroker: false,
+
+    // Product & Costs
     productSku: "BOX-MST-024",
     productName: "Cajas Corrugadas Master Box Cerveza 24pk",
     targetQuantity: 1000,
@@ -168,7 +225,6 @@ export default function EstimatesModule({
     inventoryAccountId: "",
     inventoryAccountCode: "1105",
     inventoryAccountName: "Inventario en Proceso / Terminado",
-    notes: "",
     items: [] as Array<{
       rawMaterialId?: string;
       rawMaterialSku: string;
@@ -234,18 +290,41 @@ export default function EstimatesModule({
     const defAsset = assetAccounts.find((a) => a.code.includes("1105") || a.name.toLowerCase().includes("inventario")) ||
       assetAccounts[0] || { code: "1105", name: "Inventario en Proceso / Terminado" };
 
+    const todayStr = new Date().toISOString().split("T")[0];
+
     setForm({
       estimateNumber: nextNumber,
       title: "Estimación Técnica para Fabricación de Empaque",
-      customerId: defaultCust?.id || "",
-      customerName: defaultCust?.name || "Cervecería Hondureña S.A.",
-      customerRtn: defaultCust?.rtn || "05019001234567",
-      customerEmail: defaultCust?.email || "compras@cerveceria.hn",
-      customerPhone: defaultCust?.phone || "+504 2550-1000",
-      date: new Date().toISOString().split("T")[0],
+      date: todayStr,
+      dueDate: "",
+      fromJobNo: "338958",
+      openedDate: todayStr,
+      statusCode: "Open",
+      completionStatus: "Incomplete",
+      division: "HH",
       validUntil: new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString().split("T")[0],
       currency: "USD",
       status: "BORRADOR",
+
+      customerId: defaultCust?.id || "",
+      customerCode: defaultCust?.macolaCode || "VFS200",
+      customerName: defaultCust?.name || "VFS PANAMA TRADING S. DE R.L.",
+      customerAddress1: defaultCust?.address || "DREAM PLAZA, PISO 8 OFICINA 811 AVE",
+      customerAddress2: "CENTENARIO COSTA del ESTE",
+      customerCity: "CUIDAD de PANAMA",
+      customerState: "PA",
+      customerZip: "",
+      customerRtn: defaultCust?.rtn || "",
+      contactName: "GISSELLE ANDERSON",
+      customerPhone: defaultCust?.phone || "507-831-2374",
+      phoneExt: "",
+      customerFax: "",
+      customerEmail: defaultCust?.email || "gisselle.anderson@vfs.com",
+      salespersonCode: "005",
+      salespersonName: "HOUSE",
+      notes: "Estimación basada en corrida estándar con cartón corrugado e impresión flexográfica.",
+      isBroker: false,
+
       productSku: "BOX-MST-024",
       productName: "Cajas Corrugadas Master Box Cerveza 24pk",
       targetQuantity: 1000,
@@ -263,7 +342,6 @@ export default function EstimatesModule({
       inventoryAccountId: defAsset.id || "",
       inventoryAccountCode: defAsset.code || "1105",
       inventoryAccountName: defAsset.name || "Inventario en Proceso / Terminado",
-      notes: "Estimación basada en corrida estándar con cartón corrugado e impresión flexográfica.",
       items: [
         {
           rawMaterialSku: inventory[0]?.sku || "MAT-FLX-01",
@@ -701,26 +779,46 @@ export default function EstimatesModule({
                       <button
                         type="button"
                         onClick={() => setSelectedEstimate(est)}
-                        className="text-[#f6821f] hover:underline cursor-pointer flex items-center gap-1"
+                        className="text-[#f6821f] hover:underline cursor-pointer flex items-center gap-1.5"
                       >
                         <span>{est.estimateNumber}</span>
                       </button>
+                      {est.fromJobNo && (
+                        <div className="mt-1">
+                          <span className="px-1.5 py-0.5 bg-blue-50 text-blue-700 rounded text-[9px] font-mono font-bold border border-blue-200 inline-block">
+                            Job #{est.fromJobNo}
+                          </span>
+                        </div>
+                      )}
                     </td>
 
                     {/* Fechas */}
                     <td className="p-3.5 text-slate-600 whitespace-nowrap">
                       <div>{est.date}</div>
-                      {est.validUntil && (
+                      {est.dueDate ? (
+                        <div className="text-[10px] text-amber-600 font-medium">Vence: {est.dueDate}</div>
+                      ) : est.validUntil ? (
                         <div className="text-[10px] text-slate-400">Vence: {est.validUntil}</div>
-                      )}
+                      ) : null}
                     </td>
 
                     {/* Cliente */}
                     <td className="p-3.5">
-                      <div className="font-bold text-slate-800">{est.customerName}</div>
-                      {est.customerEmail && (
-                        <div className="text-[10px] text-slate-400">{est.customerEmail}</div>
-                      )}
+                      <div className="flex items-center gap-1.5">
+                        {est.customerCode && (
+                          <span className="font-mono text-[10px] px-1.5 py-0.5 bg-slate-100 border border-slate-200 rounded text-slate-700 font-black">
+                            {est.customerCode}
+                          </span>
+                        )}
+                        <span className="font-bold text-slate-800">{est.customerName}</span>
+                      </div>
+                      {est.contactName ? (
+                        <div className="text-[10px] text-slate-400 truncate max-w-[200px]">
+                          {est.contactName} {est.customerCity ? `• ${est.customerCity}` : ""}
+                        </div>
+                      ) : est.customerEmail ? (
+                        <div className="text-[10px] text-slate-400 truncate max-w-[200px]">{est.customerEmail}</div>
+                      ) : null}
                     </td>
 
                     {/* Producto */}
@@ -766,6 +864,21 @@ export default function EstimatesModule({
                       >
                         {est.status === "EN_PRODUCCION" ? "En Producción" : est.status}
                       </span>
+                      <div className="mt-1 flex items-center justify-center gap-1">
+                        <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold border ${
+                          est.statusCode === "Closed"
+                            ? "bg-slate-100 text-slate-600 border-slate-200"
+                            : "bg-emerald-50 text-emerald-700 border-emerald-200"
+                        }`}>
+                          {est.statusCode === "Closed" ? "Closed" : "Open"}
+                        </span>
+                        <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-slate-100 text-slate-600 border border-slate-200">
+                          {est.division || "HH"}
+                        </span>
+                        <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-orange-50 text-[#f6821f] border border-orange-200">
+                          {est.completionStatus || "Incomplete"}
+                        </span>
+                      </div>
                     </td>
 
                     {/* Acciones */}
@@ -846,86 +959,468 @@ export default function EstimatesModule({
 
             {/* Modal Form Content */}
             <form onSubmit={handleCreateEstimate} className="p-6 overflow-y-auto space-y-6 text-xs flex-1">
-              {/* Sección 1: Datos Comerciales */}
-              <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200/80 space-y-3">
-                <span className="font-bold text-slate-800 text-[11px] uppercase tracking-wider flex items-center gap-1.5">
-                  <Building2 className="w-3.5 h-3.5 text-[#f6821f]" />
-                  <span>1. Datos del Cliente &amp; Documento</span>
-                </span>
+              {/* Sección 1: Datos del Documento y Cliente */}
+              <div className="bg-slate-50/80 p-4 sm:p-5 rounded-3xl border border-slate-200/90 space-y-4">
+                <div className="flex items-center justify-between pb-2 border-b border-slate-200/80">
+                  <span className="font-bold text-slate-800 text-xs uppercase tracking-wider flex items-center gap-2">
+                    <div className="w-6 h-6 rounded-lg bg-orange-100 text-[#f6821f] flex items-center justify-center">
+                      <Building2 className="w-3.5 h-3.5" />
+                    </div>
+                    <span>1. Datos del Documento &amp; Cliente</span>
+                  </span>
+                  <span className="text-[11px] font-semibold text-slate-400 flex items-center gap-1">
+                    <Pin className="w-3.5 h-3.5 text-[#f6821f]" />
+                    <span>Control ERP</span>
+                  </span>
+                </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div>
-                    <label className="block font-semibold text-slate-700 mb-1">N° de Estimación *</label>
-                    <input
-                      type="text"
-                      required
-                      value={form.estimateNumber}
-                      onChange={(e) => setForm({ ...form, estimateNumber: e.target.value })}
-                      className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl font-mono text-slate-900 font-bold focus:border-[#f6821f] focus:outline-none"
-                    />
+                {/* A. Encabezado del Documento */}
+                <div className="bg-white p-3.5 rounded-2xl border border-slate-200/80 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                      <Calendar className="w-3 h-3 text-[#f6821f]" />
+                      <span>Encabezado de Documento</span>
+                    </span>
+                    <span className="text-[10px] text-slate-400 font-mono">
+                      N° {form.estimateNumber || "Nuevo"}
+                    </span>
                   </div>
 
-                  <div>
-                    <label className="block font-semibold text-slate-700 mb-1">Cliente *</label>
-                    <input
-                      type="text"
-                      required
-                      list="customers-list"
-                      value={form.customerName}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        const match = customers.find((c) => c.name.toLowerCase() === val.toLowerCase());
-                        setForm({
-                          ...form,
-                          customerName: val,
-                          customerId: match?.id || "",
-                          customerRtn: match?.rtn || form.customerRtn,
-                          customerEmail: match?.email || form.customerEmail,
-                          customerPhone: match?.phone || form.customerPhone,
-                        });
-                      }}
-                      className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-slate-900 font-medium focus:border-[#f6821f] focus:outline-none"
-                      placeholder="Seleccionar o escribir cliente..."
-                    />
-                    <datalist id="customers-list">
-                      {customers.map((c) => (
-                        <option key={c.id} value={c.name} />
-                      ))}
-                    </datalist>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2.5">
+                    {/* Date */}
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                        Date *
+                      </label>
+                      <input
+                        type="date"
+                        required
+                        value={form.date}
+                        onChange={(e) => setForm({ ...form, date: e.target.value })}
+                        className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-xs font-medium focus:bg-white focus:border-[#f6821f] focus:outline-none transition"
+                      />
+                    </div>
+
+                    {/* Due Date */}
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                        Due Date
+                      </label>
+                      <input
+                        type="date"
+                        value={form.dueDate}
+                        onChange={(e) => setForm({ ...form, dueDate: e.target.value })}
+                        className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-xs font-medium focus:bg-white focus:border-[#f6821f] focus:outline-none transition"
+                      />
+                    </div>
+
+                    {/* From Job No. */}
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                        From Job No.
+                      </label>
+                      <input
+                        type="text"
+                        value={form.fromJobNo}
+                        onChange={(e) => setForm({ ...form, fromJobNo: e.target.value })}
+                        placeholder="338958"
+                        className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-mono text-xs font-bold focus:bg-white focus:border-[#f6821f] focus:outline-none transition"
+                      />
+                    </div>
+
+                    {/* Opened */}
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                        Opened
+                      </label>
+                      <input
+                        type="date"
+                        value={form.openedDate}
+                        onChange={(e) => setForm({ ...form, openedDate: e.target.value })}
+                        className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-xs font-medium focus:bg-white focus:border-[#f6821f] focus:outline-none transition"
+                      />
+                    </div>
+
+                    {/* Status (Open / Closed) */}
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                        Status
+                      </label>
+                      <select
+                        value={form.statusCode}
+                        onChange={(e) => setForm({ ...form, statusCode: e.target.value })}
+                        className="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-xs font-bold focus:bg-white focus:border-[#f6821f] focus:outline-none transition cursor-pointer"
+                      >
+                        <option value="Open">Open</option>
+                        <option value="Closed">Closed</option>
+                      </select>
+                    </div>
+
+                    {/* Completion Status */}
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-700 mb-1 truncate" title="Completion Status">
+                        Completion Status
+                      </label>
+                      <select
+                        value={form.completionStatus}
+                        onChange={(e) => setForm({ ...form, completionStatus: e.target.value })}
+                        className="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-xs font-semibold focus:bg-white focus:border-[#f6821f] focus:outline-none transition cursor-pointer"
+                      >
+                        <option value="Incomplete">Incomplete</option>
+                        <option value="Complete">Complete</option>
+                        <option value="Pending">Pending</option>
+                        <option value="Cancelled">Cancelled</option>
+                      </select>
+                    </div>
+
+                    {/* Division */}
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                        Division
+                      </label>
+                      <select
+                        value={form.division}
+                        onChange={(e) => setForm({ ...form, division: e.target.value })}
+                        className="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-xs font-bold focus:bg-white focus:border-[#f6821f] focus:outline-none transition cursor-pointer"
+                      >
+                        <option value="HH">HH</option>
+                        <option value="PP">PP</option>
+                        <option value="FL">FL</option>
+                        <option value="CV">CV</option>
+                        <option value="CORR">CORR</option>
+                      </select>
+                    </div>
                   </div>
 
-                  <div>
-                    <label className="block font-semibold text-slate-700 mb-1">Fecha Emisión *</label>
-                    <input
-                      type="date"
-                      required
-                      value={form.date}
-                      onChange={(e) => setForm({ ...form, date: e.target.value })}
-                      className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-slate-900 focus:border-[#f6821f] focus:outline-none"
-                    />
+                  {/* N° Estimación & Título */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-2 border-t border-slate-100">
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                        N° de Estimación *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={form.estimateNumber}
+                        onChange={(e) => setForm({ ...form, estimateNumber: e.target.value })}
+                        className="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl font-mono text-slate-900 font-bold text-xs focus:bg-white focus:border-[#f6821f] focus:outline-none transition"
+                      />
+                    </div>
+
+                    <div className="sm:col-span-2">
+                      <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                        Título / Descripción del Trabajo
+                      </label>
+                      <input
+                        type="text"
+                        value={form.title}
+                        onChange={(e) => setForm({ ...form, title: e.target.value })}
+                        placeholder="Ej: Tiraje 360,000 etiquetas DICKIES -WWOF..."
+                        className="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-xs focus:bg-white focus:border-[#f6821f] focus:outline-none transition"
+                      />
+                    </div>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block font-semibold text-slate-700 mb-1">Título de la Estimación</label>
-                    <input
-                      type="text"
-                      value={form.title}
-                      onChange={(e) => setForm({ ...form, title: e.target.value })}
-                      className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-slate-900 focus:border-[#f6821f] focus:outline-none"
-                      placeholder="Ej. Tiraje 10,000 Cajas con Impresión 4 Tintas..."
-                    />
+                {/* B. Bloque del Cliente y Contacto (2 columnas) */}
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-3">
+                  {/* Columna Izquierda: Customer, Dirección y Ciudad/Estado/Zip */}
+                  <div className="lg:col-span-6 bg-white p-3.5 rounded-2xl border border-slate-200/80 space-y-2.5">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
+                      <Building2 className="w-3 h-3 text-[#f6821f]" />
+                      <span>Datos del Cliente &amp; Dirección</span>
+                    </span>
+
+                    {/* Customer Code */}
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                        Customer (Código) *
+                      </label>
+                      <div className="flex gap-1.5">
+                        <input
+                          type="text"
+                          required
+                          list="customers-code-list"
+                          value={form.customerCode}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            const match = customers.find(
+                              (c) =>
+                                (c.macolaCode && c.macolaCode.toLowerCase() === val.toLowerCase()) ||
+                                c.id.toLowerCase() === val.toLowerCase() ||
+                                c.name.toLowerCase() === val.toLowerCase()
+                            );
+                            if (match) {
+                              setForm({
+                                ...form,
+                                customerCode: match.macolaCode || val,
+                                customerId: match.id,
+                                customerName: match.name,
+                                customerAddress1: match.address || form.customerAddress1,
+                                customerEmail: match.email || form.customerEmail,
+                                customerPhone: match.phone || form.customerPhone,
+                                customerRtn: match.rtn || form.customerRtn,
+                              });
+                            } else {
+                              setForm({ ...form, customerCode: val });
+                            }
+                          }}
+                          placeholder="VFS200"
+                          className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-xl font-mono text-slate-900 font-black text-xs uppercase focus:bg-white focus:border-[#f6821f] focus:outline-none transition"
+                        />
+                        <datalist id="customers-code-list">
+                          {customers.map((c) => (
+                            <option key={c.id} value={c.macolaCode || c.id}>
+                              {c.name}
+                            </option>
+                          ))}
+                        </datalist>
+                      </div>
+                    </div>
+
+                    {/* Customer Name Line 1 */}
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                        Nombre o Razón Social *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        list="customers-name-list"
+                        value={form.customerName}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          const match = customers.find((c) => c.name.toLowerCase() === val.toLowerCase());
+                          if (match) {
+                            setForm({
+                              ...form,
+                              customerName: val,
+                              customerCode: match.macolaCode || form.customerCode,
+                              customerId: match.id,
+                              customerAddress1: match.address || form.customerAddress1,
+                              customerEmail: match.email || form.customerEmail,
+                              customerPhone: match.phone || form.customerPhone,
+                              customerRtn: match.rtn || form.customerRtn,
+                            });
+                          } else {
+                            setForm({ ...form, customerName: val });
+                          }
+                        }}
+                        placeholder="VFS PANAMA TRADING S. DE R.L."
+                        className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-xs font-bold uppercase focus:bg-white focus:border-[#f6821f] focus:outline-none transition"
+                      />
+                      <datalist id="customers-name-list">
+                        {customers.map((c) => (
+                          <option key={c.id} value={c.name} />
+                        ))}
+                      </datalist>
+                    </div>
+
+                    {/* Address Line 1 */}
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                        Dirección Línea 1
+                      </label>
+                      <input
+                        type="text"
+                        value={form.customerAddress1}
+                        onChange={(e) => setForm({ ...form, customerAddress1: e.target.value })}
+                        placeholder="DREAM PLAZA, PISO 8 OFICINA 811 AVE"
+                        className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-xs uppercase focus:bg-white focus:border-[#f6821f] focus:outline-none transition"
+                      />
+                    </div>
+
+                    {/* Address Line 2 */}
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                        Dirección Línea 2
+                      </label>
+                      <input
+                        type="text"
+                        value={form.customerAddress2}
+                        onChange={(e) => setForm({ ...form, customerAddress2: e.target.value })}
+                        placeholder="CENTENARIO COSTA del ESTE"
+                        className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-xs uppercase focus:bg-white focus:border-[#f6821f] focus:outline-none transition"
+                      />
+                    </div>
+
+                    {/* City, State/Region dropdown, Zip */}
+                    <div className="grid grid-cols-12 gap-1.5">
+                      <div className="col-span-6">
+                        <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                          Ciudad (City)
+                        </label>
+                        <input
+                          type="text"
+                          value={form.customerCity}
+                          onChange={(e) => setForm({ ...form, customerCity: e.target.value })}
+                          placeholder="CUIDAD de PANAMA"
+                          className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-xs uppercase focus:bg-white focus:border-[#f6821f] focus:outline-none transition"
+                        />
+                      </div>
+
+                      <div className="col-span-3">
+                        <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                          Estado / País
+                        </label>
+                        <select
+                          value={form.customerState}
+                          onChange={(e) => setForm({ ...form, customerState: e.target.value })}
+                          className="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-xs font-semibold focus:bg-white focus:border-[#f6821f] focus:outline-none transition cursor-pointer"
+                        >
+                          <option value="PA">PA</option>
+                          <option value="HN">HN</option>
+                          <option value="US">US</option>
+                          <option value="GT">GT</option>
+                          <option value="SV">SV</option>
+                          <option value="NI">NI</option>
+                          <option value="CR">CR</option>
+                          <option value="OTHER">Otro</option>
+                        </select>
+                      </div>
+
+                      <div className="col-span-3">
+                        <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                          Zip / C.P.
+                        </label>
+                        <input
+                          type="text"
+                          value={form.customerZip}
+                          onChange={(e) => setForm({ ...form, customerZip: e.target.value })}
+                          placeholder="0819"
+                          className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-mono text-xs focus:bg-white focus:border-[#f6821f] focus:outline-none transition"
+                        />
+                      </div>
+                    </div>
                   </div>
 
-                  <div>
-                    <label className="block font-semibold text-slate-700 mb-1">Validez Hasta</label>
-                    <input
-                      type="date"
-                      value={form.validUntil}
-                      onChange={(e) => setForm({ ...form, validUntil: e.target.value })}
-                      className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-slate-900 focus:border-[#f6821f] focus:outline-none"
-                    />
+                  {/* Columna Derecha: Contacto, Phone/Fax, E-mail, Salespn, Note, Broker */}
+                  <div className="lg:col-span-6 bg-white p-3.5 rounded-2xl border border-slate-200/80 space-y-2.5">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
+                      <User className="w-3 h-3 text-[#f6821f]" />
+                      <span>Contacto, Comunicaciones &amp; Venta</span>
+                    </span>
+
+                    {/* Contact */}
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                        Contact (Contacto)
+                      </label>
+                      <input
+                        type="text"
+                        value={form.contactName}
+                        onChange={(e) => setForm({ ...form, contactName: e.target.value })}
+                        placeholder="GISSELLE ANDERSON"
+                        className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-xs font-semibold uppercase focus:bg-white focus:border-[#f6821f] focus:outline-none transition"
+                      />
+                    </div>
+
+                    {/* Phone/Fax: Main Phone + Ext (X) + Fax/Alt */}
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                        Phone / Fax / Ext.
+                      </label>
+                      <div className="grid grid-cols-12 gap-1.5">
+                        <div className="col-span-6">
+                          <input
+                            type="text"
+                            value={form.customerPhone}
+                            onChange={(e) => setForm({ ...form, customerPhone: e.target.value })}
+                            placeholder="507-831-2374"
+                            className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-xs font-mono focus:bg-white focus:border-[#f6821f] focus:outline-none transition"
+                          />
+                        </div>
+                        <div className="col-span-2 flex items-center gap-1">
+                          <span className="text-[10px] font-black text-slate-400 font-mono">X</span>
+                          <input
+                            type="text"
+                            value={form.phoneExt}
+                            onChange={(e) => setForm({ ...form, phoneExt: e.target.value })}
+                            placeholder="201"
+                            className="w-full px-1.5 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-xs font-mono text-center focus:bg-white focus:border-[#f6821f] focus:outline-none transition"
+                          />
+                        </div>
+                        <div className="col-span-4">
+                          <input
+                            type="text"
+                            value={form.customerFax}
+                            onChange={(e) => setForm({ ...form, customerFax: e.target.value })}
+                            placeholder="Fax / Alt"
+                            className="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-xs font-mono focus:bg-white focus:border-[#f6821f] focus:outline-none transition"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* E-mail */}
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                        E-mail
+                      </label>
+                      <input
+                        type="email"
+                        value={form.customerEmail}
+                        onChange={(e) => setForm({ ...form, customerEmail: e.target.value })}
+                        placeholder="correo@ejemplo.com"
+                        className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-xs focus:bg-white focus:border-[#f6821f] focus:outline-none transition"
+                      />
+                    </div>
+
+                    {/* Salespn (Code + Name) */}
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                        Salespn (Vendedor)
+                      </label>
+                      <div className="grid grid-cols-12 gap-1.5">
+                        <div className="col-span-4">
+                          <input
+                            type="text"
+                            value={form.salespersonCode}
+                            onChange={(e) => setForm({ ...form, salespersonCode: e.target.value })}
+                            placeholder="005"
+                            className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-mono text-xs font-bold text-center uppercase focus:bg-white focus:border-[#f6821f] focus:outline-none transition"
+                          />
+                        </div>
+                        <div className="col-span-8">
+                          <input
+                            type="text"
+                            value={form.salespersonName}
+                            onChange={(e) => setForm({ ...form, salespersonName: e.target.value })}
+                            placeholder="HOUSE"
+                            className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-xs font-bold uppercase focus:bg-white focus:border-[#f6821f] focus:outline-none transition"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Note & Broker Checkbox */}
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1">
+                        <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                          Note (Nota)
+                        </label>
+                        <input
+                          type="text"
+                          value={form.notes}
+                          onChange={(e) => setForm({ ...form, notes: e.target.value })}
+                          placeholder="Observación de documento o cliente..."
+                          className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-xs focus:bg-white focus:border-[#f6821f] focus:outline-none transition"
+                        />
+                      </div>
+
+                      {/* Checkbox Broker */}
+                      <div className="shrink-0 pt-4">
+                        <label className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-700 cursor-pointer select-none px-2.5 py-1.5 rounded-xl bg-slate-50 border border-slate-200 hover:bg-slate-100 transition">
+                          <input
+                            type="checkbox"
+                            checked={form.isBroker}
+                            onChange={(e) => setForm({ ...form, isBroker: e.target.checked })}
+                            className="rounded text-[#f6821f] focus:ring-[#f6821f]"
+                          />
+                          <span className="text-[11px]">Broker</span>
+                        </label>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1393,6 +1888,140 @@ export default function EstimatesModule({
                   <span className="text-2xl font-black text-[#f6821f] tracking-tight">
                     {formatCurrency(selectedEstimate.totalAmount)}
                   </span>
+                </div>
+              </div>
+
+              {/* Document Header & Control Bar */}
+              <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold text-slate-500 uppercase flex items-center gap-1.5">
+                    <Calendar className="w-3 h-3 text-[#f6821f]" />
+                    <span>Control de Documento (ERP)</span>
+                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-slate-200/80 text-slate-700">
+                      División: {selectedEstimate.division || "HH"}
+                    </span>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-orange-100 text-[#f6821f] border border-orange-200">
+                      {selectedEstimate.completionStatus || "Incomplete"}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 pt-1 border-t border-slate-200/70 text-slate-700">
+                  <div className="bg-white p-2 rounded-xl border border-slate-100">
+                    <span className="text-[10px] text-slate-400 block font-semibold">DATE (EMISIÓN)</span>
+                    <span className="font-mono font-bold text-slate-900">{selectedEstimate.date}</span>
+                  </div>
+                  <div className="bg-white p-2 rounded-xl border border-slate-100">
+                    <span className="text-[10px] text-slate-400 block font-semibold">DUE DATE (VENCE)</span>
+                    <span className="font-mono font-bold text-slate-900">{selectedEstimate.dueDate || "-"}</span>
+                  </div>
+                  <div className="bg-white p-2 rounded-xl border border-slate-100">
+                    <span className="text-[10px] text-slate-400 block font-semibold">FROM JOB NO.</span>
+                    <span className="font-mono font-bold text-slate-900">{selectedEstimate.fromJobNo || "-"}</span>
+                  </div>
+                  <div className="bg-white p-2 rounded-xl border border-slate-100">
+                    <span className="text-[10px] text-slate-400 block font-semibold">OPENED (APERTURA)</span>
+                    <span className="font-mono font-bold text-slate-900">{selectedEstimate.openedDate || "-"}</span>
+                  </div>
+                  <div className="bg-white p-2 rounded-xl border border-slate-100">
+                    <span className="text-[10px] text-slate-400 block font-semibold">STATUS (JOB)</span>
+                    <span className={`font-mono font-bold text-xs px-2 py-0.5 rounded-md inline-block mt-0.5 border ${
+                      selectedEstimate.statusCode === "Closed"
+                        ? "bg-slate-100 text-slate-700 border-slate-200"
+                        : "bg-emerald-50 text-emerald-700 border-emerald-200"
+                    }`}>
+                      {selectedEstimate.statusCode === "Closed" ? "Closed" : "Open"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Customer Information & Contact Details Card */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {/* Cliente y Dirección */}
+                <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold text-slate-500 uppercase flex items-center gap-1.5">
+                      <Building2 className="w-3 h-3 text-[#f6821f]" />
+                      <span>Cliente &amp; Dirección</span>
+                    </span>
+                  </div>
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      {selectedEstimate.customerCode && (
+                        <span className="font-mono font-black text-xs px-2 py-0.5 bg-slate-200 text-slate-800 rounded-md">
+                          {selectedEstimate.customerCode}
+                        </span>
+                      )}
+                      <span className="font-bold text-slate-900 text-xs">{selectedEstimate.customerName}</span>
+                    </div>
+                    {selectedEstimate.customerAddress1 && (
+                      <p className="text-slate-600 text-[11px] flex items-center gap-1">
+                        <MapPin className="w-3 h-3 text-slate-400 shrink-0" />
+                        <span>{selectedEstimate.customerAddress1}</span>
+                      </p>
+                    )}
+                    {selectedEstimate.customerAddress2 && (
+                      <p className="text-slate-500 text-[11px] pl-4">{selectedEstimate.customerAddress2}</p>
+                    )}
+                    {(selectedEstimate.customerCity || selectedEstimate.customerState || selectedEstimate.customerZip) && (
+                      <p className="text-slate-500 text-[11px] pl-4 font-medium">
+                        {[selectedEstimate.customerCity, selectedEstimate.customerState, selectedEstimate.customerZip].filter(Boolean).join(", ")}
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Contacto & Vendedor */}
+                <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold text-slate-500 uppercase flex items-center gap-1.5">
+                      <User className="w-3 h-3 text-[#f6821f]" />
+                      <span>Contacto &amp; Ventas</span>
+                    </span>
+                    {selectedEstimate.isBroker && (
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200">
+                        Broker
+                      </span>
+                    )}
+                  </div>
+                  <div className="space-y-1.5 text-[11px]">
+                    <div className="flex items-center gap-1.5 text-slate-800">
+                      <span className="text-slate-400 font-semibold">Contacto:</span>
+                      <span className="font-bold">{selectedEstimate.contactName || "-"}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 text-slate-800">
+                      <Phone className="w-3 h-3 text-slate-400 shrink-0" />
+                      <span className="font-mono">{selectedEstimate.customerPhone || "-"}</span>
+                      {selectedEstimate.phoneExt && (
+                        <span className="text-slate-400 font-mono">X {selectedEstimate.phoneExt}</span>
+                      )}
+                      {selectedEstimate.customerFax && (
+                        <span className="text-slate-400 font-mono text-[10px]">| Fax: {selectedEstimate.customerFax}</span>
+                      )}
+                    </div>
+                    {selectedEstimate.customerEmail && (
+                      <div className="flex items-center gap-1.5 text-slate-800">
+                        <Mail className="w-3 h-3 text-slate-400 shrink-0" />
+                        <span>{selectedEstimate.customerEmail}</span>
+                      </div>
+                    )}
+                    <div className="flex items-center gap-1.5 text-slate-800 pt-1 border-t border-slate-200/60">
+                      <Briefcase className="w-3 h-3 text-slate-400 shrink-0" />
+                      <span className="text-slate-400">Vendedor:</span>
+                      <span className="font-bold">
+                        {selectedEstimate.salespersonCode ? `${selectedEstimate.salespersonCode} - ` : ""}
+                        {selectedEstimate.salespersonName || "HOUSE"}
+                      </span>
+                    </div>
+                    {selectedEstimate.notes && (
+                      <div className="text-[10px] text-slate-500 italic bg-white p-1.5 rounded-lg border border-slate-100">
+                        Nota: {selectedEstimate.notes}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
 

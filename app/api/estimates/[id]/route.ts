@@ -64,7 +64,34 @@ export async function PATCH(
     if (body.workOrderNumber !== undefined) updateData.workOrderNumber = body.workOrderNumber;
     if (body.title !== undefined) updateData.title = body.title;
     if (body.notes !== undefined) updateData.notes = body.notes;
+    if (body.date !== undefined) updateData.date = body.date;
+    if (body.dueDate !== undefined) updateData.dueDate = body.dueDate;
+    if (body.fromJobNo !== undefined) updateData.fromJobNo = body.fromJobNo;
+    if (body.openedDate !== undefined) updateData.openedDate = body.openedDate;
+    if (body.statusCode !== undefined) updateData.statusCode = body.statusCode;
+    if (body.completionStatus !== undefined) updateData.completionStatus = body.completionStatus;
+    if (body.division !== undefined) updateData.division = body.division;
     if (body.validUntil !== undefined) updateData.validUntil = body.validUntil;
+
+    // Cliente y contacto
+    if (body.customerId !== undefined) updateData.customerId = body.customerId;
+    if (body.customerCode !== undefined) updateData.customerCode = body.customerCode;
+    if (body.customerName !== undefined) updateData.customerName = body.customerName;
+    if (body.customerAddress1 !== undefined) updateData.customerAddress1 = body.customerAddress1;
+    if (body.customerAddress2 !== undefined) updateData.customerAddress2 = body.customerAddress2;
+    if (body.customerCity !== undefined) updateData.customerCity = body.customerCity;
+    if (body.customerState !== undefined) updateData.customerState = body.customerState;
+    if (body.customerZip !== undefined) updateData.customerZip = body.customerZip;
+    if (body.customerRtn !== undefined) updateData.customerRtn = body.customerRtn;
+    if (body.contactName !== undefined) updateData.contactName = body.contactName;
+    if (body.customerPhone !== undefined) updateData.customerPhone = body.customerPhone;
+    if (body.phoneExt !== undefined) updateData.phoneExt = body.phoneExt;
+    if (body.customerFax !== undefined) updateData.customerFax = body.customerFax;
+    if (body.customerEmail !== undefined) updateData.customerEmail = body.customerEmail;
+    if (body.salespersonCode !== undefined) updateData.salespersonCode = body.salespersonCode;
+    if (body.salespersonName !== undefined) updateData.salespersonName = body.salespersonName;
+    if (body.isBroker !== undefined) updateData.isBroker = Boolean(body.isBroker);
+
     if (body.incomeAccountId !== undefined) updateData.incomeAccountId = body.incomeAccountId;
     if (body.incomeAccountCode !== undefined) updateData.incomeAccountCode = body.incomeAccountCode;
     if (body.incomeAccountName !== undefined) updateData.incomeAccountName = body.incomeAccountName;
