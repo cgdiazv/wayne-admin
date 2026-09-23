@@ -822,6 +822,8 @@ model WorkOrder {
   totalCost         Float           @default(0) // Costo total acumulado de producción
   unitCostFinal     Float           @default(0) // totalCost / producedQuantity
   journalEntryId    String?         // Asiento contable generado al completar la OT
+  estimateId        String?         // Referencia a la estimación origen
+  estimateNumber    String?         // e.g. "EST-2026-0001"
   items             WorkOrderItem[]
   createdAt         DateTime        @default(now())
   updatedAt         DateTime        @updatedAt
@@ -841,6 +843,74 @@ model WorkOrderItem {
   lotNumber       String?   // Lote del que se consumió la materia prima
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
+}
+
+model Estimate {
+  id                    String         @id @default(cuid())
+  estimateNumber        String         @unique // e.g. "EST-2026-0001"
+  title                 String         @default("Estimación Técnica de Costos")
+  customerId            String?
+  customerName          String         @default("Cliente General")
+  customerRtn           String?
+  customerEmail         String?
+  customerPhone         String?
+  date                  String         // e.g. "2026-09-23"
+  validUntil            String?        // e.g. "2026-10-23"
+  currency              String         @default("USD")
+  status                String         @default("BORRADOR") // "BORRADOR" | "APROBADA" | "EN_PRODUCCION" | "RECHAZADA"
+  
+  // Producto terminado / trabajo a fabricar
+  productId             String?
+  productSku            String
+  productName           String
+  targetQuantity        Float          @default(1)
+  unitOfMeasure         String         @default("UND")
+  
+  // Costeo Técnico
+  materialCost          Float          @default(0) // Suma de insumos consumibles
+  laborCost             Float          @default(0) // Mano de obra directa (MOD)
+  overheadCost          Float          @default(0) // Costos indirectos de fabricación (CIF)
+  totalEstimatedCost    Float          @default(0) // material + labor + overhead
+  unitCost              Float          @default(0)
+  marginPercent         Float          @default(30) // Margen de utilidad deseado (%)
+  suggestedPrice        Float          @default(0) // Precio sugerido de venta (subtotal)
+  taxRate               Float          @default(15) // ISV % (15% o 18%)
+  tax                   Float          @default(0)
+  totalAmount           Float          @default(0) // Precio total con impuestos
+  
+  // Conexión automática con el Plan de Cuentas
+  incomeAccountId       String?
+  incomeAccountCode     String?        @default("4100")
+  incomeAccountName     String?        @default("Ventas de Productos Fabricados")
+  costAccountId         String?
+  costAccountCode       String?        @default("5100")
+  costAccountName       String?        @default("Costo de Ventas y Manufactura")
+  inventoryAccountId    String?
+  inventoryAccountCode  String?        @default("1105")
+  inventoryAccountName  String?        @default("Inventario de Producto Terminado")
+  
+  // Referencia cruzada con Producción
+  workOrderId           String?
+  workOrderNumber       String?
+  
+  notes                 String?
+  items                 EstimateItem[]
+  createdAt             DateTime       @default(now())
+  updatedAt             DateTime       @updatedAt
+}
+
+model EstimateItem {
+  id              String   @id @default(cuid())
+  estimateId      String
+  estimate        Estimate @relation(fields: [estimateId], references: [id], onDelete: Cascade)
+  rawMaterialId   String?
+  rawMaterialSku  String
+  description     String
+  quantity        Float    @default(1)
+  unitCost        Float    @default(0)
+  totalCost       Float    @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 }
 
 

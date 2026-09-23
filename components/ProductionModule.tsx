@@ -112,6 +112,8 @@ interface ProductionModuleProps {
   formatCurrency?: (val: number) => string;
   activeTab?: "work-orders" | "bom-recipes";
   onTabChange?: (tab: "work-orders" | "bom-recipes") => void;
+  initialEstimateForWO?: any;
+  onClearInitialEstimate?: () => void;
 }
 
 export default function ProductionModule({
@@ -121,6 +123,8 @@ export default function ProductionModule({
   formatCurrency = (v) => `$${v.toFixed(2)}`,
   activeTab: controlledActiveTab,
   onTabChange,
+  initialEstimateForWO,
+  onClearInitialEstimate,
 }: ProductionModuleProps) {
   // Navigation inside Production: "work-orders" | "bom-recipes"
   const [internalTab, setInternalTab] = useState<"work-orders" | "bom-recipes">("work-orders");
@@ -152,9 +156,12 @@ export default function ProductionModule({
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   // Forms
+  const [estimatesList, setEstimatesList] = useState<any[]>([]);
   const [newWOForm, setNewWOForm] = useState({
     orderNumber: "",
     bomId: "",
+    estimateId: "",
+    estimateNumber: "",
     productSku: "",
     productName: "",
     productId: "",
@@ -224,9 +231,10 @@ export default function ProductionModule({
     if (isRefresh) setRefreshing(true);
     else setLoading(true);
     try {
-      const [woRes, bomRes] = await Promise.all([
+      const [woRes, bomRes, estRes] = await Promise.all([
         fetch("/api/production/work-orders").then((r) => r.json()),
         fetch("/api/production/bom").then((r) => r.json()),
+        fetch("/api/estimates").then((r) => r.json()),
       ]);
 
       if (woRes.success && Array.isArray(woRes.data)) {
@@ -234,6 +242,9 @@ export default function ProductionModule({
       }
       if (bomRes.success && Array.isArray(bomRes.data)) {
         setBoms(bomRes.data);
+      }
+      if (estRes.success && Array.isArray(estRes.data)) {
+        setEstimatesList(estRes.data);
       }
     } catch (err: any) {
       console.error("Error loading production data:", err);
@@ -247,6 +258,53 @@ export default function ProductionModule({
   useEffect(() => {
     loadData();
   }, []);
+
+  // Listen to incoming initialEstimateForWO from EstimatesModule
+  useEffect(() => {
+    if (initialEstimateForWO) {
+      const defaultLot = `LOT-PRD-${new Date().getFullYear()}-${Date.now().toString().slice(-4)}`;
+      const randomSuffix = String(Math.floor(100 + Math.random() * 900));
+      const orderNum = `OT-${new Date().getFullYear()}-${randomSuffix}`;
+
+      const est = initialEstimateForWO;
+      const scaledItems = (est.items || []).map((it: any) => {
+        const invItem = inventory.find((inv) => inv.sku === it.rawMaterialSku || inv.id === it.rawMaterialId);
+        const availableLot = invItem?.lots && invItem.lots.length > 0 ? invItem.lots[0].lotNumber : "";
+        return {
+          rawMaterialId: it.rawMaterialId || undefined,
+          rawMaterialSku: it.rawMaterialSku,
+          description: it.description,
+          plannedQuantity: Number(it.quantity) || 1,
+          unitCost: Number(it.unitCost) || 0,
+          lotNumber: availableLot,
+        };
+      });
+
+      setNewWOForm({
+        orderNumber: orderNum,
+        bomId: "",
+        estimateId: est.id,
+        estimateNumber: est.estimateNumber,
+        productSku: est.productSku,
+        productName: est.productName,
+        productId: est.productId || "",
+        targetQuantity: Number(est.targetQuantity) || 1000,
+        unitOfMeasure: est.unitOfMeasure || "UND",
+        startDate: new Date().toISOString().split("T")[0],
+        completionDate: new Date(Date.now() + 5 * 24 * 3600 * 1000).toISOString().split("T")[0],
+        supervisor: "Ing. Carlos Mendoza (Planta Zip Búfalo)",
+        productionLine: "Línea Flexografía 1 (6 Colores)",
+        notes: `Fabricación programada a partir de Estimación ${est.estimateNumber} para ${est.customerName}. ${est.notes || ""}`,
+        assignedLotNumber: defaultLot,
+        totalLaborCost: Number(est.laborCost) || 150.0,
+        totalOverheadCost: Number(est.overheadCost) || 65.0,
+        items: scaledItems,
+      });
+
+      setShowNewWOModal(true);
+      if (onClearInitialEstimate) onClearInitialEstimate();
+    }
+  }, [initialEstimateForWO]);
 
   // Pre-generate next order number
   const nextOrderNumber = useMemo(() => {
@@ -292,6 +350,8 @@ export default function ProductionModule({
     setNewWOForm({
       orderNumber: nextOrderNumber,
       bomId: "",
+      estimateId: "",
+      estimateNumber: "",
       productSku: finishedProducts[0]?.sku || "",
       productName: finishedProducts[0]?.description || "",
       productId: finishedProducts[0]?.id || "",
@@ -335,12 +395,57 @@ export default function ProductionModule({
     setNewWOForm((prev) => ({
       ...prev,
       bomId: selectedBom.id,
+      estimateId: "",
+      estimateNumber: "",
       productSku: selectedBom.productSku,
       productName: selectedBom.productName,
       productId: selectedBom.productId || "",
       unitOfMeasure: selectedBom.unitOfMeasure,
       totalLaborCost: Number((selectedBom.laborCost * scale).toFixed(2)),
       totalOverheadCost: Number((selectedBom.overheadCost * scale).toFixed(2)),
+      items: scaledItems,
+    }));
+  };
+
+  // When an Estimate is selected in New WO Modal, populate items & specifications
+  const handleSelectEstimateInWO = (estimateId: string) => {
+    const selectedEst = estimatesList.find((e) => e.id === estimateId);
+    if (!selectedEst) {
+      setNewWOForm((prev) => ({ ...prev, estimateId: "", estimateNumber: "" }));
+      return;
+    }
+
+    const scale =
+      newWOForm.targetQuantity > 0 && selectedEst.targetQuantity > 0
+        ? newWOForm.targetQuantity / selectedEst.targetQuantity
+        : 1;
+
+    const scaledItems = (selectedEst.items || []).map((it: any) => {
+      const invItem = inventory.find((inv) => inv.sku === it.rawMaterialSku || inv.id === it.rawMaterialId);
+      const availableLot = invItem?.lots && invItem.lots.length > 0 ? invItem.lots[0].lotNumber : "";
+      return {
+        rawMaterialId: it.rawMaterialId || undefined,
+        rawMaterialSku: it.rawMaterialSku,
+        description: it.description,
+        plannedQuantity: Number((it.quantity * scale).toFixed(2)),
+        unitCost: it.unitCost,
+        lotNumber: availableLot,
+      };
+    });
+
+    setNewWOForm((prev) => ({
+      ...prev,
+      estimateId: selectedEst.id,
+      estimateNumber: selectedEst.estimateNumber,
+      bomId: "",
+      productSku: selectedEst.productSku,
+      productName: selectedEst.productName,
+      productId: selectedEst.productId || "",
+      targetQuantity: selectedEst.targetQuantity,
+      unitOfMeasure: selectedEst.unitOfMeasure,
+      totalLaborCost: Number((selectedEst.laborCost * scale).toFixed(2)),
+      totalOverheadCost: Number((selectedEst.overheadCost * scale).toFixed(2)),
+      notes: `Fabricación según Estimación ${selectedEst.estimateNumber} para ${selectedEst.customerName}. ${selectedEst.notes || ""}`,
       items: scaledItems,
     }));
   };
@@ -998,7 +1103,7 @@ export default function ProductionModule({
             </div>
 
             <form onSubmit={handleCreateWorkOrder} className="p-6 overflow-y-auto space-y-4 text-xs flex-1">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
                   <label className="block font-bold text-slate-700 mb-1">N° de Orden de Trabajo *</label>
                   <input
@@ -1010,13 +1115,31 @@ export default function ProductionModule({
                   />
                 </div>
                 <div>
-                  <label className="block font-bold text-slate-700 mb-1">Cargar de Receta / BOM (Opcional)</label>
+                  <label className="block font-bold text-slate-700 mb-1 flex items-center justify-between">
+                    <span>Cargar de Estimación</span>
+                    <span className="text-[10px] text-[#f6821f] font-bold">Presupuesto</span>
+                  </label>
+                  <select
+                    value={newWOForm.estimateId}
+                    onChange={(e) => handleSelectEstimateInWO(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl bg-orange-50/60 border border-orange-200 text-slate-900 font-semibold text-xs focus:border-[#f6821f] focus:outline-none"
+                  >
+                    <option value="">-- Seleccionar Estimación --</option>
+                    {estimatesList.map((est) => (
+                      <option key={est.id} value={est.id}>
+                        {est.estimateNumber} - {est.productName} ({est.customerName})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Cargar de Receta / BOM</label>
                   <select
                     value={newWOForm.bomId}
                     onChange={(e) => handleSelectBOMInWO(e.target.value, newWOForm.targetQuantity)}
                     className="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 text-slate-800 font-medium"
                   >
-                    <option value="">-- Seleccionar Receta Guardada --</option>
+                    <option value="">-- Seleccionar Receta --</option>
                     {boms.map((b) => (
                       <option key={b.id} value={b.id}>
                         {b.name} ({b.productName})

@@ -14,6 +14,7 @@ import VendorPaymentsModule from "@/components/VendorPaymentsModule";
 import BankReconciliationModule from "@/components/BankReconciliationModule";
 import SalesOrdersModule from "@/components/SalesOrdersModule";
 import ProductionModule from "@/components/ProductionModule";
+import EstimatesModule, { Estimate } from "@/components/EstimatesModule";
 import { Skeleton, CardSkeleton, TableRowsSkeleton } from "@/components/Skeleton";
 
 
@@ -200,7 +201,7 @@ type PurchaseInvoice = {
   createdAt?: string;
 };
 
-type NavItem = "dashboard" | "plan-cuentas" | "transacciones" | "conciliacion-bancaria" | "caja-chica" | "clientes" | "cotizaciones" | "pedidos-venta" | "proveedores" | "vendedores" | "comisiones" | "inventario" | "lotes" | "series" | "produccion" | "notas-credito-debito" | "reportes" | "configuracion" | "factura-editor" | "lista-facturas" | "lista-ordenes-compra" | "orden-compra-editor" | "factura-compra-lista" | "factura-compra-editor" | "deposito-bancario" | "recibir-pago" | "agregar-gasto" | "pagar-proveedor" | "pagos-proveedores" | "devoluciones-proveedor" | "antiguedad-saldos" | "antiguedad-saldos-proveedores" | "estado-cuenta-cliente" | "retenciones-isv";
+type NavItem = "dashboard" | "plan-cuentas" | "transacciones" | "conciliacion-bancaria" | "caja-chica" | "estimaciones" | "clientes" | "cotizaciones" | "pedidos-venta" | "proveedores" | "vendedores" | "comisiones" | "inventario" | "lotes" | "series" | "produccion" | "notas-credito-debito" | "reportes" | "configuracion" | "factura-editor" | "lista-facturas" | "lista-ordenes-compra" | "orden-compra-editor" | "factura-compra-lista" | "factura-compra-editor" | "deposito-bancario" | "recibir-pago" | "agregar-gasto" | "pagar-proveedor" | "pagos-proveedores" | "devoluciones-proveedor" | "antiguedad-saldos" | "antiguedad-saldos-proveedores" | "estado-cuenta-cliente" | "retenciones-isv";
 
 
 
@@ -213,6 +214,7 @@ export default function AdminDashboard() {
   const [previousInvoiceView, setPreviousInvoiceView] = useState<NavItem>("dashboard");
   const [selectedStatementCustomerId, setSelectedStatementCustomerId] = useState<string>("");
   const [selectedPaymentVendor, setSelectedPaymentVendor] = useState<string>("");
+  const [estimateForProduction, setEstimateForProduction] = useState<any | null>(null);
 
   const openCustomerStatement = (customerIdOrName: string) => {
     setSelectedStatementCustomerId(customerIdOrName);
@@ -6831,6 +6833,31 @@ export default function AdminDashboard() {
             )}
           </div>
 
+          {/* Estimaciones (Ubicado directamente abajo de Contabilidad) */}
+          <div className="pt-1">
+            <button
+              onClick={() => setCurrentView("estimaciones")}
+              title={sidebarCollapsed ? "Estimaciones" : undefined}
+              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl transition cursor-pointer text-slate-700 hover:bg-slate-100 ${
+                currentView === "estimaciones"
+                  ? "bg-[#fff7ed] text-[#f6821f] font-semibold shadow-xs"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              <div className="flex items-center gap-3 truncate">
+                <svg className="w-4 h-4 shrink-0 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                </svg>
+                {!sidebarCollapsed && <span>Estimaciones</span>}
+              </div>
+              {!sidebarCollapsed && (
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-orange-100 text-[#f6821f] font-bold">
+                  Costos
+                </span>
+              )}
+            </button>
+          </div>
+
           {/* Ventas Collapsible Group */}
           <div className="pt-1">
             <button
@@ -7299,6 +7326,7 @@ export default function AdminDashboard() {
                   {currentView === "transacciones" && "Contabilidad / Transacciones Bancarias"}
                   {currentView === "caja-chica" && "Contabilidad / Arqueo & Control de Caja Chica"}
                   {currentView === "conciliacion-bancaria" && "Contabilidad / Conciliación de Extracto Mensual"}
+                  {currentView === "estimaciones" && "Costeo / Estimaciones Técnicas & Presupuestos"}
                   {currentView === "clientes" && "Directorio de Clientes"}
                   {currentView === "cotizaciones" && "Ventas / Cotizaciones & Presupuestos"}
                   {currentView === "pedidos-venta" && "Ventas / Pedidos de Venta (Sales Orders)"}
@@ -9701,6 +9729,26 @@ export default function AdminDashboard() {
             </div>
           )}
 
+          {/* ================= VIEW: ESTIMACIONES ================= */}
+          {currentView === "estimaciones" && (
+            <div className="animate-in fade-in duration-150 p-6">
+              <EstimatesModule
+                onBackToDashboard={() => setCurrentView("dashboard")}
+                inventory={inventory}
+                customers={customers}
+                accounts={accounts}
+                companySettings={companySettings}
+                formatCurrency={formatCurrency}
+                onEmitWorkOrder={(est) => {
+                  setEstimateForProduction(est);
+                  setProductionActiveTab("work-orders");
+                  setCurrentView("produccion");
+                }}
+                onNavigateToAccounts={() => setCurrentView("plan-cuentas")}
+              />
+            </div>
+          )}
+
           {/* ================= VIEW: PRODUCCIÓN Y ÓRDENES DE TRABAJO ================= */}
           {currentView === "produccion" && (
             <ProductionModule
@@ -9710,6 +9758,8 @@ export default function AdminDashboard() {
               formatCurrency={formatCurrency}
               activeTab={productionActiveTab}
               onTabChange={setProductionActiveTab}
+              initialEstimateForWO={estimateForProduction}
+              onClearInitialEstimate={() => setEstimateForProduction(null)}
             />
           )}
 

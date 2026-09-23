@@ -53,6 +53,8 @@ export async function POST(req: NextRequest) {
       assignedLotNumber,
       totalLaborCost = 0,
       totalOverheadCost = 0,
+      estimateId,
+      estimateNumber,
       items = [],
     } = body;
 
@@ -105,6 +107,8 @@ export async function POST(req: NextRequest) {
         totalOverheadCost: Number(totalOverheadCost) || 0,
         totalCost,
         unitCostFinal: Number(targetQuantity) > 0 ? totalCost / Number(targetQuantity) : 0,
+        estimateId: estimateId || null,
+        estimateNumber: estimateNumber || null,
         items: {
           create: (items || []).map((it: any) => ({
             rawMaterialId: it.rawMaterialId || null,
@@ -123,6 +127,27 @@ export async function POST(req: NextRequest) {
         bom: true,
       },
     });
+
+    // Actualizar estimación a EN_PRODUCCION si viene de una estimación
+    if (estimateId || estimateNumber) {
+      try {
+        await (prisma as any).estimate.updateMany({
+          where: {
+            OR: [
+              ...(estimateId ? [{ id: estimateId }] : []),
+              ...(estimateNumber ? [{ estimateNumber }] : []),
+            ],
+          },
+          data: {
+            status: "EN_PRODUCCION",
+            workOrderId: newWO.id,
+            workOrderNumber: newWO.orderNumber,
+          },
+        });
+      } catch (estErr) {
+        console.error("Error al actualizar estado de la estimación:", estErr);
+      }
+    }
 
     return NextResponse.json({ success: true, data: newWO });
   } catch (error: any) {
