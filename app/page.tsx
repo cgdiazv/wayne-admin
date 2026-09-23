@@ -199,7 +199,7 @@ type PurchaseInvoice = {
   createdAt?: string;
 };
 
-type NavItem = "dashboard" | "plan-cuentas" | "transacciones" | "conciliacion-bancaria" | "macola-sync" | "caja-chica" | "clientes" | "cotizaciones" | "pedidos-venta" | "proveedores" | "vendedores" | "comisiones" | "inventario" | "lotes" | "series" | "notas-credito-debito" | "reportes" | "configuracion" | "factura-editor" | "lista-facturas" | "lista-ordenes-compra" | "orden-compra-editor" | "factura-compra-lista" | "factura-compra-editor" | "deposito-bancario" | "recibir-pago" | "agregar-gasto" | "pagar-proveedor" | "pagos-proveedores" | "devoluciones-proveedor" | "antiguedad-saldos" | "antiguedad-saldos-proveedores" | "estado-cuenta-cliente" | "retenciones-isv";
+type NavItem = "dashboard" | "plan-cuentas" | "transacciones" | "conciliacion-bancaria" | "caja-chica" | "clientes" | "cotizaciones" | "pedidos-venta" | "proveedores" | "vendedores" | "comisiones" | "inventario" | "lotes" | "series" | "notas-credito-debito" | "reportes" | "configuracion" | "factura-editor" | "lista-facturas" | "lista-ordenes-compra" | "orden-compra-editor" | "factura-compra-lista" | "factura-compra-editor" | "deposito-bancario" | "recibir-pago" | "agregar-gasto" | "pagar-proveedor" | "pagos-proveedores" | "devoluciones-proveedor" | "antiguedad-saldos" | "antiguedad-saldos-proveedores" | "estado-cuenta-cliente" | "retenciones-isv";
 
 
 
@@ -372,6 +372,50 @@ export default function AdminDashboard() {
           quantity: 4000,
           rate: 2.18,
           amount: 8720,
+        },
+      ],
+    },
+    {
+      num: "1002",
+      date: "2026-09-12",
+      customer: "Cervecería Hondureña S.A.",
+      due: "2026-09-26",
+      total: 6340,
+      status: "Pendiente",
+      paymentTerms: "Neto 15",
+      lines: [
+        {
+          id: "line-1002-1",
+          serviceDate: "2026-09-12",
+          productId: "",
+          productName: "Etiquetas Termoencogibles Cerveza Barena 12oz",
+          sku: "LBL-BAR-012",
+          description: "Etiquetas termoencogibles de PVC impresas a 6 tintas",
+          quantity: 3170,
+          rate: 2.00,
+          amount: 6340,
+        },
+      ],
+    },
+    {
+      num: "0998",
+      date: "2026-08-18",
+      customer: "Distribuidora del Caribe",
+      due: "2026-09-18",
+      total: 3820,
+      status: "Pendiente",
+      paymentTerms: "Neto 30",
+      lines: [
+        {
+          id: "line-0998-1",
+          serviceDate: "2026-08-18",
+          productId: "",
+          productName: "Película Estirable Stretch Film Industrial",
+          sku: "ST-FLM-001",
+          description: "Rollos de película estirable transparente de 18 pulgadas",
+          quantity: 200,
+          rate: 19.10,
+          amount: 3820,
         },
       ],
     },
@@ -1361,7 +1405,15 @@ export default function AdminDashboard() {
             contadorColegiacion: res.data.contadorColegiacion || "Ninguno indicado",
             contadorTelefono: res.data.contadorTelefono || "Ninguno indicado",
             contadorEmail: res.data.contadorEmail || "Ninguno indicado",
+            monedaPrincipal: res.data.monedaPrincipal || "USD ($) Dólar estadounidense",
           });
+
+          if (res.data.monedaPrincipal) {
+            setMonedasSettings((prev) => ({
+              ...prev,
+              monedaPrincipal: res.data.monedaPrincipal,
+            }));
+          }
 
           if (res.data.logoUrl) {
             setCompanyLogo(res.data.logoUrl);
@@ -1549,6 +1601,7 @@ export default function AdminDashboard() {
     contadorColegiacion: "Ninguno indicado",
     contadorTelefono: "Ninguno indicado",
     contadorEmail: "Ninguno indicado",
+    monedaPrincipal: "USD ($) Dólar estadounidense",
   });
 
   // Report customization state (Configuración -> Reportes)
@@ -2527,6 +2580,9 @@ export default function AdminDashboard() {
         ...prev,
         [fieldKey]: updatedValue,
       }));
+      if (fieldKey === "monedaPrincipal") {
+        setMonedasSettings((prev) => ({ ...prev, monedaPrincipal: updatedValue }));
+      }
       setEditingConfigKey(null);
 
       // Persist in PostgreSQL database
@@ -5935,13 +5991,15 @@ export default function AdminDashboard() {
         throw new Error(data.error || "Error al registrar factura de compra");
       }
 
-      const [invRes, itemsRes] = await Promise.all([
+      const [invRes, itemsRes, accRes] = await Promise.all([
         fetch("/api/purchase-invoices").then((r) => r.json()),
         fetch("/api/inventory").then((r) => r.json()),
+        fetch("/api/accounts").then((r) => r.json()),
       ]);
 
       if (invRes.success) setPurchaseInvoices(invRes.data);
       if (itemsRes.success && Array.isArray(itemsRes.data)) setInventory(itemsRes.data);
+      if (accRes.success && Array.isArray(accRes.data)) setAccounts(accRes.data);
 
       setPurchaseInvoiceSuccess("Factura de Compra e Ingreso a Inventario registrado exitosamente.");
       setTimeout(() => {
@@ -6141,6 +6199,51 @@ export default function AdminDashboard() {
     return list.slice(0, 3);
   }, [purchaseInvoices, purchaseOrders]);
 
+  // Cobros pendientes (Upcoming Receivables from pending invoices)
+  const upcomingReceivables = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    return invoicesList
+      .filter((inv) => inv.status === "Pendiente" || inv.status === "Emitida")
+      .map((inv) => {
+        const dueDate = inv.due ? new Date(inv.due) : null;
+        const diffDays = dueDate
+          ? Math.ceil((dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+          : null;
+        let status: "VENCIDA" | "PROXIMO" | "PROGRAMADO" = "PROGRAMADO";
+        let daysLeft = "Programado";
+        if (diffDays !== null) {
+          if (diffDays < 0) {
+            status = "VENCIDA";
+            daysLeft = `Hace ${Math.abs(diffDays)} día${Math.abs(diffDays) === 1 ? "" : "s"}`;
+          } else if (diffDays === 0) {
+            status = "VENCIDA";
+            daysLeft = "Hoy";
+          } else if (diffDays <= 7) {
+            status = "PROXIMO";
+            daysLeft = `En ${diffDays} día${diffDays === 1 ? "" : "s"}`;
+          } else {
+            daysLeft = `En ${diffDays} días`;
+          }
+        }
+        return {
+          id: `inv-${inv.num}`,
+          customer: inv.customer,
+          concept: `Factura ${inv.num}`,
+          dueDate: dueDate
+            ? dueDate.toLocaleDateString("es-HN", { day: "2-digit", month: "short" })
+            : "—",
+          daysLeft,
+          amount: inv.total,
+          sortKey: dueDate ? dueDate.getTime() : Number.MAX_SAFE_INTEGER,
+          status,
+        };
+      })
+      .sort((a, b) => a.sortKey - b.sortKey)
+      .slice(0, 3);
+  }, [invoicesList]);
+
   // Global click-outside handler: closes ALL open dropdowns when clicking outside them
   useEffect(() => {
     const anyOpen =
@@ -6269,7 +6372,7 @@ export default function AdminDashboard() {
             <button
               onClick={() => setContabilidadOpen(!contabilidadOpen)}
               className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl transition cursor-pointer text-slate-700 hover:bg-slate-100 ${
-                currentView.includes("cuentas") || currentView === "transacciones" || currentView === "macola-sync" || currentView === "caja-chica" || currentView === "conciliacion-bancaria"
+                currentView.includes("cuentas") || currentView === "transacciones" || currentView === "caja-chica" || currentView === "conciliacion-bancaria"
                   ? "font-semibold text-slate-900"
                   : ""
               }`}
@@ -6327,16 +6430,6 @@ export default function AdminDashboard() {
                 >
                   <span>Conciliación extractos</span>
                   <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 font-bold">NIIF</span>
-                </button>
-                <button
-                  onClick={() => setCurrentView("macola-sync")}
-                  className={`w-full text-left px-2.5 py-1.5 rounded-lg transition cursor-pointer ${
-                    currentView === "macola-sync"
-                      ? "bg-[#fff7ed] text-[#f6821f] font-semibold"
-                      : "text-slate-500 hover:text-slate-900 hover:bg-slate-50"
-                  }`}
-                >
-                  Transacciones de integración
                 </button>
                 <button
                   onClick={() => setCurrentView("caja-chica")}
@@ -6766,7 +6859,6 @@ export default function AdminDashboard() {
                   {currentView === "dashboard" && "Resumen Ejecutivo"}
                   {currentView === "plan-cuentas" && "Contabilidad / Plan de Cuentas"}
                   {currentView === "transacciones" && "Contabilidad / Transacciones Bancarias"}
-                  {currentView === "macola-sync" && "Contabilidad / Transacciones de Integración"}
                   {currentView === "caja-chica" && "Contabilidad / Arqueo & Control de Caja Chica"}
                   {currentView === "conciliacion-bancaria" && "Contabilidad / Conciliación de Extracto Mensual"}
                   {currentView === "clientes" && "Directorio de Clientes"}
@@ -7215,20 +7307,72 @@ export default function AdminDashboard() {
                 </div>
 
                 <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs space-y-4">
-                  <h2 className="text-sm font-bold text-slate-900">Infraestructura del Sistema</h2>
-                  <div className="space-y-2.5 text-xs">
-                    <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between">
-                      <span className="text-slate-700 font-medium">Motor de Base de Datos</span>
-                      <span className="text-emerald-700 font-mono font-medium bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">PostgreSQL 17.6</span>
-                    </div>
-                    <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between">
-                      <span className="text-slate-700 font-medium">Cliente ORM</span>
-                      <span className="text-[#f6821f] font-mono font-medium bg-[#fff7ed] px-2 py-0.5 rounded border border-[#fed7aa]">Prisma 6.19.3</span>
-                    </div>
-                    <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between">
-                      <span className="text-slate-700 font-medium">Organización</span>
-                      <span className="text-slate-800 font-medium">Wayne Trademark Honduras</span>
-                    </div>
+                  {/* Header */}
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-sm font-bold text-slate-900">Cobros Pendientes</h2>
+                    <span
+                      className="text-xs text-[#f6821f] font-medium cursor-pointer hover:underline"
+                      onClick={() => setCurrentView("lista-facturas")}
+                    >
+                      Ver todo →
+                    </span>
+                  </div>
+
+                  {/* Receivables List */}
+                  <div className="space-y-2">
+                    {upcomingReceivables.length === 0 ? (
+                      <div className="py-8 text-center text-slate-400 text-xs">
+                        No hay facturas pendientes de cobro
+                      </div>
+                    ) : (
+                      upcomingReceivables.map((item) => (
+                        <div
+                          key={item.id}
+                          onClick={() => setCurrentView("lista-facturas")}
+                          className="p-3 rounded-xl bg-white border border-slate-200 hover:border-[#f6821f]/50 hover:bg-orange-50/20 hover:shadow-xs transition-all flex items-center justify-between gap-3 cursor-pointer group"
+                        >
+                          <div className="flex items-center gap-3 min-w-0">
+                            {/* Date Box */}
+                            <div className="px-2.5 py-1.5 rounded-lg bg-slate-100 group-hover:bg-orange-100/60 transition-colors text-center shrink-0 min-w-[54px]">
+                              <span className="block font-bold text-slate-800 text-[11px] leading-tight">
+                                {item.dueDate}
+                              </span>
+                              <span className="text-[9px] text-slate-500 font-medium block leading-none mt-0.5">
+                                {item.daysLeft}
+                              </span>
+                            </div>
+
+                            {/* Customer Info */}
+                            <div className="min-w-0">
+                              <p className="text-xs font-semibold text-slate-900 truncate group-hover:text-[#f6821f] transition-colors">
+                                {item.customer}
+                              </p>
+                              <p className="text-[11px] text-slate-500 truncate">
+                                {item.concept}
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* Amount and Status */}
+                          <div className="text-right shrink-0">
+                            <span className="block text-xs font-bold text-slate-900 font-mono">
+                              {formatCurrency(item.amount)}
+                            </span>
+                            <span
+                              className={`inline-block text-[9px] font-semibold px-2 py-0.5 rounded-full uppercase tracking-wider ${
+                                item.status === "VENCIDA"
+                                  ? "bg-rose-50 text-rose-700 border border-rose-200"
+                                  : item.status === "PROXIMO"
+                                  ? "bg-amber-50 text-amber-700 border border-amber-200"
+                                  : "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                              }`}
+                            >
+                              {item.status === "VENCIDA" ? "Vencida" : item.status === "PROXIMO" ? "Por cobrar" : "Programado"}
+                            </span>
+                          </div>
+                        </div>
+                      ))
+                    )}
                   </div>
                 </div>
               </div>
@@ -7880,59 +8024,7 @@ export default function AdminDashboard() {
             </div>
           )}
 
-          {/* ================= VIEW: TRANSACCIONES DE INTEGRACIÓN ================= */}
-          {currentView === "macola-sync" && (
-            <div className="space-y-4">
-              <button
-                type="button"
-                onClick={() => setCurrentView("dashboard")}
-                className="text-xs font-semibold text-slate-600 hover:text-slate-900 transition flex items-center gap-1.5 cursor-pointer w-fit"
-              >
-                <svg className="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
-                </svg>
-                <span>Regresar a Dashboard</span>
-              </button>
 
-              <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="font-bold text-base text-slate-900">Transacciones de Integración Macola</h2>
-                  <p className="text-xs text-slate-500">Historial y estado de sincronización de datos con Macola</p>
-                </div>
-                <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                  Sincronización Habilitada
-                </span>
-              </div>
-
-              <div className="space-y-3 text-xs">
-                <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between">
-                  <div>
-                    <span className="font-semibold text-slate-800 block">Sincronización de Clientes Macola</span>
-                    <span className="text-slate-500 text-[11px]">{customers.length} registros con código tracking</span>
-                  </div>
-                  <span className="text-emerald-700 font-medium">Sincronizado</span>
-                </div>
-
-                <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between">
-                  <div>
-                    <span className="font-semibold text-slate-800 block">Sincronización de Proveedores Macola</span>
-                    <span className="text-slate-500 text-[11px]">{vendors.length} registros con código tracking</span>
-                  </div>
-                  <span className="text-emerald-700 font-medium">Sincronizado</span>
-                </div>
-
-                <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between">
-                  <div>
-                    <span className="font-semibold text-slate-800 block">Catálogo Maestro de SKUs</span>
-                    <span className="text-slate-500 text-[11px]">{inventory.length} artículos enlazados</span>
-                  </div>
-                  <span className="text-emerald-700 font-medium">Sincronizado</span>
-                </div>
-              </div>
-            </div>
-            </div>
-          )}
 
           {/* ================= VIEW: CAJA CHICA & CONTROL DE ARQUEOS ================= */}
           {currentView === "caja-chica" && (
@@ -10450,7 +10542,19 @@ export default function AdminDashboard() {
                                   label: "Moneda principal del sistema",
                                   value: monedasSettings.monedaPrincipal,
                                   options: ["USD ($) Dólar estadounidense", "HNL (L) Lempira hondureño", "EUR (€) Euro"],
-                                  onSave: (val) => setMonedasSettings((prev) => ({ ...prev, monedaPrincipal: val })),
+                                  onSave: async (val) => {
+                                    setMonedasSettings((prev) => ({ ...prev, monedaPrincipal: val }));
+                                    setCompanySettings((prev) => ({ ...prev, monedaPrincipal: val }));
+                                    try {
+                                      await fetch("/api/company", {
+                                        method: "PUT",
+                                        headers: { "Content-Type": "application/json" },
+                                        body: JSON.stringify({ monedaPrincipal: val }),
+                                      });
+                                    } catch (err) {
+                                      console.error("Error saving monedaPrincipal to DB:", err);
+                                    }
+                                  },
                                 })
                               }
                               className="text-xs font-semibold text-[#f6821f] hover:underline cursor-pointer shrink-0"
@@ -13044,7 +13148,19 @@ export default function AdminDashboard() {
                                   label: "Moneda principal del sistema",
                                   value: monedasSettings.monedaPrincipal,
                                   options: ["USD ($) Dólar estadounidense", "HNL (L) Lempira hondureño", "EUR (€) Euro"],
-                                  onSave: (val) => setMonedasSettings((prev) => ({ ...prev, monedaPrincipal: val })),
+                                  onSave: async (val) => {
+                                    setMonedasSettings((prev) => ({ ...prev, monedaPrincipal: val }));
+                                    setCompanySettings((prev) => ({ ...prev, monedaPrincipal: val }));
+                                    try {
+                                      await fetch("/api/company", {
+                                        method: "PUT",
+                                        headers: { "Content-Type": "application/json" },
+                                        body: JSON.stringify({ monedaPrincipal: val }),
+                                      });
+                                    } catch (err) {
+                                      console.error("Error saving monedaPrincipal to DB:", err);
+                                    }
+                                  },
                                 })
                               }
                               className="text-[#f6821f] font-semibold hover:underline cursor-pointer shrink-0"
@@ -14886,8 +15002,24 @@ export default function AdminDashboard() {
                       <label className="block text-xs font-semibold text-slate-700 mb-1.5">{editingConfigLabel}</label>
                       {editingConfigKey === "rangoAutorizado" ? (
                         <div className="space-y-4">
+                          <div>
+                            <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                              Prefijo del Rango (Establecimiento - Punto de Emisión - Tipo)
+                            </label>
+                            <input
+                              type="text"
+                              value={rangoPrefijo}
+                              onChange={(e) => setRangoPrefijo(e.target.value)}
+                              placeholder="000-001-01-"
+                              className="w-full px-3 py-2 text-xs font-mono font-bold text-slate-900 bg-slate-50 border border-slate-300 rounded-xl focus:outline-none focus:border-[#f6821f]"
+                            />
+                            <span className="text-[10px] text-slate-400 mt-1 block">
+                              Ejemplo: 000-001-01- (o el código de establecimiento asignado por SAR)
+                            </span>
+                          </div>
+
                           <p className="text-[11px] text-slate-500 leading-relaxed">
-                            Ingresa los últimos <strong>8 dígitos</strong> de cada parte autorizada por el SAR (el prefijo fiscal se asigna automáticamente):
+                            Ingresa los <strong>8 dígitos</strong> de cada parte autorizada por el SAR:
                           </p>
 
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

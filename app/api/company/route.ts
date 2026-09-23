@@ -24,6 +24,7 @@ const DEFAULT_COMPANY_DATA = {
   contadorColegiacion: "Ninguno indicado",
   contadorTelefono: "Ninguno indicado",
   contadorEmail: "Ninguno indicado",
+  monedaPrincipal: "USD ($) Dólar estadounidense",
 };
 
 // GET /api/company - Retrieve official company settings
@@ -75,6 +76,7 @@ export async function PUT(request: NextRequest) {
       "contadorColegiacion",
       "contadorTelefono",
       "contadorEmail",
+      "monedaPrincipal",
       "logoUrl",
     ];
 

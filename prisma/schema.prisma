@@ -111,6 +111,7 @@ model CompanySettings {
   contadorColegiacion String?  @default("")
   contadorTelefono    String?  @default("")
   contadorEmail       String?  @default("")
+  monedaPrincipal     String?  @default("USD ($) Dólar estadounidense")
   logoUrl          String?  @db.Text
   updatedAt        DateTime @updatedAt
 }
