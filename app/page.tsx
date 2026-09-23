@@ -13944,11 +13944,6 @@ export default function AdminDashboard() {
                               <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-mono bg-emerald-50 text-emerald-700 border border-emerald-200">
                                 {dbTelemetry.latencyMs} ms
                               </span>
-                              {dbTelemetry.host && (
-                                <span className="text-[11px] text-slate-400 font-normal hidden sm:inline">
-                                  ({dbTelemetry.provider || "Supabase Cloud"})
-                                </span>
-                              )}
                             </div>
                             <div className="flex items-center gap-3 shrink-0">
                               <div className="flex items-center gap-1.5">
