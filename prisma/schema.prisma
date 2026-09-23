@@ -709,4 +709,34 @@ model BankReconciliationItem {
   @@index([isCleared])
 }
 
+model ReportSettings {
+  id                   String   @id @default("default")
+  // Encabezado
+  headerLogo           Boolean  @default(false)
+  headerPeriod         Boolean  @default(true)
+  headerLegalName      Boolean  @default(true)
+  headerAlignment      String   @default("Centro")
+  // Pie de página
+  footerDate           Boolean  @default(true)
+  footerTime           Boolean  @default(false)
+  footerMethod         Boolean  @default(true)
+  footerAlignment      String   @default("Centro")
+  // Número y Divisa
+  divideBy1000         Boolean  @default(false)
+  hideZeroAmounts      Boolean  @default(false)
+  hideCurrencySymbol   Boolean  @default(false)
+  negativeNumberFormat String   @default("-100") // "-100", "(100)", "-$100", "100-"
+  negativeInRed        Boolean  @default(false)
+  decimalMode          String   @default("decimals") // "decimals" | "round"
+  decimalPlaces        Int      @default(2)
+  // Formato y Cuadrícula
+  gridBorderSetting    String   @default("Predeterminado")
+  emptyCellFormat      String   @default("hyphen") // "hyphen" | "zero" | "blank"
+  expandSubaccounts    Boolean  @default(true)
+  showGroupTotals      Boolean  @default(true)
+  compactView          Boolean  @default(true)
+  wrapText             Boolean  @default(true)
+  updatedAt            DateTime @updatedAt
+}
+
 

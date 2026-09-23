@@ -1476,6 +1476,40 @@ export default function AdminDashboard() {
         }
       })
       .catch((err) => console.error("Error loading purchase invoices from DB:", err));
+
+    // 8. Load report customization settings from PostgreSQL database
+    fetch("/api/reports/settings")
+      .then((res) => res.json())
+      .then((res) => {
+        if (res.success && res.data) {
+          const d = res.data;
+          setReportHeaderLogo(!!d.headerLogo);
+          setReportHeaderPeriod(d.headerPeriod !== undefined ? !!d.headerPeriod : true);
+          setReportHeaderLegalName(d.headerLegalName !== undefined ? !!d.headerLegalName : true);
+          if (d.headerAlignment) setReportHeaderAlignment(d.headerAlignment as any);
+
+          setReportFooterDate(d.footerDate !== undefined ? !!d.footerDate : true);
+          setReportFooterTime(!!d.footerTime);
+          setReportFooterMethod(d.footerMethod !== undefined ? !!d.footerMethod : true);
+          if (d.footerAlignment) setReportFooterAlignment(d.footerAlignment as any);
+
+          setReportDivideBy1000(!!d.divideBy1000);
+          setReportHideZeroAmounts(!!d.hideZeroAmounts);
+          setReportHideCurrencySymbol(!!d.hideCurrencySymbol);
+          if (d.negativeNumberFormat) setReportNegativeNumberFormat(d.negativeNumberFormat);
+          setReportNegativeInRed(!!d.negativeInRed);
+          if (d.decimalMode) setReportDecimalMode(d.decimalMode as any);
+          if (typeof d.decimalPlaces === "number") setReportDecimalPlaces(d.decimalPlaces);
+
+          if (d.gridBorderSetting) setGridBorderSetting(d.gridBorderSetting);
+          if (d.emptyCellFormat) setReportEmptyCellFormat(d.emptyCellFormat);
+          setReportExpandSubaccounts(d.expandSubaccounts !== undefined ? !!d.expandSubaccounts : true);
+          setReportShowGroupTotals(d.showGroupTotals !== undefined ? !!d.showGroupTotals : true);
+          setReportCompactView(d.compactView !== undefined ? !!d.compactView : true);
+          setReportWrapText(d.wrapText !== undefined ? !!d.wrapText : true);
+        }
+      })
+      .catch((err) => console.error("Error loading report settings from DB:", err));
   }, []);
 
 
@@ -1643,6 +1677,51 @@ export default function AdminDashboard() {
   const [reportCompactView, setReportCompactView] = useState(true);
   const [reportWrapText, setReportWrapText] = useState(true);
   const [reportSavedNotification, setReportSavedNotification] = useState(false);
+  const [reportSaving, setReportSaving] = useState(false);
+
+  const handleSaveReportSettings = async () => {
+    setReportSaving(true);
+    const payload = {
+      headerLogo: reportHeaderLogo,
+      headerPeriod: reportHeaderPeriod,
+      headerLegalName: reportHeaderLegalName,
+      headerAlignment: reportHeaderAlignment,
+      footerDate: reportFooterDate,
+      footerTime: reportFooterTime,
+      footerMethod: reportFooterMethod,
+      footerAlignment: reportFooterAlignment,
+      divideBy1000: reportDivideBy1000,
+      hideZeroAmounts: reportHideZeroAmounts,
+      hideCurrencySymbol: reportHideCurrencySymbol,
+      negativeNumberFormat: reportNegativeNumberFormat,
+      negativeInRed: reportNegativeInRed,
+      decimalMode: reportDecimalMode,
+      decimalPlaces: reportDecimalPlaces,
+      gridBorderSetting: gridBorderSetting,
+      emptyCellFormat: reportEmptyCellFormat,
+      expandSubaccounts: reportExpandSubaccounts,
+      showGroupTotals: reportShowGroupTotals,
+      compactView: reportCompactView,
+      wrapText: reportWrapText,
+    };
+
+    try {
+      const res = await fetch("/api/reports/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setReportSavedNotification(true);
+        setTimeout(() => setReportSavedNotification(false), 4000);
+      }
+    } catch (err) {
+      console.error("Error saving report settings to DB:", err);
+    } finally {
+      setReportSaving(false);
+    }
+  };
 
   const formatReportAmount = (amount: number) => {
     if (amount === 0) {
@@ -1672,7 +1751,7 @@ export default function AdminDashboard() {
             maximumFractionDigits: reportDecimalPlaces,
           });
 
-    const curr = reportHideCurrencySymbol ? "" : "$";
+    const curr = reportHideCurrencySymbol ? "" : (defaultCurrencySymbol || "$");
 
     if (!isNegative) {
       return `${curr}${formattedNumber}`;
@@ -7383,6 +7462,7 @@ export default function AdminDashboard() {
           {currentView === "plan-cuentas" && (
             <AccountingBooksModule
               accounts={accounts}
+              formatCurrency={formatReportAmount}
               onRefreshAccounts={async () => {
                 const res = await fetch("/api/accounts").then((r) => r.json());
                 if (res.success) setAccounts(res.data || []);
@@ -7408,7 +7488,6 @@ export default function AdminDashboard() {
               }}
               onOpenEditAccount={(acc) => handleOpenEditAccount(acc)}
               onBackToDashboard={() => setCurrentView("dashboard")}
-              formatCurrency={formatCurrency}
             />
           )}
 
@@ -10091,16 +10170,27 @@ export default function AdminDashboard() {
 
               <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-5">
-                  <div>
-                    <h2 className="font-bold text-base text-slate-900">Centro de Reportes</h2>
-                    <p className="text-xs text-slate-500 mt-0.5">Informes financieros, contables y operativos de Wayne Trademark Honduras</p>
+                  <div className={`flex items-center gap-4 ${reportHeaderAlignment === "Centro" ? "sm:mx-auto text-center flex-col sm:flex-row" : reportHeaderAlignment === "Derecha" ? "sm:ml-auto text-right flex-row-reverse" : "text-left"}`}>
+                    {reportHeaderLogo && companyLogo && (
+                      <img src={companyLogo} alt="Logo" className="max-h-12 max-w-[160px] object-contain rounded-lg shrink-0" />
+                    )}
+                    <div>
+                      <h2 className="font-bold text-base text-slate-900">
+                        {reportHeaderLegalName ? companySettings.nombreLegal : "Centro de Reportes"}
+                      </h2>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        {reportHeaderLegalName ? "Centro de Reportes Financieros y Contables" : "Informes financieros, contables y operativos de Wayne Trademark Honduras"}
+                      </p>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-slate-500 font-medium">Período fiscal:</span>
-                    <span className="px-3 py-1.5 rounded-lg bg-slate-100 text-slate-800 text-xs font-semibold border border-slate-200">
-                      Año 2026 (Actual)
-                    </span>
-                  </div>
+                  {reportHeaderPeriod && (
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="text-xs text-slate-500 font-medium">Período fiscal:</span>
+                      <span className="px-3 py-1.5 rounded-lg bg-slate-100 text-slate-800 text-xs font-semibold border border-slate-200">
+                        Año 2026 (Actual)
+                      </span>
+                    </div>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 pt-5">
@@ -10238,6 +10328,28 @@ export default function AdminDashboard() {
                     </div>
                   </div>
                 </div>
+
+                {/* Report Customization Footer */}
+                {(reportFooterDate || reportFooterTime || reportFooterMethod) && (
+                  <div
+                    className={`mt-6 pt-4 border-t border-slate-100 text-[11px] text-slate-500 flex flex-col gap-1 ${
+                      reportFooterAlignment === "Centro"
+                        ? "items-center text-center"
+                        : reportFooterAlignment === "Derecha"
+                        ? "items-end text-right"
+                        : "items-start text-left"
+                    }`}
+                  >
+                    <div>
+                      {reportFooterDate && <span>Fecha de preparación: {new Date().toLocaleDateString("es-HN")}</span>}
+                      {reportFooterDate && reportFooterTime && <span> | </span>}
+                      {reportFooterTime && <span>Hora: {new Date().toLocaleTimeString("es-HN")}</span>}
+                    </div>
+                    {reportFooterMethod && (
+                      <div>Método contable: Criterio de devengo (Acumulación SAR)</div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -10326,7 +10438,7 @@ export default function AdminDashboard() {
                 const found = customers.find((c) => c.name.toLowerCase() === custName.toLowerCase());
                 openRecibirPagoView(found?.id);
               }}
-              formatCurrency={formatCurrency}
+              formatCurrency={formatReportAmount}
             />
           )}
 
@@ -11586,20 +11698,31 @@ export default function AdminDashboard() {
                       <div className="mt-8 pt-4 border-t border-slate-200 flex items-center justify-between">
                         <div>
                           {reportSavedNotification && (
-                            <span className="text-xs font-semibold text-emerald-600 animate-in fade-in">
-                              ✓ Configuración de reportes guardada
+                            <span className="text-xs font-semibold text-emerald-600 animate-in fade-in flex items-center gap-1.5">
+                              <svg className="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                              </svg>
+                              <span>Configuración de reportes guardada exitosamente en la base de datos</span>
                             </span>
                           )}
                         </div>
                         <button
                           type="button"
-                          onClick={() => {
-                            setReportSavedNotification(true);
-                            setTimeout(() => setReportSavedNotification(false), 3000);
-                          }}
-                          className="px-6 py-2 rounded-xl text-xs font-semibold text-white bg-[#f6821f] hover:bg-[#e07216] transition cursor-pointer shadow-xs"
+                          disabled={reportSaving}
+                          onClick={handleSaveReportSettings}
+                          className="px-6 py-2 rounded-xl text-xs font-semibold text-white bg-[#f6821f] hover:bg-[#e07216] transition cursor-pointer shadow-xs disabled:opacity-50 flex items-center gap-2"
                         >
-                          Guardar
+                          {reportSaving ? (
+                            <>
+                              <svg className="animate-spin w-3.5 h-3.5" viewBox="0 0 24 24">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+                              </svg>
+                              <span>Guardando...</span>
+                            </>
+                          ) : (
+                            <span>Guardar</span>
+                          )}
                         </button>
                       </div>
                     </div>

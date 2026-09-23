@@ -59,7 +59,8 @@ export const prisma: PrismaClient = new Proxy({} as PrismaClient, {
       !(globalForPrisma.prisma as any).vendorPayment ||
       !(globalForPrisma.prisma as any).purchaseOrder ||
       !(globalForPrisma.prisma as any).bankReconciliation ||
-      !(globalForPrisma.prisma as any).salesOrder
+      !(globalForPrisma.prisma as any).salesOrder ||
+      !(globalForPrisma.prisma as any).reportSettings
     ) {
       globalForPrisma.prisma = createClient();
     }
