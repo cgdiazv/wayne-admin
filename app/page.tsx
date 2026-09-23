@@ -1418,11 +1418,15 @@ export default function AdminDashboard() {
             });
           }
 
-          if (res.data.monedaPrincipal) {
-            setMonedasSettings((prev) => ({
-              ...prev,
-              monedaPrincipal: res.data.monedaPrincipal,
-            }));
+          if (res.data.monedaPrincipal || res.data.multidivisa) {
+            setMonedasSettings({
+              monedaPrincipal: res.data.monedaPrincipal || "USD ($) Dólar estadounidense",
+              multidivisa: res.data.multidivisa || "Activado (USD, HNL)",
+              bancoPrincipal: res.data.bancoPrincipal || "Banco Ficohsa (Cuenta de cheques empresarial USD)",
+              transferenciasAch: res.data.transferenciasAch || "Habilitadas",
+              tasaCambioHnl: typeof res.data.tasaCambioHnl === "number" ? res.data.tasaCambioHnl : 24.85,
+              tasaCambioEur: typeof res.data.tasaCambioEur === "number" ? res.data.tasaCambioEur : 1.08,
+            });
           }
 
           if (res.data.logoUrl) {
@@ -1933,28 +1937,40 @@ export default function AdminDashboard() {
     multidivisa: string;
     bancoPrincipal: string;
     transferenciasAch: string;
+    tasaCambioHnl: number;
+    tasaCambioEur: number;
   }
 
-  const [monedasSettings, setMonedasSettings] = useState<MonedasSettingsState>(() => {
-    if (typeof window !== "undefined") {
-      try {
-        const saved = localStorage.getItem("wayne_monedas_settings");
-        if (saved) return JSON.parse(saved) as MonedasSettingsState;
-      } catch {}
-    }
-    return {
-      monedaPrincipal: "USD ($) Dólar estadounidense",
-      multidivisa: "Activado (USD, HNL)",
-      bancoPrincipal: "Banco Ficohsa (Cuenta de cheques empresarial USD)",
-      transferenciasAch: "Habilitadas",
-    };
+  const [monedasSettings, setMonedasSettings] = useState<MonedasSettingsState>({
+    monedaPrincipal: "USD ($) Dólar estadounidense",
+    multidivisa: "Activado (USD, HNL)",
+    bancoPrincipal: "Banco Ficohsa (Cuenta de cheques empresarial USD)",
+    transferenciasAch: "Habilitadas",
+    tasaCambioHnl: 24.85,
+    tasaCambioEur: 1.08,
   });
+  const [monedasSavedNotification, setMonedasSavedNotification] = useState(false);
 
-  useEffect(() => {
+  const handleSaveMonedasParam = async (field: string, value: any) => {
+    setMonedasSettings((prev) => ({ ...prev, [field]: value }));
+    if (field === "monedaPrincipal") {
+      setCompanySettings((prev) => ({ ...prev, monedaPrincipal: value }));
+    }
     try {
-      localStorage.setItem("wayne_monedas_settings", JSON.stringify(monedasSettings));
-    } catch {}
-  }, [monedasSettings]);
+      const res = await fetch("/api/company", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ [field]: value }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setMonedasSavedNotification(true);
+        setTimeout(() => setMonedasSavedNotification(false), 3500);
+      }
+    } catch (err) {
+      console.error("Error saving currency parameter to DB:", err);
+    }
+  };
 
   const defaultCurrencySymbol = useMemo(() => {
     const main = monedasSettings?.monedaPrincipal || "";
@@ -13301,11 +13317,30 @@ export default function AdminDashboard() {
                   {/* SUBTAB 8: MONEDAS */}
                   {configSubTab === "monedas" && (
                     <div className="max-w-3xl space-y-6">
+                      {/* Notification banner */}
+                      {monedasSavedNotification && (
+                        <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs rounded-xl flex items-center justify-between animate-in fade-in duration-200">
+                          <div className="flex items-center gap-2">
+                            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                            <span className="font-semibold">Configuración de monedas y cuentas bancarias guardada y sincronizada en la base de datos.</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setMonedasSavedNotification(false)}
+                            className="text-emerald-500 hover:text-emerald-700 cursor-pointer font-bold ml-2"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      )}
+
+                      {/* Card 1: Parámetros Generales de Monedas */}
                       <div className="border border-slate-200 rounded-xl p-5 bg-white shadow-xs">
                         <h2 className="font-bold text-sm text-slate-900 mb-1">Cuentas Bancarias y Monedas</h2>
-                        <p className="text-xs text-slate-500 mb-4">Gestión de cuentas institucionales y multidivisa.</p>
+                        <p className="text-xs text-slate-500 mb-4">Gestión de moneda principal, multidivisa y operativa bancaria.</p>
 
                         <div className="divide-y divide-slate-100 text-xs">
+                          {/* Moneda Principal */}
                           <div className="py-3 flex items-center justify-between gap-4">
                             <span className="w-80 font-semibold text-slate-800 shrink-0 text-left">Moneda principal del sistema</span>
                             <span className="flex-1 text-slate-700 font-semibold text-left">{monedasSettings.monedaPrincipal}</span>
@@ -13317,19 +13352,7 @@ export default function AdminDashboard() {
                                   label: "Moneda principal del sistema",
                                   value: monedasSettings.monedaPrincipal,
                                   options: ["USD ($) Dólar estadounidense", "HNL (L) Lempira hondureño", "EUR (€) Euro"],
-                                  onSave: async (val) => {
-                                    setMonedasSettings((prev) => ({ ...prev, monedaPrincipal: val }));
-                                    setCompanySettings((prev) => ({ ...prev, monedaPrincipal: val }));
-                                    try {
-                                      await fetch("/api/company", {
-                                        method: "PUT",
-                                        headers: { "Content-Type": "application/json" },
-                                        body: JSON.stringify({ monedaPrincipal: val }),
-                                      });
-                                    } catch (err) {
-                                      console.error("Error saving monedaPrincipal to DB:", err);
-                                    }
-                                  },
+                                  onSave: (val) => handleSaveMonedasParam("monedaPrincipal", val),
                                 })
                               }
                               className="text-[#f6821f] font-semibold hover:underline cursor-pointer shrink-0"
@@ -13337,6 +13360,8 @@ export default function AdminDashboard() {
                               Editar
                             </button>
                           </div>
+
+                          {/* Multidivisa */}
                           <div className="py-3 flex items-center justify-between gap-4">
                             <span className="w-80 font-semibold text-slate-800 shrink-0 text-left">Multidivisa</span>
                             <span className="flex-1 text-emerald-700 font-semibold text-left">{monedasSettings.multidivisa}</span>
@@ -13347,8 +13372,8 @@ export default function AdminDashboard() {
                                   title: "Multidivisa",
                                   label: "Configuración multidivisa",
                                   value: monedasSettings.multidivisa,
-                                  options: ["Activado (USD, HNL)", "Desactivado"],
-                                  onSave: (val) => setMonedasSettings((prev) => ({ ...prev, multidivisa: val })),
+                                  options: ["Activado (USD, HNL)", "Desactivado", "Multidivisa Completa (USD, HNL, EUR)"],
+                                  onSave: (val) => handleSaveMonedasParam("multidivisa", val),
                                 })
                               }
                               className="text-[#f6821f] font-semibold hover:underline cursor-pointer shrink-0"
@@ -13356,6 +13381,8 @@ export default function AdminDashboard() {
                               Editar
                             </button>
                           </div>
+
+                          {/* Banco Principal */}
                           <div className="py-3 flex items-center justify-between gap-4">
                             <span className="w-80 font-semibold text-slate-800 shrink-0 text-left">Banco de operaciones principal</span>
                             <span className="flex-1 text-slate-700 text-left">{monedasSettings.bancoPrincipal}</span>
@@ -13375,7 +13402,7 @@ export default function AdminDashboard() {
                                   label: "Banco de operaciones principal",
                                   value: monedasSettings.bancoPrincipal,
                                   options: bankOptions,
-                                  onSave: (val) => setMonedasSettings((prev) => ({ ...prev, bancoPrincipal: val })),
+                                  onSave: (val) => handleSaveMonedasParam("bancoPrincipal", val),
                                 });
                               }}
                               className="text-[#f6821f] font-semibold hover:underline cursor-pointer shrink-0"
@@ -13383,6 +13410,8 @@ export default function AdminDashboard() {
                               Editar
                             </button>
                           </div>
+
+                          {/* Transferencias ACH */}
                           <div className="py-3 flex items-center justify-between gap-4">
                             <span className="w-80 font-semibold text-slate-800 shrink-0 text-left">Transferencias ACH Interbancarias</span>
                             <span className="flex-1 text-emerald-700 font-semibold text-left">{monedasSettings.transferenciasAch}</span>
@@ -13394,7 +13423,7 @@ export default function AdminDashboard() {
                                   label: "Transferencias ACH Interbancarias",
                                   value: monedasSettings.transferenciasAch,
                                   options: ["Habilitadas", "Deshabilitadas"],
-                                  onSave: (val) => setMonedasSettings((prev) => ({ ...prev, transferenciasAch: val })),
+                                  onSave: (val) => handleSaveMonedasParam("transferenciasAch", val),
                                 })
                               }
                               className="text-[#f6821f] font-semibold hover:underline cursor-pointer shrink-0"
@@ -13403,6 +13432,151 @@ export default function AdminDashboard() {
                             </button>
                           </div>
                         </div>
+                      </div>
+
+                      {/* Card 2: Tipos de Cambio Oficiales (Multidivisa) */}
+                      <div className="border border-slate-200 rounded-xl p-5 bg-white shadow-xs">
+                        <div className="flex items-center justify-between mb-1">
+                          <h2 className="font-bold text-sm text-slate-900">Tipos de Cambio Oficiales (Multidivisa)</h2>
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
+                            Banco Central de Honduras
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-500 mb-4">
+                          Tasas de referencia para conversión automática en facturas de venta, compras a proveedores y asientos por diferencial cambiario (Cuenta 4400).
+                        </p>
+
+                        <div className="divide-y divide-slate-100 text-xs">
+                          {/* Tasa BCH USD / HNL */}
+                          <div className="py-3 flex items-center justify-between gap-4">
+                            <div>
+                              <span className="font-semibold text-slate-800 block text-left">Tasa de Cambio BCH: USD → HNL (Lempiras)</span>
+                              <span className="text-[11px] text-slate-400 block text-left">Tipo de cambio de referencia oficial SAR / Banco Central</span>
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <span className="font-mono font-bold text-slate-900 text-xs bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-200">
+                                L {monedasSettings.tasaCambioHnl.toFixed(2)} por $1.00 USD
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setParamEditModal({
+                                    title: "Tasa de Cambio USD / HNL",
+                                    label: "Tasa oficial BCH (Lempiras por Dólar)",
+                                    value: String(monedasSettings.tasaCambioHnl),
+                                    onSave: (val) => handleSaveMonedasParam("tasaCambioHnl", parseFloat(val) || 24.85),
+                                  })
+                                }
+                                className="text-[#f6821f] font-semibold hover:underline cursor-pointer shrink-0"
+                              >
+                                Editar Tasa
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Tasa USD / EUR */}
+                          <div className="py-3 flex items-center justify-between gap-4">
+                            <div>
+                              <span className="font-semibold text-slate-800 block text-left">Tasa Referencial: USD → EUR (Euros)</span>
+                              <span className="text-[11px] text-slate-400 block text-left">Paridad de cambio para transacciones internacionales en Euros</span>
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <span className="font-mono font-bold text-slate-900 text-xs bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-200">
+                                € {monedasSettings.tasaCambioEur.toFixed(2)} por $1.00 USD
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setParamEditModal({
+                                    title: "Tasa Referencial USD / EUR",
+                                    label: "Tasa de cambio EUR por Dólar estadounidense",
+                                    value: String(monedasSettings.tasaCambioEur),
+                                    onSave: (val) => handleSaveMonedasParam("tasaCambioEur", parseFloat(val) || 1.08),
+                                  })
+                                }
+                                className="text-[#f6821f] font-semibold hover:underline cursor-pointer shrink-0"
+                              >
+                                Editar Tasa
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Card 3: Cuentas Bancarias Registradas en Base de Datos */}
+                      <div className="border border-slate-200 rounded-xl p-5 bg-white shadow-xs">
+                        <div className="flex items-center justify-between mb-1">
+                          <h2 className="font-bold text-sm text-slate-900">Cuentas Bancarias Vinculadas ({connectedBanks.length})</h2>
+                          <button
+                            type="button"
+                            onClick={() => setShowConnectBankModal(true)}
+                            className="px-3 py-1.5 rounded-lg bg-[#f6821f] hover:bg-[#e07216] text-white text-xs font-semibold cursor-pointer transition shadow-xs flex items-center gap-1.5"
+                          >
+                            <span>+ Registrar cuenta bancaria</span>
+                          </button>
+                        </div>
+                        <p className="text-xs text-slate-500 mb-4">
+                          Cuentas oficiales de cheques y ahorros habilitadas para cobros, pagos a proveedores y transferencias.
+                        </p>
+
+                        {connectedBanks.length === 0 ? (
+                          <div className="p-6 text-center border border-dashed border-slate-200 rounded-xl bg-slate-50 text-xs text-slate-500">
+                            No hay cuentas bancarias registradas en la base de datos.
+                          </div>
+                        ) : (
+                          <div className="overflow-x-auto border border-slate-200 rounded-xl">
+                            <table className="w-full text-left text-xs divide-y divide-slate-100">
+                              <thead className="bg-slate-50 text-slate-700 font-bold">
+                                <tr>
+                                  <th className="p-2.5">Banco / Institución</th>
+                                  <th className="p-2.5">Tipo & Cuenta</th>
+                                  <th className="p-2.5">Moneda</th>
+                                  <th className="p-2.5 text-right">Saldo Bancario</th>
+                                  <th className="p-2.5 text-center">Estado</th>
+                                  <th className="p-2.5 text-right">Acción</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-100">
+                                {connectedBanks.map((b) => (
+                                  <tr key={b.id} className="hover:bg-slate-50/80 transition-colors">
+                                    <td className="p-2.5 font-bold text-slate-800">{b.name}</td>
+                                    <td className="p-2.5 text-slate-600 font-mono">
+                                      <span className="block text-[11px] font-sans text-slate-500">{b.type}</span>
+                                      <span>{b.accountNumber}</span>
+                                    </td>
+                                    <td className="p-2.5">
+                                      <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                        b.currency === "USD"
+                                          ? "bg-blue-50 text-blue-700 border border-blue-200"
+                                          : "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                      }`}>
+                                        {b.currency === "USD" ? "$ USD" : "L HNL"}
+                                      </span>
+                                    </td>
+                                    <td className="p-2.5 text-right font-mono font-bold text-slate-900">
+                                      {b.currency === "USD" ? "$" : "L "}{(b.bankBalance || 0).toLocaleString("es-HN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    </td>
+                                    <td className="p-2.5 text-center">
+                                      <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                                        <span>{b.status || "Conectado"}</span>
+                                      </span>
+                                    </td>
+                                    <td className="p-2.5 text-right">
+                                      <button
+                                        type="button"
+                                        onClick={() => setEditingBank(b)}
+                                        className="text-[#f6821f] font-semibold hover:underline cursor-pointer"
+                                      >
+                                        Editar
+                                      </button>
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
                       </div>
                     </div>
                   )}

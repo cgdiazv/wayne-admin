@@ -118,6 +118,12 @@ model CompanySettings {
   metodoContabilidad  String?  @default("Criterio de devengo")
   cierreLibros        String?  @default("Desactivado (Periodo 2026 abierto)")
   numerosCuenta       String?  @default("Activado")
+  // Parámetros de Monedas y Cuentas Bancarias
+  multidivisa         String?  @default("Activado (USD, HNL)")
+  bancoPrincipal      String?  @default("Banco Ficohsa (Cuenta de cheques empresarial USD)")
+  transferenciasAch   String?  @default("Habilitadas")
+  tasaCambioHnl       Float?   @default(24.85)
+  tasaCambioEur       Float?   @default(1.08)
   logoUrl          String?  @db.Text
   updatedAt        DateTime @updatedAt
 }

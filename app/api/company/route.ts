@@ -31,6 +31,12 @@ const DEFAULT_COMPANY_DATA = {
   metodoContabilidad: "Criterio de devengo",
   cierreLibros: "Desactivado (Periodo 2026 abierto)",
   numerosCuenta: "Activado",
+  // Parámetros de Monedas y Cuentas Bancarias
+  multidivisa: "Activado (USD, HNL)",
+  bancoPrincipal: "Banco Ficohsa (Cuenta de cheques empresarial USD)",
+  transferenciasAch: "Habilitadas",
+  tasaCambioHnl: 24.85,
+  tasaCambioEur: 1.08,
 };
 
 // GET /api/company - Retrieve official company settings
@@ -89,12 +95,21 @@ export async function PUT(request: NextRequest) {
       "metodoContabilidad",
       "cierreLibros",
       "numerosCuenta",
+      "multidivisa",
+      "bancoPrincipal",
+      "transferenciasAch",
+      "tasaCambioHnl",
+      "tasaCambioEur",
     ];
 
-    const updateData: Record<string, string | null> = {};
+    const updateData: Record<string, any> = {};
     for (const field of allowedFields) {
       if (field in body) {
-        updateData[field] = body[field];
+        if (field === "tasaCambioHnl" || field === "tasaCambioEur") {
+          updateData[field] = typeof body[field] === "number" ? body[field] : parseFloat(body[field]) || 0;
+        } else {
+          updateData[field] = body[field];
+        }
       }
     }
 
