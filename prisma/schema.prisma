@@ -124,6 +124,10 @@ model CompanySettings {
   transferenciasAch   String?  @default("Habilitadas")
   tasaCambioHnl       Float?   @default(24.85)
   tasaCambioEur       Float?   @default(1.08)
+  // Parámetros Avanzados del Sistema
+  zonaHoraria                 String?  @default("(GMT-06:00) Hora estándar central (Honduras)")
+  idioma                      String?  @default("Español (Latinoamérica)")
+  cierreSesionInactividad     String?  @default("3 horas")
   logoUrl          String?  @db.Text
   updatedAt        DateTime @updatedAt
 }

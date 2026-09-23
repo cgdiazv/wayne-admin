@@ -1429,6 +1429,14 @@ export default function AdminDashboard() {
             });
           }
 
+          if (res.data.zonaHoraria || res.data.idioma || res.data.cierreSesionInactividad) {
+            setAvanzadasSettings({
+              zonaHoraria: res.data.zonaHoraria || "(GMT-06:00) Hora estándar central (Honduras)",
+              idioma: res.data.idioma || "Español (Latinoamérica)",
+              cierreSesionInactividad: res.data.cierreSesionInactividad || "3 horas",
+            });
+          }
+
           if (res.data.logoUrl) {
             setCompanyLogo(res.data.logoUrl);
             try {
@@ -1440,6 +1448,9 @@ export default function AdminDashboard() {
         }
       })
       .catch((err) => console.error("Error loading company settings from DB:", err));
+
+    // Load dynamic real-time DB telemetry
+    fetchDbTelemetry();
 
     // 3. Load inventory items from database
     fetch("/api/inventory")
@@ -1985,6 +1996,73 @@ export default function AdminDashboard() {
     idioma: "Español (Latinoamérica)",
     cierreSesionInactividad: "3 horas",
   });
+  const [avanzadasSavedNotification, setAvanzadasSavedNotification] = useState(false);
+
+  // Dynamic Database Telemetry
+  interface DbTelemetryState {
+    engine: string;
+    version: string;
+    rawVersion?: string;
+    status: string;
+    latencyMs: number;
+    host?: string;
+    provider?: string;
+    checkedAt?: string;
+    loading: boolean;
+  }
+  const [dbTelemetry, setDbTelemetry] = useState<DbTelemetryState>({
+    engine: "PostgreSQL 17.6 Enterprise",
+    version: "17.6",
+    status: "Conectada",
+    latencyMs: 38,
+    host: "aws-0-us-west-2.pooler.supabase.com",
+    provider: "Supabase Cloud (PostgreSQL)",
+    loading: false,
+  });
+
+  const fetchDbTelemetry = async () => {
+    setDbTelemetry((prev) => ({ ...prev, loading: true }));
+    try {
+      const res = await fetch("/api/system/database");
+      const json = await res.json();
+      if (json.success && json.data) {
+        setDbTelemetry({
+          ...json.data,
+          loading: false,
+        });
+      } else {
+        setDbTelemetry((prev) => ({
+          ...prev,
+          status: "Error de conexión",
+          loading: false,
+        }));
+      }
+    } catch {
+      setDbTelemetry((prev) => ({
+        ...prev,
+        status: "Desconectada",
+        loading: false,
+      }));
+    }
+  };
+
+  const handleSaveAvanzadasParam = async (field: string, value: string) => {
+    setAvanzadasSettings((prev) => ({ ...prev, [field]: value }));
+    try {
+      const res = await fetch("/api/company", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ [field]: value }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setAvanzadasSavedNotification(true);
+        setTimeout(() => setAvanzadasSavedNotification(false), 3500);
+      }
+    } catch (err) {
+      console.error("Error saving advanced parameter to DB:", err);
+    }
+  };
 
   // Generic Edit Modal State for parameter subtabs
   const [paramEditModal, setParamEditModal] = useState<{
@@ -13745,11 +13823,29 @@ export default function AdminDashboard() {
                   {/* SUBTAB 9: AVANZADAS */}
                   {configSubTab === "avanzadas" && (
                     <div className="max-w-3xl space-y-6">
+                      {/* Notification banner */}
+                      {avanzadasSavedNotification && (
+                        <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs rounded-xl flex items-center justify-between animate-in fade-in duration-200">
+                          <div className="flex items-center gap-2">
+                            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                            <span className="font-semibold">Parámetros avanzados guardados y sincronizados en la base de datos.</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setAvanzadasSavedNotification(false)}
+                            className="text-emerald-500 hover:text-emerald-700 cursor-pointer font-bold ml-2"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      )}
+
                       <div className="border border-slate-200 rounded-xl p-5 bg-white shadow-xs">
                         <h2 className="font-bold text-sm text-slate-900 mb-1">Parámetros Avanzados del Sistema</h2>
                         <p className="text-xs text-slate-500 mb-4">Configuraciones de seguridad, regionalización e infraestructura.</p>
 
                         <div className="divide-y divide-slate-100 text-xs">
+                          {/* Zona horaria */}
                           <div className="py-3 flex items-center justify-between gap-4">
                             <span className="w-80 font-semibold text-slate-800 shrink-0 text-left">Zona horaria</span>
                             <span className="flex-1 text-slate-700 text-left">{avanzadasSettings.zonaHoraria}</span>
@@ -13758,10 +13854,22 @@ export default function AdminDashboard() {
                               onClick={() =>
                                 setParamEditModal({
                                   title: "Zona Horaria",
-                                  label: "Zona horaria",
+                                  label: "Zona horaria del sistema",
                                   value: avanzadasSettings.zonaHoraria,
-                                  options: ["(GMT-06:00) Hora estándar central (Honduras)", "(GMT-05:00) Hora estándar del este (US)", "(GMT+00:00) UTC"],
-                                  onSave: (val) => setAvanzadasSettings((prev) => ({ ...prev, zonaHoraria: val })),
+                                  options: [
+                                    "(GMT-06:00) Hora estándar central (Honduras)",
+                                    "(GMT-06:00) Hora estándar central (Guatemala, El Salvador, Costa Rica)",
+                                    "(GMT-06:00) Hora central (México DF, Monterrey, Guadalajara)",
+                                    "(GMT-05:00) Hora estándar del este (US, Miami, Nueva York)",
+                                    "(GMT-05:00) Hora estándar de Colombia, Panamá, Perú",
+                                    "(GMT-04:00) Hora estándar del Atlántico (Puerto Rico, Rep. Dominicana)",
+                                    "(GMT-07:00) Hora estándar de la montaña (US, Arizona, Denver)",
+                                    "(GMT-08:00) Hora estándar del Pacífico (US, Los Ángeles, Tijuana)",
+                                    "(GMT-03:00) Hora de Argentina, Brasil (São Paulo), Chile",
+                                    "(GMT+00:00) Tiempo Universal Coordinado (UTC / Londres)",
+                                    "(GMT+01:00) Hora central europea (Madrid, París, Berlín)",
+                                  ],
+                                  onSave: (val) => handleSaveAvanzadasParam("zonaHoraria", val),
                                 })
                               }
                               className="text-[#f6821f] font-semibold hover:underline cursor-pointer shrink-0"
@@ -13769,6 +13877,8 @@ export default function AdminDashboard() {
                               Editar
                             </button>
                           </div>
+
+                          {/* Idioma del sistema */}
                           <div className="py-3 flex items-center justify-between gap-4">
                             <span className="w-80 font-semibold text-slate-800 shrink-0 text-left">Idioma del sistema</span>
                             <span className="flex-1 text-slate-700 text-left">{avanzadasSettings.idioma}</span>
@@ -13777,10 +13887,16 @@ export default function AdminDashboard() {
                               onClick={() =>
                                 setParamEditModal({
                                   title: "Idioma del Sistema",
-                                  label: "Idioma del sistema",
+                                  label: "Idioma de la interfaz y reportes",
                                   value: avanzadasSettings.idioma,
-                                  options: ["Español (Latinoamérica)", "English (US)"],
-                                  onSave: (val) => setAvanzadasSettings((prev) => ({ ...prev, idioma: val })),
+                                  options: [
+                                    "Español (Latinoamérica)",
+                                    "Español (Honduras)",
+                                    "Español (España)",
+                                    "English (United States)",
+                                    "English (United Kingdom)",
+                                  ],
+                                  onSave: (val) => handleSaveAvanzadasParam("idioma", val),
                                 })
                               }
                               className="text-[#f6821f] font-semibold hover:underline cursor-pointer shrink-0"
@@ -13788,6 +13904,8 @@ export default function AdminDashboard() {
                               Editar
                             </button>
                           </div>
+
+                          {/* Cierre de sesión por inactividad */}
                           <div className="py-3 flex items-center justify-between gap-4">
                             <span className="w-80 font-semibold text-slate-800 shrink-0 text-left">Cierre de sesión por inactividad</span>
                             <span className="flex-1 text-slate-700 text-left">{avanzadasSettings.cierreSesionInactividad}</span>
@@ -13796,10 +13914,20 @@ export default function AdminDashboard() {
                               onClick={() =>
                                 setParamEditModal({
                                   title: "Inactividad",
-                                  label: "Cierre de sesión por inactividad",
+                                  label: "Tiempo de espera antes de cerrar la sesión automáticamente",
                                   value: avanzadasSettings.cierreSesionInactividad,
-                                  options: ["30 minutos", "1 hora", "3 horas", "8 horas"],
-                                  onSave: (val) => setAvanzadasSettings((prev) => ({ ...prev, cierreSesionInactividad: val })),
+                                  options: [
+                                    "15 minutos",
+                                    "30 minutos",
+                                    "1 hora",
+                                    "2 horas",
+                                    "3 horas",
+                                    "8 horas (Jornada laboral completa)",
+                                    "12 horas",
+                                    "24 horas",
+                                    "Nunca (Sesión persistente)",
+                                  ],
+                                  onSave: (val) => handleSaveAvanzadasParam("cierreSesionInactividad", val),
                                 })
                               }
                               className="text-[#f6821f] font-semibold hover:underline cursor-pointer shrink-0"
@@ -13807,10 +13935,38 @@ export default function AdminDashboard() {
                               Editar
                             </button>
                           </div>
+
+                          {/* Base de datos empresarial - Live Telemetry */}
                           <div className="py-3 flex items-center justify-between gap-4">
                             <span className="w-80 font-semibold text-slate-800 shrink-0 text-left">Base de datos empresarial</span>
-                            <span className="flex-1 font-mono text-emerald-700 font-semibold text-left">PostgreSQL 17.6 Enterprise</span>
-                            <span className="text-slate-400 text-[11px] shrink-0">Conectada</span>
+                            <div className="flex-1 flex items-center gap-2 text-left">
+                              <span className="font-mono text-emerald-700 font-semibold">{dbTelemetry.engine}</span>
+                              <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-mono bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                {dbTelemetry.latencyMs} ms
+                              </span>
+                              {dbTelemetry.host && (
+                                <span className="text-[11px] text-slate-400 font-normal hidden sm:inline">
+                                  ({dbTelemetry.provider || "Supabase Cloud"})
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-3 shrink-0">
+                              <div className="flex items-center gap-1.5">
+                                <span className={`w-2 h-2 rounded-full ${dbTelemetry.status === "Conectada" ? "bg-emerald-500 animate-pulse" : "bg-red-500"}`} />
+                                <span className={`text-[11px] font-medium ${dbTelemetry.status === "Conectada" ? "text-slate-500" : "text-red-600"}`}>
+                                  {dbTelemetry.status}
+                                </span>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={fetchDbTelemetry}
+                                disabled={dbTelemetry.loading}
+                                title="Verificar latencia y estado de la base de datos en tiempo real"
+                                className="text-[#f6821f] text-xs font-semibold hover:underline cursor-pointer disabled:opacity-50"
+                              >
+                                {dbTelemetry.loading ? "Probando..." : "Comprobar"}
+                              </button>
+                            </div>
                           </div>
                         </div>
                       </div>

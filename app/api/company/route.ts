@@ -37,6 +37,10 @@ const DEFAULT_COMPANY_DATA = {
   transferenciasAch: "Habilitadas",
   tasaCambioHnl: 24.85,
   tasaCambioEur: 1.08,
+  // Parámetros Avanzados del Sistema
+  zonaHoraria: "(GMT-06:00) Hora estándar central (Honduras)",
+  idioma: "Español (Latinoamérica)",
+  cierreSesionInactividad: "3 horas",
 };
 
 // GET /api/company - Retrieve official company settings
@@ -100,6 +104,9 @@ export async function PUT(request: NextRequest) {
       "transferenciasAch",
       "tasaCambioHnl",
       "tasaCambioEur",
+      "zonaHoraria",
+      "idioma",
+      "cierreSesionInactividad",
     ];
 
     const updateData: Record<string, any> = {};
