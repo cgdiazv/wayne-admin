@@ -6850,11 +6850,6 @@ export default function AdminDashboard() {
                 </svg>
                 {!sidebarCollapsed && <span>Estimaciones</span>}
               </div>
-              {!sidebarCollapsed && (
-                <span className="text-[10px] px-1.5 py-0.5 rounded bg-orange-100 text-[#f6821f] font-bold">
-                  Costos
-                </span>
-              )}
             </button>
           </div>
 
@@ -7326,7 +7321,7 @@ export default function AdminDashboard() {
                   {currentView === "transacciones" && "Contabilidad / Transacciones Bancarias"}
                   {currentView === "caja-chica" && "Contabilidad / Arqueo & Control de Caja Chica"}
                   {currentView === "conciliacion-bancaria" && "Contabilidad / Conciliación de Extracto Mensual"}
-                  {currentView === "estimaciones" && "Costeo / Estimaciones Técnicas & Presupuestos"}
+                  {currentView === "estimaciones" && "Estimaciones & Cotizaciones a Clientes"}
                   {currentView === "clientes" && "Directorio de Clientes"}
                   {currentView === "cotizaciones" && "Ventas / Cotizaciones & Presupuestos"}
                   {currentView === "pedidos-venta" && "Ventas / Pedidos de Venta (Sales Orders)"}

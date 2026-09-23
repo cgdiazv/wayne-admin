@@ -481,14 +481,14 @@ export default function EstimatesModule({
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-lg font-black text-slate-900 tracking-tight">
-                Estimaciones Técnicas &amp; Presupuestos
+                Estimaciones &amp; Cotizaciones a Clientes
               </h1>
               <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#fff7ed] text-[#f6821f] border border-orange-200">
-                Costeo Industrial
+                Cotizaciones Clientes
               </span>
             </div>
             <p className="text-xs text-slate-500 mt-0.5">
-              Costeo de insumos, mano de obra (MOD), CIF y vinculación automática al Plan Contable y Producción.
+              Crea cotizaciones y presupuestos para clientes calculando insumos, mano de obra y margen comercial, con enlace directo al Plan Contable y emisión a Producción.
             </p>
           </div>
         </div>
@@ -830,10 +830,10 @@ export default function EstimatesModule({
                 </div>
                 <div>
                   <h2 className="text-lg font-bold text-slate-900">
-                    Nueva Estimación Técnica de Costos
+                    Nueva Estimación / Cotización para Cliente
                   </h2>
                   <p className="text-xs text-slate-500">
-                    Calcula insumos, mano de obra, CIF y enlaza automáticamente al Plan de Cuentas y Producción.
+                    Calcula insumos, mano de obra, margen comercial y genera la cotización conectada a Cuentas y Producción.
                   </p>
                 </div>
               </div>
