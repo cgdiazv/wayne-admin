@@ -13,6 +13,7 @@ import TaxRetentionsModule from "@/components/TaxRetentionsModule";
 import VendorPaymentsModule from "@/components/VendorPaymentsModule";
 import BankReconciliationModule from "@/components/BankReconciliationModule";
 import SalesOrdersModule from "@/components/SalesOrdersModule";
+import ProductionModule from "@/components/ProductionModule";
 import { Skeleton, CardSkeleton, TableRowsSkeleton } from "@/components/Skeleton";
 
 
@@ -199,7 +200,7 @@ type PurchaseInvoice = {
   createdAt?: string;
 };
 
-type NavItem = "dashboard" | "plan-cuentas" | "transacciones" | "conciliacion-bancaria" | "caja-chica" | "clientes" | "cotizaciones" | "pedidos-venta" | "proveedores" | "vendedores" | "comisiones" | "inventario" | "lotes" | "series" | "notas-credito-debito" | "reportes" | "configuracion" | "factura-editor" | "lista-facturas" | "lista-ordenes-compra" | "orden-compra-editor" | "factura-compra-lista" | "factura-compra-editor" | "deposito-bancario" | "recibir-pago" | "agregar-gasto" | "pagar-proveedor" | "pagos-proveedores" | "devoluciones-proveedor" | "antiguedad-saldos" | "antiguedad-saldos-proveedores" | "estado-cuenta-cliente" | "retenciones-isv";
+type NavItem = "dashboard" | "plan-cuentas" | "transacciones" | "conciliacion-bancaria" | "caja-chica" | "clientes" | "cotizaciones" | "pedidos-venta" | "proveedores" | "vendedores" | "comisiones" | "inventario" | "lotes" | "series" | "produccion" | "notas-credito-debito" | "reportes" | "configuracion" | "factura-editor" | "lista-facturas" | "lista-ordenes-compra" | "orden-compra-editor" | "factura-compra-lista" | "factura-compra-editor" | "deposito-bancario" | "recibir-pago" | "agregar-gasto" | "pagar-proveedor" | "pagos-proveedores" | "devoluciones-proveedor" | "antiguedad-saldos" | "antiguedad-saldos-proveedores" | "estado-cuenta-cliente" | "retenciones-isv";
 
 
 
@@ -477,6 +478,13 @@ export default function AdminDashboard() {
       console.error("Error al sincronizar estado de orden con el servidor:", err);
       await loadPurchaseOrders();
     }
+  };
+
+  const handleCancelPO = async (poNum: string) => {
+    if (!window.confirm(`¿Está seguro de que desea cancelar la orden de compra ${poNum}?`)) {
+      return;
+    }
+    await handleUpdatePOStatus(poNum, "Cancelada");
   };
 
   const handleUpdateInvoiceStatus = (num: string, newStatus: string) => {
@@ -4098,7 +4106,7 @@ export default function AdminDashboard() {
         date: new Date().toISOString().split("T")[0],
         expectedDate: "2026-09-20",
         paymentTerms: "Crédito 30 días",
-        status: "Aprobada",
+        status: "Pendiente",
         notes: "Favor incluir certificado de análisis y cumplir normas de seguridad en transporte.",
         lines: [
           { id: "1", productName: "Materia Prima Flexográfica", sku: "MAT-FLX-01", description: "Insumo de producción estándar", quantity: 10, rate: 250.00, total: 2500.00 },
@@ -4258,7 +4266,7 @@ export default function AdminDashboard() {
     setSendingPOEmail(true);
     try {
       await new Promise((resolve) => setTimeout(resolve, 800));
-      await handleSavePOEditor("Aprobada");
+      await handleSavePOEditor(poForm.status || "Pendiente");
       setPOSuccessMsg(`¡Orden de compra ${poForm.num} enviada con éxito por correo a ${poForm.vendorName} (${poForm.vendorEmail})!`);
       setTimeout(() => setPOSuccessMsg(""), 4500);
     } catch (err) {
@@ -6369,7 +6377,15 @@ export default function AdminDashboard() {
       if (itemsRes.success && Array.isArray(itemsRes.data)) setInventory(itemsRes.data);
       if (accRes.success && Array.isArray(accRes.data)) setAccounts(accRes.data);
 
-      setPurchaseInvoiceSuccess("Factura de Compra e Ingreso a Inventario registrado exitosamente.");
+      if (purchaseInvoiceForm.purchaseOrderNumber) {
+        const poNum = purchaseInvoiceForm.purchaseOrderNumber;
+        setPurchaseOrders((prev) =>
+          prev.map((po) => (po.num === poNum || po.id === poNum ? { ...po, status: "Recibida" } : po))
+        );
+      }
+      await loadPurchaseOrders();
+
+      setPurchaseInvoiceSuccess("Orden de Compra recibida, Factura registrada e Inventario actualizado exitosamente.");
       setTimeout(() => {
         setCurrentView("factura-compra-lista");
       }, 1200);
@@ -6448,6 +6464,8 @@ export default function AdminDashboard() {
     });
   }, [allLots, lotesSearch, lotesFilter]);
 
+  const [produccionOpen, setProduccionOpen] = useState(true);
+  const [productionActiveTab, setProductionActiveTab] = useState<"work-orders" | "bom-recipes">("work-orders");
   const allSerials = useMemo(() => {
     const list: {
       serial: ItemSerial;
@@ -7166,6 +7184,58 @@ export default function AdminDashboard() {
             )}
           </div>
 
+          {/* Producción Collapsible Group */}
+          <div className="pt-1">
+            <button
+              onClick={() => setProduccionOpen(!produccionOpen)}
+              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl transition cursor-pointer text-slate-700 hover:bg-slate-100 ${
+                currentView === "produccion"
+                  ? "font-semibold text-slate-900"
+                  : ""
+              }`}
+            >
+              <div className="flex items-center gap-3 truncate">
+                <Factory className="w-4 h-4 shrink-0 text-[#f6821f]" />
+                {!sidebarCollapsed && <span>Producción</span>}
+              </div>
+              {!sidebarCollapsed && (
+                <svg className={`w-3.5 h-3.5 text-slate-400 transition-transform ${produccionOpen ? "rotate-180" : "rotate-0"}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                </svg>
+              )}
+            </button>
+
+            {produccionOpen && !sidebarCollapsed && (
+              <div className="ml-7 mt-1 pl-2 border-l border-slate-200 space-y-1 text-xs">
+                <button
+                  onClick={() => {
+                    setCurrentView("produccion");
+                    setProductionActiveTab("work-orders");
+                  }}
+                  className={`w-full text-left px-2.5 py-1.5 rounded-lg transition cursor-pointer flex items-center justify-between ${
+                    currentView === "produccion" && productionActiveTab === "work-orders"
+                      ? "bg-[#fff7ed] text-[#f6821f] font-semibold"
+                      : "text-slate-500 hover:text-slate-900 hover:bg-slate-50"
+                  }`}
+                >
+                  <span>Órdenes de Trabajo</span>
+                </button>
+                <button
+                  onClick={() => {
+                    setCurrentView("produccion");
+                    setProductionActiveTab("bom-recipes");
+                  }}
+                  className={`w-full text-left px-2.5 py-1.5 rounded-lg transition cursor-pointer flex items-center justify-between ${
+                    currentView === "produccion" && productionActiveTab === "bom-recipes"
+                      ? "bg-[#fff7ed] text-[#f6821f] font-semibold"
+                      : "text-slate-500 hover:text-slate-900 hover:bg-slate-50"
+                  }`}
+                >
+                  <span>Recetas / Fórmulas (BOM)</span>
+                </button>
+              </div>
+            )}
+          </div>
 
         </nav>
 
@@ -7244,6 +7314,7 @@ export default function AdminDashboard() {
                   {currentView === "inventario" && "Control Maestro de Inventario"}
                   {currentView === "lotes" && "Control de Lotes"}
                   {currentView === "series" && "Control de Números de Serie"}
+                  {currentView === "produccion" && (productionActiveTab === "bom-recipes" ? "Producción / Fórmulas y Recetas (BOM)" : "Control de Producción y Órdenes de Trabajo")}
                   {currentView === "reportes" && "Centro de Reportes"}
                   {currentView === "antiguedad-saldos" && "Reportes / Antigüedad de Saldos Clientes"}
                   {currentView === "antiguedad-saldos-proveedores" && "Reportes / Antigüedad de Saldos Proveedores"}
@@ -9628,6 +9699,18 @@ export default function AdminDashboard() {
                 </div>
               </div>
             </div>
+          )}
+
+          {/* ================= VIEW: PRODUCCIÓN Y ÓRDENES DE TRABAJO ================= */}
+          {currentView === "produccion" && (
+            <ProductionModule
+              onBackToDashboard={() => setCurrentView("dashboard")}
+              inventory={inventory}
+              companySettings={companySettings}
+              formatCurrency={formatCurrency}
+              activeTab={productionActiveTab}
+              onTabChange={setProductionActiveTab}
+            />
           )}
 
           {/* ================= VIEW: NOTAS DE CRÉDITO Y DÉBITO ================= */}
@@ -16391,38 +16474,22 @@ export default function AdminDashboard() {
                             <td className="py-3.5 px-4 font-sans text-slate-600">{po.category}</td>
                             <td className="py-3.5 px-4 text-right font-bold text-slate-900">${po.total.toFixed(2)} USD</td>
                             <td className="py-3.5 px-4 text-center font-sans">
-                              <select
-                                value={po.status}
-                                onChange={(e) => handleUpdatePOStatus(po.num, e.target.value)}
-                                className={`px-2.5 py-1 rounded-full text-[10px] font-bold cursor-pointer appearance-none outline-none border transition ${
+                              <span
+                                className={`inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold border ${
                                   po.status === "Recibida"
-                                    ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100"
-                                    : po.status === "Aprobada"
-                                    ? "bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100"
+                                    ? "bg-emerald-50 text-emerald-700 border-emerald-200"
                                     : po.status === "Cancelada"
-                                    ? "bg-red-50 text-red-700 border-red-200 hover:bg-red-100"
-                                    : "bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100"
+                                    ? "bg-rose-50 text-rose-700 border-rose-200"
+                                    : po.status === "Aprobada"
+                                    ? "bg-blue-50 text-blue-700 border-blue-200"
+                                    : "bg-amber-50 text-amber-700 border-amber-200"
                                 }`}
                               >
-                                <option value="Pendiente">Pendiente</option>
-                                <option value="Aprobada">Aprobada</option>
-                                <option value="Recibida">Recibida</option>
-                                <option value="Cancelada">Cancelada</option>
-                              </select>
+                                {po.status || "Pendiente"}
+                              </span>
                             </td>
                             <td className="py-3.5 px-4 text-right font-sans">
                               <div className="flex items-center justify-end gap-1.5">
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setSelectedPurchaseOrder(po);
-                                    setActiveModal("detalle-orden-compra");
-                                  }}
-                                  className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold cursor-pointer transition text-[11px]"
-                                  title="Ver detalle de la orden"
-                                >
-                                  Detalle
-                                </button>
                                 <button
                                   type="button"
                                   onClick={() => openPurchaseOrderEditor(po)}
@@ -16431,25 +16498,26 @@ export default function AdminDashboard() {
                                 >
                                   Editar
                                 </button>
-                                <button
-                                  type="button"
-                                  onClick={() => openCreatePurchaseInvoiceFromPO(po)}
-                                  className="px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-semibold cursor-pointer transition text-[11px]"
-                                  title="Convertir esta orden en Factura de Compra"
-                                >
-                                  Facturar
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    openPurchaseOrderEditor(po);
-                                    setTimeout(() => window.print(), 300);
-                                  }}
-                                  className="px-2.5 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-800 font-semibold cursor-pointer transition text-[11px]"
-                                  title="Imprimir documento de orden"
-                                >
-                                  PDF
-                                </button>
+                                {po.status !== "Cancelada" && po.status !== "Recibida" && (
+                                  <>
+                                    <button
+                                      type="button"
+                                      onClick={() => openCreatePurchaseInvoiceFromPO(po)}
+                                      className="px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-semibold cursor-pointer transition text-[11px]"
+                                      title="Recibir orden y generar Factura de Compra"
+                                    >
+                                      Recibir
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleCancelPO(po.num)}
+                                      className="px-2.5 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 font-semibold cursor-pointer transition text-[11px]"
+                                      title="Cancelar orden de compra"
+                                    >
+                                      Cancelar
+                                    </button>
+                                  </>
+                                )}
                               </div>
                             </td>
                           </tr>
@@ -19675,7 +19743,7 @@ export default function AdminDashboard() {
                       onClick={() => handleSavePOEditor()}
                       className="px-5 py-2 rounded-l-lg bg-[#f6821f] hover:bg-[#e07216] text-white font-bold text-xs transition cursor-pointer flex items-center gap-1"
                     >
-                      Guardar y aprobar
+                      Guardar orden
                     </button>
                     <button
                       type="button"
@@ -19698,7 +19766,7 @@ export default function AdminDashboard() {
                           type="button"
                           onClick={() => {
                             setShowPOSaveDropdown(false);
-                            handleSavePOEditor("Aprobada");
+                            handleSavePOEditor();
                             closePurchaseOrderEditor();
                           }}
                           className="w-full text-left px-4 py-2.5 text-xs text-slate-700 hover:bg-[#fff7ed] hover:text-[#f6821f] font-semibold transition cursor-pointer"
@@ -21691,24 +21759,19 @@ export default function AdminDashboard() {
                 <div>
                   <div className="flex items-center gap-2">
                     <h2 className="text-lg font-bold text-slate-900">Orden de Compra {selectedPurchaseOrder.num}</h2>
-                    <select
-                      value={selectedPurchaseOrder.status}
-                      onChange={(e) => handleUpdatePOStatus(selectedPurchaseOrder.num, e.target.value)}
-                      className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold cursor-pointer outline-none border transition ${
+                    <span
+                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${
                         selectedPurchaseOrder.status === "Recibida"
-                          ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100"
-                          : selectedPurchaseOrder.status === "Aprobada"
-                          ? "bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100"
+                          ? "bg-emerald-50 text-emerald-700 border-emerald-200"
                           : selectedPurchaseOrder.status === "Cancelada"
-                          ? "bg-red-50 text-red-700 border-red-200 hover:bg-red-100"
-                          : "bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100"
+                          ? "bg-rose-50 text-rose-700 border-rose-200"
+                          : selectedPurchaseOrder.status === "Aprobada"
+                          ? "bg-blue-50 text-blue-700 border-blue-200"
+                          : "bg-amber-50 text-amber-700 border-amber-200"
                       }`}
                     >
-                      <option value="Pendiente">Pendiente</option>
-                      <option value="Aprobada">Aprobada</option>
-                      <option value="Recibida">Recibida</option>
-                      <option value="Cancelada">Cancelada</option>
-                    </select>
+                      {selectedPurchaseOrder.status || "Pendiente"}
+                    </span>
                   </div>
                   <p className="text-xs text-slate-500">Emitida el {selectedPurchaseOrder.date} para {selectedPurchaseOrder.vendor}</p>
                 </div>
@@ -21833,16 +21896,30 @@ export default function AdminDashboard() {
                 >
                   Editar orden
                 </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setActiveModal(null);
-                    openCreatePurchaseInvoiceFromPO(selectedPurchaseOrder);
-                  }}
-                  className="px-4 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-semibold text-xs transition cursor-pointer"
-                >
-                  Convertir a Factura
-                </button>
+                {selectedPurchaseOrder.status !== "Cancelada" && selectedPurchaseOrder.status !== "Recibida" && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActiveModal(null);
+                        openCreatePurchaseInvoiceFromPO(selectedPurchaseOrder);
+                      }}
+                      className="px-4 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-semibold text-xs transition cursor-pointer"
+                    >
+                      Recibir orden
+                    </button>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        await handleCancelPO(selectedPurchaseOrder.num);
+                        setActiveModal(null);
+                      }}
+                      className="px-4 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 font-semibold text-xs transition cursor-pointer"
+                    >
+                      Cancelar orden
+                    </button>
+                  </>
+                )}
               </div>
               <div className="flex items-center gap-2">
                 <button

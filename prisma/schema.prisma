@@ -763,4 +763,85 @@ model ReportSettings {
   updatedAt            DateTime @updatedAt
 }
 
+// ================= MODELOS DE PRODUCCIÓN Y MANUFACTURA =================
+
+model BillOfMaterials {
+  id              String       @id @default(cuid())
+  code            String       @unique // e.g. "BOM-CAJA-12X12"
+  name            String       // Nombre de la receta o fórmula
+  productId       String?      // ID del InventoryItem terminado
+  productSku      String       // SKU del producto terminado
+  productName     String       // Descripción del producto terminado
+  outputQuantity  Float        @default(1) // Cantidad resultante del ensamble
+  unitOfMeasure   String       @default("UND") // "UND", "MILLAR", "KG", "ROLLO"
+  laborCost       Float        @default(0) // Costo estimado de Mano de Obra Directa (MOD)
+  overheadCost    Float        @default(0) // Costo estimado de Gastos Indirectos (CIF)
+  active          Boolean      @default(true)
+  notes           String?
+  items           BomItem[]
+  workOrders      WorkOrder[]
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+}
+
+model BomItem {
+  id              String          @id @default(cuid())
+  bomId           String
+  bom             BillOfMaterials @relation(fields: [bomId], references: [id], onDelete: Cascade)
+  rawMaterialId   String?         // ID del InventoryItem insumo
+  rawMaterialSku  String          // SKU del insumo
+  description     String          // Nombre/descripción de la materia prima
+  quantity        Float           @default(1) // Cantidad requerida por fórmula
+  unitCost        Float           @default(0) // Costo unitario referencial
+  totalCost       Float           @default(0) // quantity * unitCost
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+}
+
+model WorkOrder {
+  id                String          @id @default(cuid())
+  orderNumber       String          @unique // e.g. "OT-2026-0001"
+  bomId             String?
+  bom               BillOfMaterials? @relation(fields: [bomId], references: [id], onDelete: SetNull)
+  productId         String?         // ID del producto terminado a fabricar
+  productSku        String          // SKU del producto terminado
+  productName       String          // Nombre del producto terminado
+  targetQuantity    Float           @default(1) // Cantidad programada a fabricar
+  producedQuantity  Float           @default(0) // Cantidad efectivamente producida
+  unitOfMeasure     String          @default("UND")
+  status            String          @default("BORRADOR") // "BORRADOR" | "EN_PROCESO" | "COMPLETADA" | "CANCELADA"
+  startDate         String          // e.g. "2026-09-23"
+  completionDate    String?         // e.g. "2026-09-25"
+  supervisor        String?         // Responsable en planta
+  productionLine    String?         @default("Línea Flexografía 1")
+  notes             String?
+  assignedLotNumber String?         // Lote asignado al producto final fabricado
+  totalRawCost      Float           @default(0) // Costo total de insumos consumidos
+  totalLaborCost    Float           @default(0) // Costo total de MOD
+  totalOverheadCost Float           @default(0) // Costo total de CIF
+  totalCost         Float           @default(0) // Costo total acumulado de producción
+  unitCostFinal     Float           @default(0) // totalCost / producedQuantity
+  journalEntryId    String?         // Asiento contable generado al completar la OT
+  items             WorkOrderItem[]
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+}
+
+model WorkOrderItem {
+  id              String    @id @default(cuid())
+  workOrderId     String
+  workOrder       WorkOrder @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+  rawMaterialId   String?   // ID de la materia prima en InventoryItem
+  rawMaterialSku  String    // SKU de la materia prima
+  description     String
+  plannedQuantity Float     @default(1) // Cantidad según receta
+  consumedQuantity Float    @default(1) // Cantidad real consumida
+  unitCost        Float     @default(0)
+  totalCost       Float     @default(0)
+  lotNumber       String?   // Lote del que se consumió la materia prima
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+
 

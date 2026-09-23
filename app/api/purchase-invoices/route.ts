@@ -164,7 +164,27 @@ export async function POST(req: Request) {
       include: { items: true },
     });
 
-    // 2. AUTOMATICALLY INCREASE INVENTORY STOCK & RECORD LOTS
+    // 2. AUTOMATICALLY MARK ASSOCIATED PURCHASE ORDER AS RECIBIDA
+    if (body.purchaseOrderNumber && String(body.purchaseOrderNumber).trim()) {
+      const poNum = String(body.purchaseOrderNumber).trim();
+      try {
+        await db.purchaseOrder.updateMany({
+          where: {
+            OR: [
+              { orderNumber: poNum },
+              { id: poNum },
+            ],
+          },
+          data: {
+            status: "Recibida",
+          },
+        });
+      } catch (poErr) {
+        console.error("Error al actualizar estado de orden de compra a Recibida:", poErr);
+      }
+    }
+
+    // 3. AUTOMATICALLY INCREASE INVENTORY STOCK & RECORD LOTS
     for (const item of items) {
       if (!item.sku) continue;
       const qtyToAdd = Number(item.quantity) || 0;
