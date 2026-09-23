@@ -1073,7 +1073,7 @@ export default function ProductionModule({
                         }}
                         className="px-3 py-1.5 rounded-xl bg-orange-50 hover:bg-orange-100 text-[#f6821f] font-bold text-xs transition cursor-pointer flex items-center gap-1 border border-orange-200"
                       >
-                        <span>Emitir OT</span>
+                        <span>Crear Job</span>
                         <ArrowRight className="w-3.5 h-3.5" />
                       </button>
                     </div>
@@ -1366,7 +1366,7 @@ export default function ProductionModule({
                   disabled={actionLoading}
                   className="px-5 py-2 rounded-xl bg-[#f6821f] hover:bg-[#e07216] text-white font-bold shadow-md cursor-pointer disabled:opacity-50"
                 >
-                  {actionLoading ? "Guardando..." : "Emitir Orden de Trabajo"}
+                  {actionLoading ? "Guardando..." : "Crear Job"}
                 </button>
               </div>
             </form>

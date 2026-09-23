@@ -659,17 +659,16 @@ export default function EstimatesModule({
                 <th className="p-3.5">PRODUCTO &amp; CORRIDA</th>
                 <th className="p-3.5 text-right">COSTO TOTAL</th>
                 <th className="p-3.5 text-right">PRECIO VENTA</th>
-                <th className="p-3.5 text-center">CUENTAS VINCULADAS</th>
                 <th className="p-3.5 text-center">ESTADO</th>
                 <th className="p-3.5 text-right">ACCIONES</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {loading ? (
-                <TableRowsSkeleton rows={4} cols={9} />
+                <TableRowsSkeleton rows={4} cols={8} />
               ) : filteredEstimates.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="p-8 text-center text-slate-400">
+                  <td colSpan={8} className="p-8 text-center text-slate-400">
                     <Calculator className="w-8 h-8 text-slate-300 mx-auto mb-2 stroke-[1.5]" />
                     <p className="font-semibold text-slate-600">No se encontraron estimaciones</p>
                     <p className="text-[11px] text-slate-400 mt-0.5">
@@ -735,24 +734,6 @@ export default function EstimatesModule({
                       </div>
                     </td>
 
-                    {/* Cuentas Asociadas */}
-                    <td className="p-3.5 text-center">
-                      <div className="inline-flex flex-col gap-1 items-center">
-                        <span
-                          className="px-2 py-0.5 rounded-md text-[10px] font-mono bg-blue-50 text-blue-700 border border-blue-200"
-                          title={`Ingresos: ${est.incomeAccountName || est.incomeAccountCode}`}
-                        >
-                          Cta: {est.incomeAccountCode || "4100"}
-                        </span>
-                        <span
-                          className="px-2 py-0.5 rounded-md text-[10px] font-mono bg-amber-50 text-amber-700 border border-amber-200"
-                          title={`Costos: ${est.costAccountName || est.costAccountCode}`}
-                        >
-                          Cost: {est.costAccountCode || "5100"}
-                        </span>
-                      </div>
-                    </td>
-
                     {/* Estado */}
                     <td className="p-3.5 text-center">
                       <span
@@ -773,7 +754,7 @@ export default function EstimatesModule({
                     {/* Acciones */}
                     <td className="p-3.5 text-right">
                       <div className="flex items-center justify-end gap-1.5">
-                        {/* Botón Emitir OT si está Aprobada o Borrador */}
+                        {/* Botón Crear Job si está Aprobada o Borrador */}
                         {est.status !== "EN_PRODUCCION" && (
                           <button
                             type="button"
@@ -785,10 +766,10 @@ export default function EstimatesModule({
                               }
                             }}
                             className="px-2.5 py-1 rounded-lg bg-orange-50 hover:bg-orange-100 text-[#f6821f] font-bold text-[11px] transition cursor-pointer flex items-center gap-1 border border-orange-200 shadow-2xs"
-                            title="Crear Orden de Trabajo en Producción a partir de esta estimación"
+                            title="Crear Job en Producción a partir de esta estimación"
                           >
                             <Factory className="w-3 h-3" />
-                            <span>Emitir OT</span>
+                            <span>Crear Job</span>
                           </button>
                         )}
 
@@ -1376,23 +1357,23 @@ export default function EstimatesModule({
 
             {/* Content */}
             <div className="p-6 overflow-y-auto space-y-5 text-xs flex-1">
-              {/* Product Info Banner */}
-              <div className="bg-gradient-to-r from-slate-900 to-slate-800 text-white p-4 rounded-2xl flex items-center justify-between">
+              {/* Product Info Banner (Light theme) */}
+              <div className="bg-gradient-to-r from-orange-50/80 via-amber-50/40 to-slate-50 p-4 rounded-2xl border border-orange-200/80 flex items-center justify-between shadow-2xs">
                 <div>
-                  <span className="text-[10px] uppercase font-bold tracking-wider text-orange-400">
-                    Producto a Fabricar
+                  <span className="text-[10px] uppercase font-bold tracking-wider text-[#ea580c] bg-orange-100/80 px-2 py-0.5 rounded-md inline-block mb-1">
+                    Producto a Cotizar
                   </span>
-                  <h3 className="text-base font-bold">{selectedEstimate.productName}</h3>
-                  <p className="text-xs text-slate-300 font-mono mt-0.5">
-                    SKU: {selectedEstimate.productSku} • Corrida programada:{" "}
-                    {selectedEstimate.targetQuantity.toLocaleString()} {selectedEstimate.unitOfMeasure}
+                  <h3 className="text-base font-black text-slate-900">{selectedEstimate.productName}</h3>
+                  <p className="text-xs text-slate-600 font-mono mt-0.5">
+                    SKU: <span className="font-bold text-slate-800">{selectedEstimate.productSku}</span> • Corrida programada:{" "}
+                    <span className="font-bold text-slate-800">{selectedEstimate.targetQuantity.toLocaleString()} {selectedEstimate.unitOfMeasure}</span>
                   </p>
                 </div>
                 <div className="text-right">
-                  <span className="text-[10px] text-slate-400 uppercase block font-semibold">
+                  <span className="text-[10px] text-slate-500 uppercase block font-bold tracking-wider">
                     Precio Sugerido
                   </span>
-                  <span className="text-xl font-black text-[#f6821f]">
+                  <span className="text-2xl font-black text-[#f6821f] tracking-tight">
                     {formatCurrency(selectedEstimate.totalAmount)}
                   </span>
                 </div>
@@ -1536,7 +1517,7 @@ export default function EstimatesModule({
                     className="px-4 py-2 rounded-xl bg-[#f6821f] hover:bg-[#e07216] text-white font-bold text-xs transition cursor-pointer flex items-center gap-1.5 shadow-md shadow-[#f6821f]/20"
                   >
                     <Factory className="w-3.5 h-3.5" />
-                    <span>Emitir Orden de Trabajo</span>
+                    <span>Crear Job</span>
                   </button>
                 )}
               </div>
