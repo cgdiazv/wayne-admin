@@ -41,6 +41,14 @@ const DEFAULT_COMPANY_DATA = {
   zonaHoraria: "(GMT-06:00) Hora estándar central (Honduras)",
   idioma: "Español (Latinoamérica)",
   cierreSesionInactividad: "3 horas",
+  // Parámetros de Gastos y Compras
+  mostrarTablaArticulosGasto: false,
+  mostrarCampoEtiquetas: true,
+  seguimientoGastosArticulosCliente: false,
+  hacerGastosArticulosFacturables: false,
+  condicionesPagoProveedores: "Net 30",
+  usarOrdenesCompra: true,
+  mensajeOrdenesCompra: "Mensaje de correo electrónico predeterminado que se envía con las órdenes de compra",
 };
 
 // GET /api/company - Retrieve official company settings
@@ -107,6 +115,13 @@ export async function PUT(request: NextRequest) {
       "zonaHoraria",
       "idioma",
       "cierreSesionInactividad",
+      "mostrarTablaArticulosGasto",
+      "mostrarCampoEtiquetas",
+      "seguimientoGastosArticulosCliente",
+      "hacerGastosArticulosFacturables",
+      "condicionesPagoProveedores",
+      "usarOrdenesCompra",
+      "mensajeOrdenesCompra",
     ];
 
     const updateData: Record<string, any> = {};

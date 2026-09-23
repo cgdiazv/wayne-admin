@@ -128,6 +128,14 @@ model CompanySettings {
   zonaHoraria                 String?  @default("(GMT-06:00) Hora estándar central (Honduras)")
   idioma                      String?  @default("Español (Latinoamérica)")
   cierreSesionInactividad     String?  @default("3 horas")
+  // Parámetros de Gastos y Compras
+  mostrarTablaArticulosGasto          Boolean? @default(false)
+  mostrarCampoEtiquetas               Boolean? @default(true)
+  seguimientoGastosArticulosCliente   Boolean? @default(false)
+  hacerGastosArticulosFacturables     Boolean? @default(false)
+  condicionesPagoProveedores          String?  @default("Net 30")
+  usarOrdenesCompra                   Boolean? @default(true)
+  mensajeOrdenesCompra                String?  @default("Mensaje de correo electrónico predeterminado que se envía con las órdenes de compra")
   logoUrl          String?  @db.Text
   updatedAt        DateTime @updatedAt
 }

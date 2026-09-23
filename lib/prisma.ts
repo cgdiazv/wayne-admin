@@ -59,12 +59,16 @@ export const prisma: PrismaClient = new Proxy({} as PrismaClient, {
     const hasAvanzadas = (globalForPrisma.prisma as any)?._runtimeDataModel?.models?.CompanySettings?.fields?.some(
       (f: any) => f.name === "zonaHoraria"
     );
+    const hasGastos = (globalForPrisma.prisma as any)?._runtimeDataModel?.models?.CompanySettings?.fields?.some(
+      (f: any) => f.name === "condicionesPagoProveedores"
+    );
     if (
       !globalForPrisma.prisma ||
       !hasMoneda ||
       !hasAccounting ||
       !hasCurrency ||
       !hasAvanzadas ||
+      !hasGastos ||
       !(globalForPrisma.prisma as any).taxRetention ||
       !(globalForPrisma.prisma as any).user ||
       !(globalForPrisma.prisma as any).pettyCashFund ||

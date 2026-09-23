@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { Users, Factory, Package, Tag, Boxes, AlertCircle, Clock, CheckCircle2, ShieldAlert, Layers, Hash, BookOpen, Download, Upload, FileSpreadsheet, ArrowRight, ArrowLeft, RefreshCw, X, FileText, Calendar, CreditCard, Printer, Database, ArrowUpDown, FileUp, FolderOpen, HelpCircle, Receipt, Check } from "lucide-react";
+import { Users, Factory, Package, Tag, Boxes, AlertCircle, Clock, CheckCircle2, ShieldAlert, Layers, Hash, BookOpen, Download, Upload, FileSpreadsheet, ArrowRight, ArrowLeft, RefreshCw, X, FileText, Calendar, CreditCard, Printer, Database, ArrowUpDown, FileUp, FolderOpen, HelpCircle, Receipt, Check, Loader2 } from "lucide-react";
 import CajaChicaModule from "@/components/CajaChicaModule";
 import AccountingBooksModule from "@/components/AccountingBooksModule";
 import CustomerAgingReportModule from "@/components/CustomerAgingReportModule";
@@ -1437,6 +1437,22 @@ export default function AdminDashboard() {
             });
           }
 
+          if (
+            res.data.condicionesPagoProveedores ||
+            res.data.mensajeOrdenesCompra !== undefined ||
+            res.data.mostrarTablaArticulosGasto !== undefined
+          ) {
+            setExpenseSettings({
+              mostrarTablaArticulosGasto: !!res.data.mostrarTablaArticulosGasto,
+              mostrarCampoEtiquetas: res.data.mostrarCampoEtiquetas !== undefined ? !!res.data.mostrarCampoEtiquetas : true,
+              seguimientoGastosArticulosCliente: !!res.data.seguimientoGastosArticulosCliente,
+              hacerGastosArticulosFacturables: !!res.data.hacerGastosArticulosFacturables,
+              condicionesPagoProveedores: res.data.condicionesPagoProveedores || "Net 30",
+              usarOrdenesCompra: res.data.usarOrdenesCompra !== undefined ? !!res.data.usarOrdenesCompra : true,
+              mensajeOrdenesCompra: res.data.mensajeOrdenesCompra || "Mensaje de correo electrónico predeterminado que se envía con las órdenes de compra",
+            });
+          }
+
           if (res.data.logoUrl) {
             setCompanyLogo(res.data.logoUrl);
             try {
@@ -1908,6 +1924,32 @@ export default function AdminDashboard() {
 
   const [editingExpenseSection, setEditingExpenseSection] = useState<string | null>(null);
   const [expenseSavedNotification, setExpenseSavedNotification] = useState(false);
+  const [expenseSaving, setExpenseSaving] = useState(false);
+
+  const handleSaveExpenseSettings = async (overrideData?: Partial<typeof expenseSettings>) => {
+    const payload = overrideData ? { ...expenseSettings, ...overrideData } : expenseSettings;
+    if (overrideData) {
+      setExpenseSettings((prev) => ({ ...prev, ...overrideData }));
+    }
+    setExpenseSaving(true);
+    try {
+      const res = await fetch("/api/company", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setEditingExpenseSection(null);
+        setExpenseSavedNotification(true);
+        setTimeout(() => setExpenseSavedNotification(false), 3500);
+      }
+    } catch (err) {
+      console.error("Error saving expense settings to DB:", err);
+    } finally {
+      setExpenseSaving(false);
+    }
+  };
 
   // Subtabs state (Contabilidad, Horas, Monedas, Avanzadas)
   const [contabilidadSettings, setContabilidadSettings] = useState({
@@ -2062,6 +2104,130 @@ export default function AdminDashboard() {
     } catch (err) {
       console.error("Error saving advanced parameter to DB:", err);
     }
+  };
+
+  // Estados y funciones para Centro de Reportes Financieros
+  const [showPnLModal, setShowPnLModal] = useState(false);
+  const [pnlLoading, setPnlLoading] = useState(false);
+  const [pnlData, setPnlData] = useState<any>(null);
+
+  const fetchPnLReport = async () => {
+    setPnlLoading(true);
+    try {
+      const res = await fetch("/api/reports/profit-and-loss");
+      const json = await res.json();
+      if (json.success && json.data) {
+        setPnlData(json.data);
+      }
+    } catch (err) {
+      console.error("Error loading P&L report:", err);
+    } finally {
+      setPnlLoading(false);
+    }
+  };
+
+  const handleOpenPnLModal = () => {
+    setShowPnLModal(true);
+    fetchPnLReport();
+  };
+
+  const handleDownloadPnLExcel = () => {
+    if (!pnlData) return;
+    const headers = ["Categoria,Codigo,Cuenta,Monto_USD"];
+    const rows: string[] = [];
+    pnlData.grupos.forEach((g: any) => {
+      g.cuentas.forEach((acc: any) => {
+        rows.push(`"${g.titulo}","${acc.code}","${acc.name.replace(/"/g, '""')}","${acc.amount.toFixed(2)}"`);
+      });
+      rows.push(`"${g.titulo} - TOTAL","","TOTAL","${g.total.toFixed(2)}"`);
+    });
+    rows.push(`"UTILIDAD NETA FINAL","","UTILIDAD NETA","${pnlData.resumen.utilidadNeta.toFixed(2)}"`);
+    const csvContent = "data:text/csv;charset=utf-8,\uFEFF" + [headers, ...rows].join("\n");
+    const link = document.createElement("a");
+    link.setAttribute("href", encodeURI(csvContent));
+    link.setAttribute("download", `estado_perdidas_y_ganancias_wayne_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const [showBalanceSheetModal, setShowBalanceSheetModal] = useState(false);
+  const [balanceSheetLoading, setBalanceSheetLoading] = useState(false);
+  const [balanceSheetData, setBalanceSheetData] = useState<any>(null);
+
+  const fetchBalanceSheetReport = async () => {
+    setBalanceSheetLoading(true);
+    try {
+      const res = await fetch("/api/reports/balance-sheet");
+      const json = await res.json();
+      if (json.success && json.data) {
+        setBalanceSheetData(json.data);
+      }
+    } catch (err) {
+      console.error("Error loading Balance Sheet report:", err);
+    } finally {
+      setBalanceSheetLoading(false);
+    }
+  };
+
+  const handleOpenBalanceSheetModal = () => {
+    setShowBalanceSheetModal(true);
+    fetchBalanceSheetReport();
+  };
+
+  const handleDownloadBalanceSheetExcel = () => {
+    if (!balanceSheetData) return;
+    const headers = ["Clasificacion,Grupo,Codigo,Cuenta,Monto_USD"];
+    const rows: string[] = [];
+    balanceSheetData.activos.corriente.forEach((a: any) => {
+      rows.push(`"ACTIVO","Activo Corriente","${a.code}","${a.name.replace(/"/g, '""')}","${a.amount.toFixed(2)}"`);
+    });
+    rows.push(`"ACTIVO","Activo Corriente - TOTAL","","TOTAL","${balanceSheetData.activos.totalCorriente.toFixed(2)}"`);
+    balanceSheetData.activos.noCorriente.forEach((a: any) => {
+      rows.push(`"ACTIVO","Activo No Corriente","${a.code}","${a.name.replace(/"/g, '""')}","${a.amount.toFixed(2)}"`);
+    });
+    rows.push(`"ACTIVO","TOTAL ACTIVOS","","TOTAL","${balanceSheetData.activos.total.toFixed(2)}"`);
+    balanceSheetData.pasivos.corriente.forEach((p: any) => {
+      rows.push(`"PASIVO","Pasivo Corriente","${p.code}","${p.name.replace(/"/g, '""')}","${p.amount.toFixed(2)}"`);
+    });
+    rows.push(`"PASIVO","TOTAL PASIVOS","","TOTAL","${balanceSheetData.pasivos.total.toFixed(2)}"`);
+    balanceSheetData.patrimonio.cuentas.forEach((pt: any) => {
+      rows.push(`"PATRIMONIO","Capital y Reservas","${pt.code}","${pt.name.replace(/"/g, '""')}","${pt.amount.toFixed(2)}"`);
+    });
+    rows.push(`"PATRIMONIO","Utilidad del Ejercicio","","UTILIDAD","${balanceSheetData.patrimonio.utilidadEjercicio.toFixed(2)}"`);
+    rows.push(`"PATRIMONIO","TOTAL PATRIMONIO","","TOTAL","${balanceSheetData.patrimonio.total.toFixed(2)}"`);
+    rows.push(`"TOTAL PASIVO Y PATRIMONIO","","","TOTAL","${balanceSheetData.resumen.totalPasivoYPatrimonio.toFixed(2)}"`);
+
+    const csvContent = "data:text/csv;charset=utf-8,\uFEFF" + [headers, ...rows].join("\n");
+    const link = document.createElement("a");
+    link.setAttribute("href", encodeURI(csvContent));
+    link.setAttribute("download", `balance_de_situacion_wayne_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const [showInventoryValuationModal, setShowInventoryValuationModal] = useState(false);
+
+  const handleDownloadInventoryValuationExcel = () => {
+    const headers = [
+      "SKU,Descripcion,Tipo_Seguimiento,Cantidad_Existencia,Costo_Unitario_USD,Valor_Total_Libros_USD,Precio_Venta_USD,Margen_Bruto_Estimado_Pct"
+    ];
+    const rows = inventory.map((item) => {
+      const qty = Number(item.quantity) || 0;
+      const cost = Number(item.cost) || 0;
+      const price = Number(item.price) || 0;
+      const totalVal = qty * cost;
+      const margin = price > 0 ? (((price - cost) / price) * 100).toFixed(1) + "%" : "0%";
+      return `"${item.sku}","${(item.description || "").replace(/"/g, '""')}","${item.trackingType || "NONE"}","${qty}","${cost.toFixed(2)}","${totalVal.toFixed(2)}","${price.toFixed(2)}","${margin}"`;
+    });
+    const csvContent = "data:text/csv;charset=utf-8,\uFEFF" + [headers, ...rows].join("\n");
+    const link = document.createElement("a");
+    link.setAttribute("href", encodeURI(csvContent));
+    link.setAttribute("download", `valoracion_inventario_wayne_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   // Generic Edit Modal State for parameter subtabs
@@ -10318,9 +10484,12 @@ export default function AdminDashboard() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 pt-5">
                   {/* Reporte 1: Pérdidas y Ganancias */}
-                  <div className="p-5 rounded-xl border border-slate-200 hover:border-[#f6821f]/50 hover:shadow-xs transition bg-white flex flex-col justify-between group">
+                  <div
+                    onClick={handleOpenPnLModal}
+                    className="p-5 rounded-xl border border-slate-200 hover:border-[#f6821f] hover:shadow-md transition bg-white flex flex-col justify-between group cursor-pointer"
+                  >
                     <div>
-                      <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center mb-3">
+                      <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center mb-3 group-hover:scale-105 transition">
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
                         </svg>
@@ -10330,14 +10499,33 @@ export default function AdminDashboard() {
                     </div>
                     <div className="pt-4 mt-4 border-t border-slate-100 flex items-center justify-between">
                       <span className="text-[11px] font-medium text-slate-400">Actualizado hoy</span>
-                      <button className="text-xs font-semibold text-[#f6821f] hover:underline cursor-pointer">Descargar PDF</button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleOpenPnLModal();
+                          }}
+                          className="text-xs font-semibold text-[#f6821f] hover:underline cursor-pointer"
+                        >
+                          Descargar PDF
+                        </button>
+                        <span className="text-slate-300">|</span>
+                        <span className="text-xs font-bold text-[#f6821f] hover:text-[#e07216] flex items-center gap-0.5">
+                          <span>Ver</span>
+                          <span className="text-sm">→</span>
+                        </span>
+                      </div>
                     </div>
                   </div>
 
                   {/* Reporte 2: Balance General */}
-                  <div className="p-5 rounded-xl border border-slate-200 hover:border-[#f6821f]/50 hover:shadow-xs transition bg-white flex flex-col justify-between group">
+                  <div
+                    onClick={handleOpenBalanceSheetModal}
+                    className="p-5 rounded-xl border border-slate-200 hover:border-[#f6821f] hover:shadow-md transition bg-white flex flex-col justify-between group cursor-pointer"
+                  >
                     <div>
-                      <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center mb-3">
+                      <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center mb-3 group-hover:scale-105 transition">
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3" />
                         </svg>
@@ -10347,14 +10535,33 @@ export default function AdminDashboard() {
                     </div>
                     <div className="pt-4 mt-4 border-t border-slate-100 flex items-center justify-between">
                       <span className="text-[11px] font-medium text-slate-400">Mensual</span>
-                      <button className="text-xs font-semibold text-[#f6821f] hover:underline cursor-pointer">Descargar PDF</button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleOpenBalanceSheetModal();
+                          }}
+                          className="text-xs font-semibold text-[#f6821f] hover:underline cursor-pointer"
+                        >
+                          Descargar PDF
+                        </button>
+                        <span className="text-slate-300">|</span>
+                        <span className="text-xs font-bold text-[#f6821f] hover:text-[#e07216] flex items-center gap-0.5">
+                          <span>Ver</span>
+                          <span className="text-sm">→</span>
+                        </span>
+                      </div>
                     </div>
                   </div>
 
                   {/* Reporte 3: Valoración de Inventario */}
-                  <div className="p-5 rounded-xl border border-slate-200 hover:border-[#f6821f]/50 hover:shadow-xs transition bg-white flex flex-col justify-between group">
+                  <div
+                    onClick={() => setShowInventoryValuationModal(true)}
+                    className="p-5 rounded-xl border border-slate-200 hover:border-[#f6821f] hover:shadow-md transition bg-white flex flex-col justify-between group cursor-pointer"
+                  >
                     <div>
-                      <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center mb-3">
+                      <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center mb-3 group-hover:scale-105 transition">
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
                         </svg>
@@ -10364,7 +10571,23 @@ export default function AdminDashboard() {
                     </div>
                     <div className="pt-4 mt-4 border-t border-slate-100 flex items-center justify-between">
                       <span className="text-[11px] font-medium text-slate-400">En tiempo real</span>
-                      <button className="text-xs font-semibold text-[#f6821f] hover:underline cursor-pointer">Descargar Excel</button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDownloadInventoryValuationExcel();
+                          }}
+                          className="text-xs font-semibold text-[#f6821f] hover:underline cursor-pointer"
+                        >
+                          Descargar Excel
+                        </button>
+                        <span className="text-slate-300">|</span>
+                        <span className="text-xs font-bold text-[#f6821f] hover:text-[#e07216] flex items-center gap-0.5">
+                          <span>Ver</span>
+                          <span className="text-sm">→</span>
+                        </span>
+                      </div>
                     </div>
                   </div>
 
@@ -10435,9 +10658,12 @@ export default function AdminDashboard() {
                   </div>
 
                   {/* Reporte 6: Libro Mayor y Plan de Cuentas */}
-                  <div className="p-5 rounded-xl border border-slate-200 hover:border-[#f6821f]/50 hover:shadow-xs transition bg-white flex flex-col justify-between group">
+                  <div
+                    onClick={() => setCurrentView("plan-cuentas")}
+                    className="p-5 rounded-xl border border-slate-200 hover:border-[#f6821f] hover:shadow-md transition bg-white flex flex-col justify-between group cursor-pointer"
+                  >
                     <div>
-                      <div className="w-10 h-10 rounded-xl bg-teal-50 text-teal-700 flex items-center justify-center mb-3">
+                      <div className="w-10 h-10 rounded-xl bg-teal-50 text-teal-700 flex items-center justify-center mb-3 group-hover:scale-105 transition">
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
                         </svg>
@@ -10447,7 +10673,23 @@ export default function AdminDashboard() {
                     </div>
                     <div className="pt-4 mt-4 border-t border-slate-100 flex items-center justify-between">
                       <span className="text-[11px] font-medium text-slate-400">{accounts.length} cuentas activas</span>
-                      <button className="text-xs font-semibold text-[#f6821f] hover:underline cursor-pointer">Descargar Excel</button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleExportAccounts();
+                          }}
+                          className="text-xs font-semibold text-[#f6821f] hover:underline cursor-pointer"
+                        >
+                          Descargar Excel
+                        </button>
+                        <span className="text-slate-300">|</span>
+                        <span className="text-xs font-bold text-[#f6821f] hover:text-[#e07216] flex items-center gap-0.5">
+                          <span>Ver</span>
+                          <span className="text-sm">→</span>
+                        </span>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -13022,12 +13264,13 @@ export default function AdminDashboard() {
                       {expenseSavedNotification && (
                         <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs rounded-xl flex items-center justify-between animate-in fade-in duration-200">
                           <div className="flex items-center gap-2">
-                            <span className="w-5 h-5 rounded-full bg-emerald-600 text-white flex items-center justify-center text-[10px] font-bold">✓</span>
-                            <span className="font-semibold">Configuración de gastos actualizada correctamente</span>
+                            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                            <span className="font-semibold">Configuración de gastos y compras guardada y sincronizada en la base de datos.</span>
                           </div>
                           <button
+                            type="button"
                             onClick={() => setExpenseSavedNotification(false)}
-                            className="text-emerald-600 hover:text-emerald-800 text-xs font-bold cursor-pointer"
+                            className="text-emerald-500 hover:text-emerald-700 cursor-pointer font-bold ml-2"
                           >
                             ✕
                           </button>
@@ -13063,7 +13306,7 @@ export default function AdminDashboard() {
                                     onChange={(e) => setExpenseSettings((prev) => ({ ...prev, mostrarTablaArticulosGasto: e.target.checked }))}
                                     className="rounded border-slate-300 text-[#f6821f] focus:ring-[#f6821f] cursor-pointer"
                                   />
-                                  <span className="text-slate-800">Mostrar tabla de artículos el gasto y formularios de compra</span>
+                                  <span className="text-slate-800">Mostrar tabla de artículos en el gasto y formularios de compra</span>
                                 </label>
                                 <label className="flex items-center gap-2 cursor-pointer select-none">
                                   <input
@@ -13081,7 +13324,7 @@ export default function AdminDashboard() {
                                     onChange={(e) => setExpenseSettings((prev) => ({ ...prev, seguimientoGastosArticulosCliente: e.target.checked }))}
                                     className="rounded border-slate-300 text-[#f6821f] focus:ring-[#f6821f] cursor-pointer"
                                   />
-                                  <span className="text-slate-800">Realizar seguimiento gastos y artículos por cliente</span>
+                                  <span className="text-slate-800">Realizar seguimiento de gastos y artículos por cliente</span>
                                 </label>
                                 <label className="flex items-center gap-2 cursor-pointer select-none">
                                   <input
@@ -13103,10 +13346,14 @@ export default function AdminDashboard() {
                                   onChange={(e) => setExpenseSettings((prev) => ({ ...prev, condicionesPagoProveedores: e.target.value }))}
                                   className="w-full px-3 py-1.5 border border-slate-300 rounded-lg text-xs bg-white text-slate-800 focus:border-[#f6821f] focus:outline-none"
                                 >
-                                  <option value="Net 30">Net 30</option>
-                                  <option value="Net 15">Net 15</option>
-                                  <option value="Net 60">Net 60</option>
+                                  <option value="Net 15">Net 15 (15 días)</option>
+                                  <option value="Net 30">Net 30 (30 días)</option>
+                                  <option value="Net 45">Net 45 (45 días)</option>
+                                  <option value="Net 60">Net 60 (60 días)</option>
+                                  <option value="Net 90">Net 90 (90 días)</option>
                                   <option value="Al recibo (Due on receipt)">Al recibo (Due on receipt)</option>
+                                  <option value="Pago anticipado / Contado">Pago anticipado / Contado</option>
+                                  <option value="Contra entrega (COD)">Contra entrega (COD)</option>
                                 </select>
                               </div>
 
@@ -13120,14 +13367,12 @@ export default function AdminDashboard() {
                                 </button>
                                 <button
                                   type="button"
-                                  onClick={() => {
-                                    setEditingExpenseSection(null);
-                                    setExpenseSavedNotification(true);
-                                    setTimeout(() => setExpenseSavedNotification(false), 3000);
-                                  }}
-                                  className="px-4 py-1.5 rounded-lg bg-[#f6821f] hover:bg-[#e07216] text-white font-semibold cursor-pointer shadow-xs"
+                                  disabled={expenseSaving}
+                                  onClick={() => handleSaveExpenseSettings()}
+                                  className="px-4 py-1.5 rounded-lg bg-[#f6821f] hover:bg-[#e07216] text-white font-semibold cursor-pointer shadow-xs disabled:opacity-50 flex items-center gap-1.5"
                                 >
-                                  Guardar
+                                  {expenseSaving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                                  <span>{expenseSaving ? "Guardando..." : "Guardar"}</span>
                                 </button>
                               </div>
                             </div>
@@ -13138,7 +13383,7 @@ export default function AdminDashboard() {
                               </div>
                               <div className="flex-1 space-y-2">
                                 <div className="flex items-center justify-between">
-                                  <span className="text-slate-700">Mostrar tabla de artículos el gasto y formularios de compra</span>
+                                  <span className="text-slate-700">Mostrar tabla de artículos en el gasto y formularios de compra</span>
                                   <span className="text-slate-600 font-medium">
                                     {expenseSettings.mostrarTablaArticulosGasto ? "Activado" : "Desactivado"}
                                   </span>
@@ -13150,7 +13395,7 @@ export default function AdminDashboard() {
                                   </span>
                                 </div>
                                 <div className="flex items-center justify-between">
-                                  <span className="text-slate-700">Realizar seguimiento gastos y artículos por cliente</span>
+                                  <span className="text-slate-700">Realizar seguimiento de gastos y artículos por cliente</span>
                                   <span className="text-slate-600 font-medium">
                                     {expenseSettings.seguimientoGastosArticulosCliente ? "Activado" : "Desactivado"}
                                   </span>
@@ -13214,14 +13459,12 @@ export default function AdminDashboard() {
                                 </button>
                                 <button
                                   type="button"
-                                  onClick={() => {
-                                    setEditingExpenseSection(null);
-                                    setExpenseSavedNotification(true);
-                                    setTimeout(() => setExpenseSavedNotification(false), 3000);
-                                  }}
-                                  className="px-4 py-1.5 rounded-lg bg-[#f6821f] hover:bg-[#e07216] text-white font-semibold cursor-pointer shadow-xs"
+                                  disabled={expenseSaving}
+                                  onClick={() => handleSaveExpenseSettings()}
+                                  className="px-4 py-1.5 rounded-lg bg-[#f6821f] hover:bg-[#e07216] text-white font-semibold cursor-pointer shadow-xs disabled:opacity-50 flex items-center gap-1.5"
                                 >
-                                  Guardar
+                                  {expenseSaving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                                  <span>{expenseSaving ? "Guardando..." : "Guardar"}</span>
                                 </button>
                               </div>
                             </div>
@@ -13284,14 +13527,12 @@ export default function AdminDashboard() {
                                 </button>
                                 <button
                                   type="button"
-                                  onClick={() => {
-                                    setEditingExpenseSection(null);
-                                    setExpenseSavedNotification(true);
-                                    setTimeout(() => setExpenseSavedNotification(false), 3000);
-                                  }}
-                                  className="px-4 py-1.5 rounded-lg bg-[#f6821f] hover:bg-[#e07216] text-white font-semibold cursor-pointer shadow-xs"
+                                  disabled={expenseSaving}
+                                  onClick={() => handleSaveExpenseSettings()}
+                                  className="px-4 py-1.5 rounded-lg bg-[#f6821f] hover:bg-[#e07216] text-white font-semibold cursor-pointer shadow-xs disabled:opacity-50 flex items-center gap-1.5"
                                 >
-                                  Guardar
+                                  {expenseSaving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                                  <span>{expenseSaving ? "Guardando..." : "Guardar"}</span>
                                 </button>
                               </div>
                             </div>
@@ -13304,7 +13545,9 @@ export default function AdminDashboard() {
                                 <span className="text-slate-700">
                                   Mensaje de correo electrónico predeterminado que se envía con las órdenes de compra
                                 </span>
-                                <span className="text-slate-400"></span>
+                                <span className="text-slate-500 font-medium italic text-right max-w-sm truncate ml-2">
+                                  &quot;{expenseSettings.mensajeOrdenesCompra}&quot;
+                                </span>
                               </div>
                               <div className="shrink-0 pt-0.5">
                                 <button
@@ -25621,6 +25864,473 @@ export default function AdminDashboard() {
               >
                 Cerrar
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ================= MODAL: ESTADO DE PÉRDIDAS Y GANANCIAS (P&L) ================= */}
+      {showPnLModal && (
+        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150 overflow-y-auto">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-4xl w-full my-8 overflow-hidden animate-in zoom-in-95 duration-150 flex flex-col max-h-[90vh]">
+            {/* Header */}
+            <div className="p-5 border-b border-slate-200 flex justify-between items-start bg-slate-50/80">
+              <div className="flex items-start gap-3">
+                {companyLogo && (
+                  <img src={companyLogo} alt="Logo" className="max-h-11 max-w-[120px] object-contain rounded shrink-0 hidden sm:block" />
+                )}
+                <div>
+                  <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider bg-emerald-100 px-2 py-0.5 rounded-full inline-block mb-1">
+                    Informe Financiero Oficial
+                  </span>
+                  <h3 className="font-bold text-base sm:text-lg text-slate-900">
+                    Estado de Pérdidas y Ganancias (Income Statement)
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    {companySettings.nombreLegal} • RTN: {companySettings.taxId}
+                  </p>
+                  <p className="text-[11px] text-slate-600 font-medium mt-0.5">
+                    Período: Año 2026 (Ejercicio Fiscal Acumulado) • Moneda: {companySettings.monedaPrincipal}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowPnLModal(false)}
+                className="text-slate-400 hover:text-slate-600 transition cursor-pointer p-1.5 rounded-lg hover:bg-slate-200"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="p-6 overflow-y-auto space-y-6 text-xs flex-1">
+              {pnlLoading ? (
+                <div className="py-16 text-center space-y-3">
+                  <Loader2 className="w-8 h-8 text-[#f6821f] animate-spin mx-auto" />
+                  <p className="text-slate-600 font-medium">Generando Estado de Resultados desde la base de datos...</p>
+                </div>
+              ) : pnlData ? (
+                <>
+                  {/* KPI Cards */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <div className="p-3.5 rounded-xl bg-emerald-50/70 border border-emerald-200">
+                      <span className="text-[10px] uppercase font-bold text-emerald-700 block">Ingresos Brutos</span>
+                      <span className="text-base sm:text-lg font-bold text-emerald-900 font-mono block mt-1">
+                        {formatCurrency(pnlData.resumen.totalIngresos)}
+                      </span>
+                    </div>
+                    <div className="p-3.5 rounded-xl bg-amber-50/70 border border-amber-200">
+                      <span className="text-[10px] uppercase font-bold text-amber-700 block">Costo de Ventas (COGS)</span>
+                      <span className="text-base sm:text-lg font-bold text-amber-900 font-mono block mt-1">
+                        {formatCurrency(pnlData.resumen.totalCostoVentas)}
+                      </span>
+                    </div>
+                    <div className="p-3.5 rounded-xl bg-blue-50/70 border border-blue-200">
+                      <span className="text-[10px] uppercase font-bold text-blue-700 block">Gastos Operativos</span>
+                      <span className="text-base sm:text-lg font-bold text-blue-900 font-mono block mt-1">
+                        {formatCurrency(pnlData.resumen.totalGastosOperativos)}
+                      </span>
+                    </div>
+                    <div className={`p-3.5 rounded-xl border ${pnlData.resumen.utilidadNeta >= 0 ? "bg-emerald-100/60 border-emerald-300" : "bg-rose-50 border-rose-200"}`}>
+                      <span className="text-[10px] uppercase font-bold text-slate-700 block">Utilidad Neta del Ejercicio</span>
+                      <span className={`text-base sm:text-lg font-bold font-mono block mt-1 ${pnlData.resumen.utilidadNeta >= 0 ? "text-emerald-900" : "text-rose-700"}`}>
+                        {formatCurrency(pnlData.resumen.utilidadNeta)}
+                      </span>
+                      <span className="text-[10px] font-semibold text-slate-500">
+                        Margen neto: {pnlData.resumen.margenNetoPct.toFixed(1)}%
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Grouped Breakdown Tables */}
+                  <div className="space-y-4">
+                    {pnlData.grupos.map((grp: any, idx: number) => (
+                      <div key={idx} className="border border-slate-200 rounded-xl overflow-hidden bg-white shadow-xs">
+                        <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+                          <span className="font-bold text-slate-800 uppercase tracking-wide text-[11px]">{grp.titulo}</span>
+                          <span className="font-mono font-bold text-slate-900">{formatCurrency(grp.total)}</span>
+                        </div>
+                        {grp.cuentas.length > 0 ? (
+                          <div className="divide-y divide-slate-100">
+                            {grp.cuentas.map((acc: any) => (
+                              <div key={acc.id} className="px-4 py-2 flex items-center justify-between text-xs hover:bg-slate-50/50">
+                                <div className="flex items-center gap-2">
+                                  <span className="font-mono text-slate-400 text-[11px] w-14 shrink-0">{acc.code}</span>
+                                  <span className="text-slate-700 font-medium">{acc.name}</span>
+                                </div>
+                                <span className="font-mono font-semibold text-slate-800">{formatCurrency(acc.amount)}</span>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="p-3 text-center text-slate-400 text-xs italic">Sin movimientos en este periodo</div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Grand Summary Result */}
+                  <div className="p-4 bg-slate-900 text-white rounded-xl flex items-center justify-between font-bold">
+                    <span className="text-sm uppercase tracking-wider">RESULTADO NETO DEL EJERCICIO (2026):</span>
+                    <span className={`text-lg font-mono ${pnlData.resumen.utilidadNeta >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
+                      {formatCurrency(pnlData.resumen.utilidadNeta)} USD
+                    </span>
+                  </div>
+                </>
+              ) : null}
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 border-t border-slate-200 bg-slate-50 flex flex-col sm:flex-row items-center justify-between gap-3">
+              <div className="text-[11px] text-slate-500">
+                Preparado bajo criterio de devengo conforme a normativa SAR y NIIF para PYMES.
+              </div>
+              <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                <button
+                  type="button"
+                  onClick={handleDownloadPnLExcel}
+                  className="px-3.5 py-1.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 font-semibold text-xs cursor-pointer flex items-center gap-1.5 shadow-xs"
+                >
+                  <Download className="w-3.5 h-3.5 text-slate-500" />
+                  <span>Excel (CSV)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  className="px-3.5 py-1.5 rounded-lg bg-[#f6821f] hover:bg-[#e07216] text-white font-semibold text-xs cursor-pointer flex items-center gap-1.5 shadow-xs"
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                  <span>Imprimir / PDF</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowPnLModal(false)}
+                  className="px-4 py-1.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 font-semibold text-xs cursor-pointer"
+                >
+                  Cerrar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ================= MODAL: BALANCE DE SITUACIÓN (BALANCE SHEET) ================= */}
+      {showBalanceSheetModal && (
+        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150 overflow-y-auto">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-4xl w-full my-8 overflow-hidden animate-in zoom-in-95 duration-150 flex flex-col max-h-[90vh]">
+            {/* Header */}
+            <div className="p-5 border-b border-slate-200 flex justify-between items-start bg-slate-50/80">
+              <div className="flex items-start gap-3">
+                {companyLogo && (
+                  <img src={companyLogo} alt="Logo" className="max-h-11 max-w-[120px] object-contain rounded shrink-0 hidden sm:block" />
+                )}
+                <div>
+                  <span className="text-[10px] font-bold text-blue-700 uppercase tracking-wider bg-blue-100 px-2 py-0.5 rounded-full inline-block mb-1">
+                    Balance General Patrimonial
+                  </span>
+                  <h3 className="font-bold text-base sm:text-lg text-slate-900">
+                    Balance de Situación (Balance Sheet)
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    {companySettings.nombreLegal} • RTN: {companySettings.taxId}
+                  </p>
+                  <p className="text-[11px] text-slate-600 font-medium mt-0.5">
+                    Al 31 de Diciembre 2026 • Moneda: {companySettings.monedaPrincipal}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowBalanceSheetModal(false)}
+                className="text-slate-400 hover:text-slate-600 transition cursor-pointer p-1.5 rounded-lg hover:bg-slate-200"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="p-6 overflow-y-auto space-y-6 text-xs flex-1">
+              {balanceSheetLoading ? (
+                <div className="py-16 text-center space-y-3">
+                  <Loader2 className="w-8 h-8 text-[#f6821f] animate-spin mx-auto" />
+                  <p className="text-slate-600 font-medium">Calculando balances patrimoniales desde la base de datos...</p>
+                </div>
+              ) : balanceSheetData ? (
+                <>
+                  {/* KPI Bar */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div className="p-3.5 rounded-xl bg-blue-50/70 border border-blue-200">
+                      <span className="text-[10px] uppercase font-bold text-blue-700 block">Total Activos</span>
+                      <span className="text-base sm:text-lg font-bold text-blue-900 font-mono block mt-1">
+                        {formatCurrency(balanceSheetData.resumen.totalActivos)}
+                      </span>
+                    </div>
+                    <div className="p-3.5 rounded-xl bg-rose-50/70 border border-rose-200">
+                      <span className="text-[10px] uppercase font-bold text-rose-700 block">Total Pasivos</span>
+                      <span className="text-base sm:text-lg font-bold text-rose-900 font-mono block mt-1">
+                        {formatCurrency(balanceSheetData.resumen.totalPasivos)}
+                      </span>
+                    </div>
+                    <div className="p-3.5 rounded-xl bg-purple-50/70 border border-purple-200">
+                      <span className="text-[10px] uppercase font-bold text-purple-700 block">Total Patrimonio Contable</span>
+                      <span className="text-base sm:text-lg font-bold text-purple-900 font-mono block mt-1">
+                        {formatCurrency(balanceSheetData.resumen.totalPatrimonio)}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Dual Column or Stacked Balance */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* ACTIVOS */}
+                    <div className="space-y-4">
+                      <div className="border border-blue-200 rounded-xl overflow-hidden bg-white shadow-xs">
+                        <div className="px-4 py-2.5 bg-blue-50 border-b border-blue-200 flex justify-between items-center">
+                          <span className="font-bold text-blue-900 uppercase text-[11px]">1. Activo Corriente</span>
+                          <span className="font-mono font-bold text-blue-950">{formatCurrency(balanceSheetData.activos.totalCorriente)}</span>
+                        </div>
+                        <div className="divide-y divide-slate-100">
+                          {balanceSheetData.activos.corriente.map((acc: any) => (
+                            <div key={acc.id} className="px-4 py-2 flex items-center justify-between hover:bg-slate-50/50">
+                              <span className="text-slate-700"><strong className="font-mono text-slate-400 mr-2 text-[11px]">{acc.code}</strong>{acc.name}</span>
+                              <span className="font-mono font-semibold text-slate-900">{formatCurrency(acc.amount)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {balanceSheetData.activos.noCorriente.length > 0 && (
+                        <div className="border border-blue-200 rounded-xl overflow-hidden bg-white shadow-xs">
+                          <div className="px-4 py-2.5 bg-blue-50 border-b border-blue-200 flex justify-between items-center">
+                            <span className="font-bold text-blue-900 uppercase text-[11px]">2. Activo No Corriente / Fijo</span>
+                            <span className="font-mono font-bold text-blue-950">{formatCurrency(balanceSheetData.activos.totalNoCorriente)}</span>
+                          </div>
+                          <div className="divide-y divide-slate-100">
+                            {balanceSheetData.activos.noCorriente.map((acc: any) => (
+                              <div key={acc.id} className="px-4 py-2 flex items-center justify-between hover:bg-slate-50/50">
+                                <span className="text-slate-700"><strong className="font-mono text-slate-400 mr-2 text-[11px]">{acc.code}</strong>{acc.name}</span>
+                                <span className="font-mono font-semibold text-slate-900">{formatCurrency(acc.amount)}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="p-3 bg-blue-100 text-blue-900 rounded-xl font-bold flex justify-between items-center text-xs">
+                        <span>TOTAL ACTIVOS:</span>
+                        <span className="font-mono text-sm">{formatCurrency(balanceSheetData.resumen.totalActivos)}</span>
+                      </div>
+                    </div>
+
+                    {/* PASIVOS & PATRIMONIO */}
+                    <div className="space-y-4">
+                      {/* Pasivos */}
+                      <div className="border border-rose-200 rounded-xl overflow-hidden bg-white shadow-xs">
+                        <div className="px-4 py-2.5 bg-rose-50 border-b border-rose-200 flex justify-between items-center">
+                          <span className="font-bold text-rose-900 uppercase text-[11px]">Pasivos (Corrientes & No Corrientes)</span>
+                          <span className="font-mono font-bold text-rose-950">{formatCurrency(balanceSheetData.resumen.totalPasivos)}</span>
+                        </div>
+                        <div className="divide-y divide-slate-100">
+                          {balanceSheetData.pasivos.corriente.map((acc: any) => (
+                            <div key={acc.id} className="px-4 py-2 flex items-center justify-between hover:bg-slate-50/50">
+                              <span className="text-slate-700"><strong className="font-mono text-slate-400 mr-2 text-[11px]">{acc.code}</strong>{acc.name}</span>
+                              <span className="font-mono font-semibold text-slate-900">{formatCurrency(acc.amount)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Patrimonio */}
+                      <div className="border border-purple-200 rounded-xl overflow-hidden bg-white shadow-xs">
+                        <div className="px-4 py-2.5 bg-purple-50 border-b border-purple-200 flex justify-between items-center">
+                          <span className="font-bold text-purple-900 uppercase text-[11px]">Capital & Patrimonio Contable</span>
+                          <span className="font-mono font-bold text-purple-950">{formatCurrency(balanceSheetData.resumen.totalPatrimonio)}</span>
+                        </div>
+                        <div className="divide-y divide-slate-100">
+                          {balanceSheetData.patrimonio.cuentas.map((acc: any) => (
+                            <div key={acc.id} className="px-4 py-2 flex items-center justify-between hover:bg-slate-50/50">
+                              <span className="text-slate-700"><strong className="font-mono text-slate-400 mr-2 text-[11px]">{acc.code}</strong>{acc.name}</span>
+                              <span className="font-mono font-semibold text-slate-900">{formatCurrency(acc.amount)}</span>
+                            </div>
+                          ))}
+                          <div className="px-4 py-2 flex items-center justify-between bg-emerald-50/40">
+                            <span className="text-emerald-800 font-semibold">Utilidad del Ejercicio Actual</span>
+                            <span className="font-mono font-bold text-emerald-800">{formatCurrency(balanceSheetData.patrimonio.utilidadEjercicio)}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="p-3 bg-purple-100 text-purple-950 rounded-xl font-bold flex justify-between items-center text-xs">
+                        <span>TOTAL PASIVO + PATRIMONIO:</span>
+                        <span className="font-mono text-sm">{formatCurrency(balanceSheetData.resumen.totalPasivoYPatrimonio)}</span>
+                      </div>
+                    </div>
+                  </div>
+                </>
+              ) : null}
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 border-t border-slate-200 bg-slate-50 flex flex-col sm:flex-row items-center justify-between gap-3">
+              <div className="text-[11px] text-slate-500">
+                Ecuación Contable Fundamental: Activo = Pasivo + Patrimonio.
+              </div>
+              <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                <button
+                  type="button"
+                  onClick={handleDownloadBalanceSheetExcel}
+                  className="px-3.5 py-1.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 font-semibold text-xs cursor-pointer flex items-center gap-1.5 shadow-xs"
+                >
+                  <Download className="w-3.5 h-3.5 text-slate-500" />
+                  <span>Excel (CSV)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  className="px-3.5 py-1.5 rounded-lg bg-[#f6821f] hover:bg-[#e07216] text-white font-semibold text-xs cursor-pointer flex items-center gap-1.5 shadow-xs"
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                  <span>Imprimir / PDF</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowBalanceSheetModal(false)}
+                  className="px-4 py-1.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 font-semibold text-xs cursor-pointer"
+                >
+                  Cerrar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ================= MODAL: VALORACIÓN DE INVENTARIO ================= */}
+      {showInventoryValuationModal && (
+        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150 overflow-y-auto">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-4xl w-full my-8 overflow-hidden animate-in zoom-in-95 duration-150 flex flex-col max-h-[90vh]">
+            {/* Header */}
+            <div className="p-5 border-b border-slate-200 flex justify-between items-start bg-slate-50/80">
+              <div className="flex items-start gap-3">
+                {companyLogo && (
+                  <img src={companyLogo} alt="Logo" className="max-h-11 max-w-[120px] object-contain rounded shrink-0 hidden sm:block" />
+                )}
+                <div>
+                  <span className="text-[10px] font-bold text-amber-700 uppercase tracking-wider bg-amber-100 px-2 py-0.5 rounded-full inline-block mb-1">
+                    Control de Existencias y Libros
+                  </span>
+                  <h3 className="font-bold text-base sm:text-lg text-slate-900">
+                    Valoración y Existencias de Inventario
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    {companySettings.nombreLegal} • Enlace en tiempo real con Kardex
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowInventoryValuationModal(false)}
+                className="text-slate-400 hover:text-slate-600 transition cursor-pointer p-1.5 rounded-lg hover:bg-slate-200"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="p-6 overflow-y-auto space-y-5 text-xs flex-1">
+              {/* Summary Cards */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="p-4 rounded-xl bg-amber-50/70 border border-amber-200">
+                  <span className="text-[11px] font-bold text-amber-800 uppercase block">Valor Total en Libros</span>
+                  <span className="text-xl font-mono font-bold text-amber-950 block mt-1">
+                    {formatCurrency(totalInventoryValuation)}
+                  </span>
+                  <span className="text-[10px] text-amber-700 font-medium">Valuado al costo unitario promedio</span>
+                </div>
+                <div className="p-4 rounded-xl bg-slate-50 border border-slate-200">
+                  <span className="text-[11px] font-bold text-slate-600 uppercase block">Artículos Registrados</span>
+                  <span className="text-xl font-mono font-bold text-slate-900 block mt-1">
+                    {inventory.length} productos / materias primas
+                  </span>
+                  <span className="text-[10px] text-slate-500 font-medium">Catálogo completo de manufactura</span>
+                </div>
+                <div className="p-4 rounded-xl bg-emerald-50/70 border border-emerald-200">
+                  <span className="text-[11px] font-bold text-emerald-800 uppercase block">Unidades Físicas en Mano</span>
+                  <span className="text-xl font-mono font-bold text-emerald-950 block mt-1">
+                    {inventory.reduce((sum, it) => sum + (Number(it.quantity) || 0), 0).toLocaleString("es-HN")} unds
+                  </span>
+                  <span className="text-[10px] text-emerald-700 font-medium">Disponibles en Bodega Búfalo</span>
+                </div>
+              </div>
+
+              {/* Items Table */}
+              <div className="border border-slate-200 rounded-xl overflow-hidden shadow-xs">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-50 border-b border-slate-200 text-slate-700 font-bold">
+                    <tr>
+                      <th className="p-3">SKU</th>
+                      <th className="p-3">Descripción</th>
+                      <th className="p-3 text-center">Tipo Rastreo</th>
+                      <th className="p-3 text-right">Existencias</th>
+                      <th className="p-3 text-right">Costo Unit.</th>
+                      <th className="p-3 text-right">Valor en Libros</th>
+                      <th className="p-3 text-right">Precio Venta</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {inventory.map((item) => {
+                      const qty = Number(item.quantity) || 0;
+                      const cost = Number(item.cost) || 0;
+                      const val = qty * cost;
+                      return (
+                        <tr key={item.id} className="hover:bg-slate-50/60">
+                          <td className="p-3 font-mono font-bold text-slate-800">{item.sku}</td>
+                          <td className="p-3 text-slate-700">{item.description}</td>
+                          <td className="p-3 text-center">
+                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                              {item.trackingType || "NONE"}
+                            </span>
+                          </td>
+                          <td className="p-3 text-right font-bold text-slate-900">{qty.toLocaleString("es-HN")}</td>
+                          <td className="p-3 text-right font-mono text-slate-600">${cost.toFixed(2)}</td>
+                          <td className="p-3 text-right font-mono font-bold text-amber-900">${val.toFixed(2)}</td>
+                          <td className="p-3 text-right font-mono text-slate-700">${(Number(item.price) || 0).toFixed(2)}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 border-t border-slate-200 bg-slate-50 flex flex-col sm:flex-row items-center justify-between gap-3">
+              <div className="text-[11px] text-slate-500">
+                Inventario valorado según normativa de costos históricos y PEPS / Promedio Ponderado SAR.
+              </div>
+              <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                <button
+                  type="button"
+                  onClick={handleDownloadInventoryValuationExcel}
+                  className="px-3.5 py-1.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 font-semibold text-xs cursor-pointer flex items-center gap-1.5 shadow-xs"
+                >
+                  <Download className="w-3.5 h-3.5 text-slate-500" />
+                  <span>Excel (CSV)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  className="px-3.5 py-1.5 rounded-lg bg-[#f6821f] hover:bg-[#e07216] text-white font-semibold text-xs cursor-pointer flex items-center gap-1.5 shadow-xs"
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                  <span>Imprimir / PDF</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowInventoryValuationModal(false)}
+                  className="px-4 py-1.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 font-semibold text-xs cursor-pointer"
+                >
+                  Cerrar
+                </button>
+              </div>
             </div>
           </div>
         </div>
