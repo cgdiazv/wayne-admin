@@ -29,9 +29,39 @@ import {
   Percent,
   Info,
   PackageCheck,
+  Tag,
+  Settings2,
+  Palette,
+  Layers,
+  Cog,
+  X,
 } from "lucide-react";
 
-interface QuoteLine {
+export interface AdditionalDie {
+  dieNumber: string;
+  qty: number;
+  shape: string;
+  teeth: string | number;
+  note: string;
+}
+
+export interface PartItem {
+  partNumber: string;
+  description1: string;
+  description2: string;
+}
+
+export interface InkItem {
+  ink: string;
+  description: string;
+  pmsNumber: string;
+  sides: number;
+  plates: number;
+  plateNumber: string;
+  coveragePercent: number;
+}
+
+export interface QuoteLine {
   id?: string;
   productName: string;
   sku?: string | null;
@@ -41,23 +71,73 @@ interface QuoteLine {
   amount: number;
 }
 
-interface Quote {
+export interface Quote {
   id: string;
   quoteNumber: string;
+  title?: string | null;
   customerId?: string | null;
+  customerCode?: string | null;
   customerName: string;
   customerRtn?: string | null;
   customerAddress?: string | null;
+  customerAddress1?: string | null;
+  customerAddress2?: string | null;
+  customerCity?: string | null;
+  customerState?: string | null;
+  customerZip?: string | null;
   customerEmail?: string | null;
   customerPhone?: string | null;
+  phoneExt?: string | null;
+  customerFax?: string | null;
+  contactName?: string | null;
   quoteDate: string;
   validUntil: string;
+  dueDate?: string | null;
+  fromJobNo?: string | null;
+  openedDate?: string | null;
+  statusCode?: string | null;
+  completionStatus?: string | null;
+  division?: string | null;
   paymentTerms: string;
   currency: string;
   salesRepId?: string | null;
   salesRepName?: string | null;
+  salespersonCode?: string | null;
+  isBroker?: boolean;
   notes?: string | null;
   termsConditions?: string | null;
+
+  // Flexo Tooling & Geometry
+  dieNumber?: string | null;
+  dieShape?: string | null;
+  sizeAcross?: string | null;
+  numAcross?: number | null;
+  spaceAcross?: string | null;
+  sizeAround?: string | null;
+  numAround?: number | null;
+  spaceAround?: string | null;
+  pitch?: string | null;
+  teeth?: number | null;
+  dieType?: string | null;
+  repeatLength?: number | null;
+  cylinderNumber?: string | null;
+  cylinderTeeth?: number | null;
+  additionalDies?: string | AdditionalDie[] | null;
+  partItems?: string | PartItem[] | null;
+  inks?: string | InkItem[] | null;
+
+  productSku?: string | null;
+  productName?: string | null;
+  targetQuantity?: number | null;
+  unitOfMeasure?: string | null;
+
+  materialCost?: number;
+  laborCost?: number;
+  overheadCost?: number;
+  totalEstimatedCost?: number;
+  unitCost?: number;
+  marginPercent?: number;
+
   subtotal: number;
   discount: number;
   taxRate: number;
@@ -78,7 +158,7 @@ interface Quote {
   createdAt: string;
 }
 
-interface QuotesModuleProps {
+export interface QuotesModuleProps {
   onBack?: () => void;
   autoOpenCreate?: boolean;
   onAutoOpenCreateConsumed?: () => void;
@@ -86,6 +166,7 @@ interface QuotesModuleProps {
   onNavigateToAccounting?: () => void;
   onNavigateToInvoices?: () => void;
   onNavigateToSalesOrders?: () => void;
+  onEmitWorkOrder?: (quote: Quote) => void;
   customers?: Array<{
     id: string;
     name: string;
@@ -93,6 +174,8 @@ interface QuotesModuleProps {
     phone: string | null;
     address: string | null;
     currency: string;
+    macolaCode?: string | null;
+    rtn?: string | null;
   }>;
   inventory?: Array<{
     id: string;
@@ -100,6 +183,7 @@ interface QuotesModuleProps {
     description: string;
     price: number;
     quantity: number;
+    cost?: number;
   }>;
   salesReps?: Array<{
     id: string;
@@ -116,6 +200,7 @@ export default function QuotesModule({
   onNavigateToAccounting,
   onNavigateToInvoices,
   onNavigateToSalesOrders,
+  onEmitWorkOrder,
   customers = [],
   inventory = [],
   salesReps = [],
@@ -140,35 +225,160 @@ export default function QuotesModule({
   const [activePrintQuote, setActivePrintQuote] = useState<Quote | null>(null);
   const [converting, setConverting] = useState(false);
 
+  const parseJsonArray = (val: any): any[] => {
+    if (Array.isArray(val)) return val;
+    if (typeof val === "string") {
+      try {
+        const parsed = JSON.parse(val);
+        if (Array.isArray(parsed)) return parsed;
+      } catch {
+        return [];
+      }
+    }
+    return [];
+  };
+
+  const getPmsColorPreview = (pms: string) => {
+    const s = (pms || "").toUpperCase();
+    if (s.includes("BLUE") || s.includes("2955")) return "#1d4ed8";
+    if (s.includes("YELLOW") || s.includes("123")) return "#eab308";
+    if (s.includes("RED") || s.includes("187")) return "#dc2626";
+    if (s.includes("BLACK")) return "#0f172a";
+    if (s.includes("WHITE")) return "#f8fafc";
+    if (s.includes("GREEN") || s.includes("354")) return "#16a34a";
+    if (s.includes("ORANGE") || s.includes("021")) return "#ea580c";
+    if (s.includes("CYAN")) return "#06b6d4";
+    if (s.includes("MAGENTA")) return "#ec4899";
+    if (s.includes("VIOLET") || s.includes("PURPLE")) return "#8b5cf6";
+    return "#94a3b8";
+  };
+
   // Formulario de Cotización
   const initialFormState = {
     id: "",
     quoteNumber: "",
-    customerId: "",
-    customerName: "",
-    customerRtn: "",
-    customerAddress: "",
-    customerEmail: "",
-    customerPhone: "",
+    title: "Cotización y Especificación Técnica",
+    
+    // Document Header
     quoteDate: new Date().toISOString().split("T")[0],
     validUntil: new Date(Date.now() + 30 * 86400000).toISOString().split("T")[0],
+    dueDate: "",
+    fromJobNo: "",
+    openedDate: "",
+    statusCode: "Open",
+    completionStatus: "Incomplete",
+    division: "HH",
     paymentTerms: "Neto 30 días",
     currency: "USD",
+    status: "Borrador",
+
+    // Customer & Contact Fields
+    customerId: "",
+    customerCode: "",
+    customerName: "",
+    customerAddress: "",
+    customerAddress1: "",
+    customerAddress2: "",
+    customerCity: "",
+    customerState: "PA",
+    customerZip: "",
+    customerRtn: "",
+    customerEmail: "",
+    customerPhone: "",
+    phoneExt: "",
+    customerFax: "",
+    contactName: "",
     salesRepId: "",
-    salesRepName: "",
+    salesRepName: "HOUSE",
+    salespersonCode: "005",
+    isBroker: false,
     notes: "Precios sujetos a confirmación de volumen y especificaciones de arte flexográfico.",
     termsConditions: "Validez de la oferta: 30 días calendario. Entrega estimada en 10-15 días laborables.",
+
+    // Product finished target
+    productSku: "0UPM11 / EW625",
+    productName: "ETIQUETAS DE CARTON IMPRESAS",
+    targetQuantity: 1000,
+    unitOfMeasure: "UND",
+
+    // Flexo Die, Cylinder & Inks Specification
+    dieNumber: "FHR020055",
+    dieShape: "NTCH RL TG",
+    sizeAcross: "2",
+    numAcross: 4,
+    spaceAcross: "1/8",
+    sizeAround: "6",
+    numAround: 2,
+    spaceAround: "",
+    pitch: "1/8",
+    teeth: 96,
+    dieType: "Circumf",
+    repeatLength: 12.0,
+    cylinderNumber: "",
+    cylinderTeeth: 96,
+    additionalDies: [] as AdditionalDie[],
+    parts: [
+      {
+        partNumber: "1",
+        description1: "0UPM11 / EW625",
+        description2: "ETIQUETAS DE CARTON IMPRESAS",
+      },
+    ] as PartItem[],
+    inks: [
+      {
+        ink: "HF-MIX",
+        description: "INKS MIXED FLEXO",
+        pmsNumber: "2955C BLUE",
+        sides: 1,
+        plates: 1,
+        plateNumber: "",
+        coveragePercent: 25,
+      },
+      {
+        ink: "HF-MIX",
+        description: "INKS MIXED FLEXO",
+        pmsNumber: "123C YELLOW",
+        sides: 1,
+        plates: 1,
+        plateNumber: "",
+        coveragePercent: 10,
+      },
+      {
+        ink: "HF-MIX",
+        description: "INKS MIXED FLEXO",
+        pmsNumber: "187C RED",
+        sides: 1,
+        plates: 1,
+        plateNumber: "",
+        coveragePercent: 10,
+      },
+      {
+        ink: "HF-MIX",
+        description: "INKS MIXED FLEXO",
+        pmsNumber: "BLACK",
+        sides: 1,
+        plates: 1,
+        plateNumber: "",
+        coveragePercent: 30,
+      },
+    ] as InkItem[],
+
+    // Technical cost breakdown
+    materialCost: 0,
+    laborCost: 150,
+    overheadCost: 75,
+    marginPercent: 35,
+
     discount: 0,
     taxRate: 15,
-    status: "Borrador",
     lines: [
       {
-        productName: "",
-        sku: "",
-        description: "",
-        quantity: 1,
-        rate: 0,
-        amount: 0,
+        productName: "ETIQUETAS DE CARTON IMPRESAS",
+        sku: "0UPM11 / EW625",
+        description: "Tiraje flexográfico alta resolución según especificaciones técnicas",
+        quantity: 1000,
+        rate: 0.15,
+        amount: 150.0,
       },
     ],
   };
@@ -257,6 +467,126 @@ export default function QuotesModule({
     };
   }, [formData.lines, formData.discount, formData.taxRate]);
 
+  // Flexo Tooling Handlers
+  const handleCalculateRepeat = () => {
+    let pitchVal = 0.125;
+    if (formData.pitch.includes("/")) {
+      const parts = formData.pitch.split("/");
+      const num = parseFloat(parts[0]);
+      const den = parseFloat(parts[1]);
+      if (den > 0) pitchVal = num / den;
+    } else {
+      pitchVal = parseFloat(formData.pitch) || 0.125;
+    }
+    const teethVal = Number(formData.teeth) || 96;
+    const calcRepeat = teethVal * pitchVal;
+    setFormData((prev) => ({
+      ...prev,
+      repeatLength: Math.round(calcRepeat * 10000) / 10000,
+      cylinderTeeth: teethVal,
+    }));
+    setSuccessAlert(`Repeat calculado: ${teethVal} dientes × ${formData.pitch}" = ${(teethVal * pitchVal).toFixed(4)}"`);
+    setTimeout(() => setSuccessAlert(null), 3500);
+  };
+
+  const handleAddAdditionalDie = () => {
+    setFormData((prev) => ({
+      ...prev,
+      additionalDies: [
+        ...prev.additionalDies,
+        { dieNumber: "", qty: 1, shape: "RECT", teeth: 96, note: "" },
+      ],
+    }));
+  };
+
+  const handleRemoveAdditionalDie = (index: number) => {
+    setFormData((prev) => ({
+      ...prev,
+      additionalDies: prev.additionalDies.filter((_, idx) => idx !== index),
+    }));
+  };
+
+  const handleAdditionalDieChange = (index: number, field: keyof AdditionalDie, value: any) => {
+    setFormData((prev) => {
+      const updated = [...prev.additionalDies];
+      updated[index] = { ...updated[index], [field]: value };
+      return { ...prev, additionalDies: updated };
+    });
+  };
+
+  const handleAddPart = () => {
+    setFormData((prev) => ({
+      ...prev,
+      parts: [
+        ...prev.parts,
+        {
+          partNumber: String(prev.parts.length + 1),
+          description1: "",
+          description2: "",
+        },
+      ],
+    }));
+  };
+
+  const handleRemovePart = (index: number) => {
+    setFormData((prev) => ({
+      ...prev,
+      parts: prev.parts.filter((_, idx) => idx !== index),
+    }));
+  };
+
+  const handlePartChange = (index: number, field: keyof PartItem, value: string) => {
+    setFormData((prev) => {
+      const updated = [...prev.parts];
+      updated[index] = { ...updated[index], [field]: value };
+      const nextState = { ...prev, parts: updated };
+      if (index === 0) {
+        if (field === "description1") {
+          nextState.productSku = value;
+          if (nextState.lines[0]) nextState.lines[0].sku = value;
+        }
+        if (field === "description2") {
+          nextState.productName = value;
+          if (nextState.lines[0]) nextState.lines[0].productName = value;
+        }
+      }
+      return nextState;
+    });
+  };
+
+  const handleAddInk = () => {
+    setFormData((prev) => ({
+      ...prev,
+      inks: [
+        ...prev.inks,
+        {
+          ink: "HF-MIX",
+          description: "INKS MIXED FLEXO",
+          pmsNumber: "",
+          sides: 1,
+          plates: 1,
+          plateNumber: "",
+          coveragePercent: 15,
+        },
+      ],
+    }));
+  };
+
+  const handleRemoveInk = (index: number) => {
+    setFormData((prev) => ({
+      ...prev,
+      inks: prev.inks.filter((_, idx) => idx !== index),
+    }));
+  };
+
+  const handleInkChange = (index: number, field: keyof InkItem, value: any) => {
+    setFormData((prev) => {
+      const updated = [...prev.inks];
+      updated[index] = { ...updated[index], [field]: value };
+      return { ...prev, inks: updated };
+    });
+  };
+
   // Manejar apertura de editor (Nuevo o Edición)
   const handleOpenCreate = () => {
     setFormData({
@@ -266,12 +596,12 @@ export default function QuotesModule({
       validUntil: new Date(Date.now() + 30 * 86400000).toISOString().split("T")[0],
       lines: [
         {
-          productName: "",
-          sku: "",
-          description: "",
-          quantity: 1,
-          rate: 0,
-          amount: 0,
+          productName: "ETIQUETAS DE CARTON IMPRESAS",
+          sku: "0UPM11 / EW625",
+          description: "Tiraje flexográfico alta resolución según especificaciones técnicas",
+          quantity: 1000,
+          rate: 0.15,
+          amount: 150,
         },
       ],
     });
@@ -281,26 +611,92 @@ export default function QuotesModule({
 
   const handleOpenEdit = (quote: Quote) => {
     setActiveEditorTab("Editar");
+    const loadedAdditionalDies = parseJsonArray(quote.additionalDies);
+    const loadedParts = parseJsonArray(quote.partItems);
+    const loadedInks = parseJsonArray(quote.inks);
+
     setFormData({
       id: quote.id,
       quoteNumber: quote.quoteNumber,
-      customerId: quote.customerId || "",
-      customerName: quote.customerName,
-      customerRtn: quote.customerRtn || "",
-      customerAddress: quote.customerAddress || "",
-      customerEmail: quote.customerEmail || "",
-      customerPhone: quote.customerPhone || "",
+      title: quote.title || "Cotización y Especificación Técnica",
+      
+      // Header
       quoteDate: quote.quoteDate,
       validUntil: quote.validUntil,
+      dueDate: quote.dueDate || "",
+      fromJobNo: quote.fromJobNo || "",
+      openedDate: quote.openedDate || "",
+      statusCode: quote.statusCode || "Open",
+      completionStatus: quote.completionStatus || "Incomplete",
+      division: quote.division || "HH",
       paymentTerms: quote.paymentTerms || "Neto 30 días",
       currency: quote.currency || "USD",
+      status: quote.status || "Borrador",
+
+      // Customer & Contact
+      customerId: quote.customerId || "",
+      customerCode: quote.customerCode || "",
+      customerName: quote.customerName,
+      customerRtn: quote.customerRtn || "",
+      customerAddress: quote.customerAddress || quote.customerAddress1 || "",
+      customerAddress1: quote.customerAddress1 || quote.customerAddress || "",
+      customerAddress2: quote.customerAddress2 || "",
+      customerCity: quote.customerCity || "",
+      customerState: quote.customerState || "PA",
+      customerZip: quote.customerZip || "",
+      customerEmail: quote.customerEmail || "",
+      customerPhone: quote.customerPhone || "",
+      phoneExt: quote.phoneExt || "",
+      customerFax: quote.customerFax || "",
+      contactName: quote.contactName || "",
       salesRepId: quote.salesRepId || "",
-      salesRepName: quote.salesRepName || "",
+      salesRepName: quote.salesRepName || "HOUSE",
+      salespersonCode: quote.salespersonCode || "005",
+      isBroker: Boolean(quote.isBroker),
       notes: quote.notes || "",
       termsConditions: quote.termsConditions || "",
+
+      // Product & Flexo specs
+      productSku: quote.productSku || (quote.lines && quote.lines[0]?.sku) || "0UPM11 / EW625",
+      productName: quote.productName || (quote.lines && quote.lines[0]?.productName) || "ETIQUETAS DE CARTON IMPRESAS",
+      targetQuantity: Number(quote.targetQuantity) || (quote.lines && quote.lines[0]?.quantity) || 1000,
+      unitOfMeasure: quote.unitOfMeasure || "UND",
+
+      dieNumber: quote.dieNumber || "FHR020055",
+      dieShape: quote.dieShape || "NTCH RL TG",
+      sizeAcross: quote.sizeAcross || "2",
+      numAcross: quote.numAcross !== undefined && quote.numAcross !== null ? Number(quote.numAcross) : 4,
+      spaceAcross: quote.spaceAcross || "1/8",
+      sizeAround: quote.sizeAround || "6",
+      numAround: quote.numAround !== undefined && quote.numAround !== null ? Number(quote.numAround) : 2,
+      spaceAround: quote.spaceAround || "",
+      pitch: quote.pitch || "1/8",
+      teeth: quote.teeth !== undefined && quote.teeth !== null ? Number(quote.teeth) : 96,
+      dieType: quote.dieType || "Circumf",
+      repeatLength: quote.repeatLength !== undefined && quote.repeatLength !== null ? Number(quote.repeatLength) : 12.0,
+      cylinderNumber: quote.cylinderNumber || "",
+      cylinderTeeth: quote.cylinderTeeth !== undefined && quote.cylinderTeeth !== null ? Number(quote.cylinderTeeth) : 96,
+      additionalDies: (loadedAdditionalDies.length > 0 ? loadedAdditionalDies : []) as AdditionalDie[],
+      parts: (loadedParts.length > 0
+        ? loadedParts
+        : [
+            {
+              partNumber: "1",
+              description1: quote.productSku || (quote.lines && quote.lines[0]?.sku) || "0UPM11 / EW625",
+              description2: quote.productName || (quote.lines && quote.lines[0]?.productName) || "ETIQUETAS DE CARTON IMPRESAS",
+            },
+          ]) as PartItem[],
+      inks: (loadedInks.length > 0
+        ? loadedInks
+        : initialFormState.inks) as InkItem[],
+
+      materialCost: Number(quote.materialCost) || 0,
+      laborCost: Number(quote.laborCost) || 150,
+      overheadCost: Number(quote.overheadCost) || 75,
+      marginPercent: Number(quote.marginPercent) || 35,
+
       discount: quote.discount || 0,
       taxRate: quote.taxRate || 15,
-      status: quote.status || "Borrador",
       lines:
         quote.lines && quote.lines.length > 0
           ? quote.lines.map((l) => ({
@@ -313,12 +709,12 @@ export default function QuotesModule({
             }))
           : [
               {
-                productName: "",
-                sku: "",
-                description: "",
-                quantity: 1,
-                rate: 0,
-                amount: 0,
+                productName: quote.productName || "ETIQUETAS DE CARTON IMPRESAS",
+                sku: quote.productSku || "0UPM11 / EW625",
+                description: "Tiraje flexográfico",
+                quantity: 1000,
+                rate: 0.15,
+                amount: 150,
               },
             ],
     });
@@ -1238,6 +1634,18 @@ export default function QuotesModule({
                       {/* Acciones */}
                       <td className="py-3.5 px-4 text-right">
                         <div className="flex items-center justify-end gap-1.5">
+                          {/* Botón de Orden de Producción / Trabajo */}
+                          {onEmitWorkOrder && (
+                            <button
+                              onClick={() => onEmitWorkOrder(quote)}
+                              className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-lg transition shadow-2xs cursor-pointer"
+                              title="Emitir Orden de Producción / Trabajo a partir de esta cotización"
+                            >
+                              <Cog className="w-3.5 h-3.5 text-indigo-600" />
+                              O.T.
+                            </button>
+                          )}
+
                           {/* Botón de Pedido de Venta (Sales Order) */}
                           {quote.status !== "Facturada" && (
                             <button
@@ -1414,207 +1822,1132 @@ export default function QuotesModule({
                     </div>
                   </div>
 
-                  {/* Datos del Cliente y Condiciones Comerciales */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-slate-50/70 p-5 rounded-2xl border border-slate-200/70 text-xs">
-                    {/* Columna Izquierda: Cliente */}
-                    <div className="space-y-3">
-                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                        Información del Cliente
+                  {/* Sección 1: Encabezado */}
+                  <div className="bg-slate-50/80 p-4 sm:p-5 rounded-3xl border border-slate-200/90 space-y-4">
+                    <div className="flex items-center justify-between pb-2 border-b border-slate-200/80">
+                      <span className="font-bold text-slate-800 text-xs uppercase tracking-wider flex items-center gap-2">
+                        <div className="w-6 h-6 rounded-lg bg-orange-100 text-[#f6821f] flex items-center justify-center">
+                          <Building2 className="w-3.5 h-3.5" />
+                        </div>
+                        <span>1. Encabezado</span>
                       </span>
-
-                      <div>
-                        <label className="block text-[11px] font-semibold text-slate-700 mb-1">
-                          Seleccionar Cliente
-                        </label>
-                        <select
-                          value={formData.customerId}
-                          onChange={(e) => handleCustomerSelect(e.target.value)}
-                          className="w-full px-3 py-2 text-xs bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#f6821f]/30 focus:border-[#f6821f]"
-                        >
-                          <option value="">-- Seleccionar de catálogo existente --</option>
-                          {customers.map((c) => (
-                            <option key={c.id} value={c.id}>
-                              {c.name}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="block text-[11px] font-semibold text-slate-700 mb-1">
-                          Nombre o Razón Social *
-                        </label>
-                        <input
-                          type="text"
-                          required
-                          placeholder="Nombre completo del cliente..."
-                          value={formData.customerName}
-                          onChange={(e) => setFormData({ ...formData, customerName: e.target.value })}
-                          className="w-full px-3 py-2 text-xs bg-white border border-slate-300 rounded-xl font-bold text-slate-900 focus:border-[#f6821f]"
-                        />
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-2">
-                        <div>
-                          <label className="block text-[11px] font-semibold text-slate-700 mb-1">
-                            RTN / ID Fiscal
-                          </label>
-                          <input
-                            type="text"
-                            placeholder="0501..."
-                            value={formData.customerRtn}
-                            onChange={(e) => setFormData({ ...formData, customerRtn: e.target.value })}
-                            className="w-full px-3 py-2 text-xs bg-white border border-slate-300 rounded-xl focus:border-[#f6821f]"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-[11px] font-semibold text-slate-700 mb-1">
-                            Teléfono
-                          </label>
-                          <input
-                            type="text"
-                            placeholder="+504..."
-                            value={formData.customerPhone}
-                            onChange={(e) => setFormData({ ...formData, customerPhone: e.target.value })}
-                            className="w-full px-3 py-2 text-xs bg-white border border-slate-300 rounded-xl focus:border-[#f6821f]"
-                          />
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-2">
-                        <div>
-                          <label className="block text-[11px] font-semibold text-slate-700 mb-1">
-                            Correo Electrónico
-                          </label>
-                          <input
-                            type="email"
-                            placeholder="correo@empresa.hn"
-                            value={formData.customerEmail}
-                            onChange={(e) => setFormData({ ...formData, customerEmail: e.target.value })}
-                            className="w-full px-3 py-2 text-xs bg-white border border-slate-300 rounded-xl focus:border-[#f6821f]"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-[11px] font-semibold text-slate-700 mb-1">
-                            Dirección Fiscal
-                          </label>
-                          <input
-                            type="text"
-                            placeholder="Ciudad, parque industrial..."
-                            value={formData.customerAddress}
-                            onChange={(e) => setFormData({ ...formData, customerAddress: e.target.value })}
-                            className="w-full px-3 py-2 text-xs bg-white border border-slate-300 rounded-xl focus:border-[#f6821f]"
-                          />
-                        </div>
-                      </div>
                     </div>
 
-                    {/* Columna Derecha: Condiciones */}
-                    <div className="space-y-3">
-                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                        Términos & Fechas
-                      </span>
+                    {/* A. Encabezado del Documento */}
+                    <div className="bg-white p-3.5 rounded-2xl border border-slate-200/80 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                          <Calendar className="w-3 h-3 text-[#f6821f]" />
+                          <span>Encabezado de Documento</span>
+                        </span>
+                        <span className="text-[10px] text-slate-400 font-mono">
+                          N° {formData.quoteNumber || "Nuevo"}
+                        </span>
+                      </div>
 
-                      <div className="grid grid-cols-2 gap-2">
+                      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2.5">
+                        {/* Date */}
                         <div>
                           <label className="block text-[11px] font-semibold text-slate-700 mb-1">
-                            Fecha de Emisión
+                            Date *
                           </label>
                           <input
                             type="date"
                             required
                             value={formData.quoteDate}
                             onChange={(e) => setFormData({ ...formData, quoteDate: e.target.value })}
-                            className="w-full px-3 py-2 text-xs bg-white border border-slate-300 rounded-xl focus:border-[#f6821f]"
+                            className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-xs font-medium focus:bg-white focus:border-[#f6821f] focus:outline-none transition"
                           />
                         </div>
+
+                        {/* Due Date */}
                         <div>
                           <label className="block text-[11px] font-semibold text-slate-700 mb-1">
-                            Válida Hasta
+                            Due Date
                           </label>
                           <input
                             type="date"
+                            value={formData.dueDate || ""}
+                            onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
+                            className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-xs font-medium focus:bg-white focus:border-[#f6821f] focus:outline-none transition"
+                          />
+                        </div>
+
+                        {/* From Job No. */}
+                        <div>
+                          <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                            From Job No.
+                          </label>
+                          <input
+                            type="text"
+                            value={formData.fromJobNo || ""}
+                            onChange={(e) => setFormData({ ...formData, fromJobNo: e.target.value })}
+                            placeholder="338958"
+                            className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-mono text-xs font-bold focus:bg-white focus:border-[#f6821f] focus:outline-none transition"
+                          />
+                        </div>
+
+                        {/* Opened */}
+                        <div>
+                          <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                            Opened
+                          </label>
+                          <input
+                            type="date"
+                            value={formData.openedDate || ""}
+                            onChange={(e) => setFormData({ ...formData, openedDate: e.target.value })}
+                            className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-xs font-medium focus:bg-white focus:border-[#f6821f] focus:outline-none transition"
+                          />
+                        </div>
+
+                        {/* Status (Open / Closed) */}
+                        <div>
+                          <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                            Status
+                          </label>
+                          <select
+                            value={formData.statusCode || "Open"}
+                            onChange={(e) => setFormData({ ...formData, statusCode: e.target.value })}
+                            className="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-xs font-bold focus:bg-white focus:border-[#f6821f] focus:outline-none transition cursor-pointer"
+                          >
+                            <option value="Open">Open</option>
+                            <option value="Closed">Closed</option>
+                          </select>
+                        </div>
+
+                        {/* Completion Status */}
+                        <div>
+                          <label className="block text-[11px] font-semibold text-slate-700 mb-1 truncate" title="Completion Status">
+                            Completion Status
+                          </label>
+                          <select
+                            value={formData.completionStatus || "Incomplete"}
+                            onChange={(e) => setFormData({ ...formData, completionStatus: e.target.value })}
+                            className="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-xs font-semibold focus:bg-white focus:border-[#f6821f] focus:outline-none transition cursor-pointer"
+                          >
+                            <option value="Incomplete">Incomplete</option>
+                            <option value="Complete">Complete</option>
+                            <option value="Pending">Pending</option>
+                            <option value="Cancelled">Cancelled</option>
+                          </select>
+                        </div>
+
+                        {/* Division */}
+                        <div>
+                          <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                            Division
+                          </label>
+                          <select
+                            value={formData.division || "HH"}
+                            onChange={(e) => setFormData({ ...formData, division: e.target.value })}
+                            className="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-xs font-bold focus:bg-white focus:border-[#f6821f] focus:outline-none transition cursor-pointer"
+                          >
+                            <option value="HH">HH</option>
+                            <option value="PP">PP</option>
+                            <option value="FL">FL</option>
+                            <option value="CV">CV</option>
+                            <option value="CORR">CORR</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      {/* N° Cotización & Título */}
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-2 border-t border-slate-100">
+                        <div>
+                          <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                            N° de Cotización *
+                          </label>
+                          <input
+                            type="text"
                             required
-                            value={formData.validUntil}
-                            onChange={(e) => setFormData({ ...formData, validUntil: e.target.value })}
-                            className="w-full px-3 py-2 text-xs bg-white border border-slate-300 rounded-xl focus:border-[#f6821f]"
+                            value={formData.quoteNumber}
+                            onChange={(e) => setFormData({ ...formData, quoteNumber: e.target.value })}
+                            className="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl font-mono text-slate-900 font-bold text-xs focus:bg-white focus:border-[#f6821f] focus:outline-none transition"
+                          />
+                        </div>
+
+                        <div className="sm:col-span-2">
+                          <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                            Título / Descripción del Trabajo
+                          </label>
+                          <input
+                            type="text"
+                            value={formData.title || ""}
+                            onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                            placeholder="Ej: Tiraje 360,000 etiquetas DICKIES -WWOF..."
+                            className="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-xs focus:bg-white focus:border-[#f6821f] focus:outline-none transition"
                           />
                         </div>
                       </div>
+                    </div>
 
-                      <div className="grid grid-cols-2 gap-2">
+                    {/* B. Bloque del Cliente y Contacto (2 columnas) */}
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-3">
+                      {/* Columna Izquierda: Customer, Dirección y Ciudad/Estado/Zip */}
+                      <div className="lg:col-span-6 bg-white p-3.5 rounded-2xl border border-slate-200/80 space-y-2.5">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
+                          <Building2 className="w-3 h-3 text-[#f6821f]" />
+                          <span>Datos del Cliente &amp; Dirección</span>
+                        </span>
+
+                        {/* Customer Code */}
                         <div>
                           <label className="block text-[11px] font-semibold text-slate-700 mb-1">
-                            Términos de Pago
+                            Customer (Código) *
                           </label>
-                          <select
-                            value={formData.paymentTerms}
-                            onChange={(e) => setFormData({ ...formData, paymentTerms: e.target.value })}
-                            className="w-full px-3 py-2 text-xs bg-white border border-slate-300 rounded-xl focus:border-[#f6821f]"
-                          >
-                            <option value="Contado">Contado</option>
-                            <option value="Neto 15 días">Neto 15 días</option>
-                            <option value="Neto 30 días">Neto 30 días</option>
-                            <option value="Neto 45 días">Neto 45 días</option>
-                            <option value="Neto 60 días">Neto 60 días</option>
-                          </select>
+                          <div className="flex gap-1.5">
+                            <input
+                              type="text"
+                              required
+                              list="customers-code-list"
+                              value={formData.customerCode || ""}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                const match = customers.find(
+                                  (c) =>
+                                    (c.macolaCode && c.macolaCode.toLowerCase() === val.toLowerCase()) ||
+                                    c.id.toLowerCase() === val.toLowerCase() ||
+                                    c.name.toLowerCase() === val.toLowerCase()
+                                );
+                                if (match) {
+                                  setFormData({
+                                    ...formData,
+                                    customerCode: match.macolaCode || val,
+                                    customerId: match.id,
+                                    customerName: match.name,
+                                    customerAddress: match.address || formData.customerAddress,
+                                    customerAddress1: match.address || formData.customerAddress1,
+                                    customerEmail: match.email || formData.customerEmail,
+                                    customerPhone: match.phone || formData.customerPhone,
+                                    customerRtn: match.rtn || formData.customerRtn,
+                                    currency: match.currency || formData.currency,
+                                  });
+                                } else {
+                                  setFormData({ ...formData, customerCode: val });
+                                }
+                              }}
+                              placeholder="VFS200"
+                              className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-xl font-mono text-slate-900 font-black text-xs uppercase focus:bg-white focus:border-[#f6821f] focus:outline-none transition"
+                            />
+                            <datalist id="customers-code-list">
+                              {customers.map((c) => (
+                                <option key={c.id} value={c.macolaCode || c.id}>
+                                  {c.name}
+                                </option>
+                              ))}
+                            </datalist>
+                          </div>
                         </div>
+
+                        {/* Customer Name */}
                         <div>
                           <label className="block text-[11px] font-semibold text-slate-700 mb-1">
-                            Moneda
+                            Nombre o Razón Social *
                           </label>
-                          <select
-                            value={formData.currency}
-                            onChange={(e) => setFormData({ ...formData, currency: e.target.value })}
-                            className="w-full px-3 py-2 text-xs bg-white border border-slate-300 rounded-xl focus:border-[#f6821f]"
-                          >
-                            <option value="USD">USD ($ - Dólar Estadounidense)</option>
-                            <option value="HNL">HNL (L - Lempira Hondureño)</option>
-                          </select>
+                          <input
+                            type="text"
+                            required
+                            list="customers-name-list"
+                            value={formData.customerName}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              const match = customers.find((c) => c.name.toLowerCase() === val.toLowerCase());
+                              if (match) {
+                                setFormData({
+                                  ...formData,
+                                  customerName: val,
+                                  customerCode: match.macolaCode || formData.customerCode,
+                                  customerId: match.id,
+                                  customerAddress: match.address || formData.customerAddress,
+                                  customerAddress1: match.address || formData.customerAddress1,
+                                  customerEmail: match.email || formData.customerEmail,
+                                  customerPhone: match.phone || formData.customerPhone,
+                                  customerRtn: match.rtn || formData.customerRtn,
+                                  currency: match.currency || formData.currency,
+                                });
+                              } else {
+                                setFormData({ ...formData, customerName: val });
+                              }
+                            }}
+                            placeholder="VFS PANAMA TRADING S. DE R.L."
+                            className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-xs font-bold uppercase focus:bg-white focus:border-[#f6821f] focus:outline-none transition"
+                          />
+                          <datalist id="customers-name-list">
+                            {customers.map((c) => (
+                              <option key={c.id} value={c.name} />
+                            ))}
+                          </datalist>
+                        </div>
+
+                        {/* Address Line 1 */}
+                        <div>
+                          <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                            Dirección Línea 1
+                          </label>
+                          <input
+                            type="text"
+                            value={formData.customerAddress1 || ""}
+                            onChange={(e) => setFormData({ ...formData, customerAddress1: e.target.value, customerAddress: e.target.value })}
+                            placeholder="DREAM PLAZA, PISO 8 OFICINA 811 AVE"
+                            className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-xs uppercase focus:bg-white focus:border-[#f6821f] focus:outline-none transition"
+                          />
+                        </div>
+
+                        {/* Address Line 2 */}
+                        <div>
+                          <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                            Dirección Línea 2
+                          </label>
+                          <input
+                            type="text"
+                            value={formData.customerAddress2 || ""}
+                            onChange={(e) => setFormData({ ...formData, customerAddress2: e.target.value })}
+                            placeholder="CENTENARIO COSTA del ESTE"
+                            className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-xs uppercase focus:bg-white focus:border-[#f6821f] focus:outline-none transition"
+                          />
+                        </div>
+
+                        {/* City, State, Zip */}
+                        <div className="grid grid-cols-12 gap-1.5">
+                          <div className="col-span-6">
+                            <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                              Ciudad (City)
+                            </label>
+                            <input
+                              type="text"
+                              value={formData.customerCity || ""}
+                              onChange={(e) => setFormData({ ...formData, customerCity: e.target.value })}
+                              placeholder="CUIDAD de PANAMA"
+                              className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-xs uppercase focus:bg-white focus:border-[#f6821f] focus:outline-none transition"
+                            />
+                          </div>
+
+                          <div className="col-span-3">
+                            <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                              Estado / País
+                            </label>
+                            <select
+                              value={formData.customerState || "PA"}
+                              onChange={(e) => setFormData({ ...formData, customerState: e.target.value })}
+                              className="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-xs font-semibold focus:bg-white focus:border-[#f6821f] focus:outline-none transition cursor-pointer"
+                            >
+                              <option value="PA">PA</option>
+                              <option value="HN">HN</option>
+                              <option value="US">US</option>
+                              <option value="GT">GT</option>
+                              <option value="SV">SV</option>
+                              <option value="NI">NI</option>
+                              <option value="CR">CR</option>
+                              <option value="OTHER">Otro</option>
+                            </select>
+                          </div>
+
+                          <div className="col-span-3">
+                            <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                              Zip / C.P.
+                            </label>
+                            <input
+                              type="text"
+                              value={formData.customerZip || ""}
+                              onChange={(e) => setFormData({ ...formData, customerZip: e.target.value })}
+                              placeholder="0819"
+                              className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-mono text-xs focus:bg-white focus:border-[#f6821f] focus:outline-none transition"
+                            />
+                          </div>
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-2">
+                      {/* Columna Derecha: Contacto, Comunicaciones & Venta */}
+                      <div className="lg:col-span-6 bg-white p-3.5 rounded-2xl border border-slate-200/80 space-y-2.5">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
+                          <User className="w-3 h-3 text-[#f6821f]" />
+                          <span>Contacto, Comunicaciones &amp; Venta</span>
+                        </span>
+
+                        {/* Contact */}
                         <div>
                           <label className="block text-[11px] font-semibold text-slate-700 mb-1">
-                            Vendedor Asignado
+                            Contact (Contacto)
                           </label>
-                          <select
-                            value={formData.salesRepId}
+                          <input
+                            type="text"
+                            value={formData.contactName || ""}
+                            onChange={(e) => setFormData({ ...formData, contactName: e.target.value })}
+                            placeholder="GISSELLE ANDERSON"
+                            className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-xs font-semibold uppercase focus:bg-white focus:border-[#f6821f] focus:outline-none transition"
+                          />
+                        </div>
+
+                        {/* Phone / Fax / Ext. */}
+                        <div>
+                          <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                            Phone / Fax / Ext.
+                          </label>
+                          <div className="grid grid-cols-12 gap-1.5">
+                            <div className="col-span-6">
+                              <input
+                                type="text"
+                                value={formData.customerPhone}
+                                onChange={(e) => setFormData({ ...formData, customerPhone: e.target.value })}
+                                placeholder="507-831-2374"
+                                className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-xs font-mono focus:bg-white focus:border-[#f6821f] focus:outline-none transition"
+                              />
+                            </div>
+                            <div className="col-span-2 flex items-center gap-1">
+                              <span className="text-[10px] font-black text-slate-400 font-mono">X</span>
+                              <input
+                                type="text"
+                                value={formData.phoneExt || ""}
+                                onChange={(e) => setFormData({ ...formData, phoneExt: e.target.value })}
+                                placeholder="201"
+                                className="w-full px-1.5 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-xs font-mono text-center focus:bg-white focus:border-[#f6821f] focus:outline-none transition"
+                              />
+                            </div>
+                            <div className="col-span-4">
+                              <input
+                                type="text"
+                                value={formData.customerFax || ""}
+                                onChange={(e) => setFormData({ ...formData, customerFax: e.target.value })}
+                                placeholder="Fax / Alt"
+                                className="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-xs font-mono focus:bg-white focus:border-[#f6821f] focus:outline-none transition"
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Email & RTN */}
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                              E-mail
+                            </label>
+                            <input
+                              type="email"
+                              value={formData.customerEmail}
+                              onChange={(e) => setFormData({ ...formData, customerEmail: e.target.value })}
+                              placeholder="correo@ejemplo.com"
+                              className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-xs focus:bg-white focus:border-[#f6821f] focus:outline-none transition"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                              RTN / ID Fiscal
+                            </label>
+                            <input
+                              type="text"
+                              value={formData.customerRtn || ""}
+                              onChange={(e) => setFormData({ ...formData, customerRtn: e.target.value })}
+                              placeholder="0501..."
+                              className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-xs font-mono focus:bg-white focus:border-[#f6821f] focus:outline-none transition"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Salespn (Code + Name) */}
+                        <div>
+                          <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                            Salespn (Vendedor)
+                          </label>
+                          <div className="grid grid-cols-12 gap-1.5">
+                            <div className="col-span-4">
+                              <input
+                                type="text"
+                                value={formData.salespersonCode || "005"}
+                                onChange={(e) => setFormData({ ...formData, salespersonCode: e.target.value })}
+                                placeholder="005"
+                                className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-mono text-xs font-bold text-center uppercase focus:bg-white focus:border-[#f6821f] focus:outline-none transition"
+                              />
+                            </div>
+                            <div className="col-span-8">
+                              <input
+                                type="text"
+                                value={formData.salesRepName || "HOUSE"}
+                                onChange={(e) => setFormData({ ...formData, salesRepName: e.target.value })}
+                                placeholder="HOUSE"
+                                className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-xs font-bold uppercase focus:bg-white focus:border-[#f6821f] focus:outline-none transition"
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Note & Broker Checkbox */}
+                        <div className="flex items-center gap-2">
+                          <div className="flex-1">
+                            <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                              Note (Nota de Venta)
+                            </label>
+                            <input
+                              type="text"
+                              value={formData.notes || ""}
+                              onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                              placeholder="Observación de documento o cliente..."
+                              className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-xs focus:bg-white focus:border-[#f6821f] focus:outline-none transition"
+                            />
+                          </div>
+
+                          <div className="shrink-0 pt-4">
+                            <label className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-700 cursor-pointer select-none px-2.5 py-1.5 rounded-xl bg-slate-50 border border-slate-200 hover:bg-slate-100 transition">
+                              <input
+                                type="checkbox"
+                                checked={formData.isBroker || false}
+                                onChange={(e) => setFormData({ ...formData, isBroker: e.target.checked })}
+                                className="rounded text-[#f6821f] focus:ring-[#f6821f]"
+                              />
+                              <span className="text-[11px]">Broker</span>
+                            </label>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Sección 2: Parte */}
+                  <div className="bg-slate-50/80 p-4 sm:p-5 rounded-3xl border border-slate-200/90 space-y-4">
+                    <div className="flex items-center justify-between pb-2 border-b border-slate-200/80">
+                      <span className="font-bold text-slate-800 text-xs uppercase tracking-wider flex items-center gap-2">
+                        <div className="w-6 h-6 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center">
+                          <Settings2 className="w-3.5 h-3.5" />
+                        </div>
+                        <span>2. Parte</span>
+                      </span>
+                    </div>
+
+                    {/* Sub-bloque A: Especificación de Troquel & Dimensiones */}
+                    <div className="bg-white p-3.5 rounded-2xl border border-slate-200/80 space-y-3">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">
+                            Die #:
+                          </label>
+                          <input
+                            type="text"
+                            value={formData.dieNumber || ""}
+                            onChange={(e) => setFormData({ ...formData, dieNumber: e.target.value })}
+                            placeholder="FHR020055"
+                            className="w-36 px-2.5 py-1 bg-slate-50 border border-slate-300 rounded-xl font-mono text-slate-900 font-black text-xs uppercase focus:bg-white focus:border-[#f6821f] focus:outline-none transition shadow-2xs"
+                          />
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">
+                            Shape:
+                          </label>
+                          <div className="flex items-center gap-1">
+                            <input
+                              type="text"
+                              list="die-shapes-list"
+                              value={formData.dieShape || ""}
+                              onChange={(e) => setFormData({ ...formData, dieShape: e.target.value })}
+                              placeholder="NTCH RL TG"
+                              className="w-32 px-2.5 py-1 bg-slate-50 border border-slate-300 rounded-xl font-mono text-slate-900 font-bold text-xs uppercase focus:bg-white focus:border-[#f6821f] focus:outline-none transition shadow-2xs"
+                            />
+                            <datalist id="die-shapes-list">
+                              <option value="NTCH RL TG">NTCH RL TG (Notch Roll Tag)</option>
+                              <option value="RECTANGLE">RECTANGLE</option>
+                              <option value="OVAL">OVAL</option>
+                              <option value="CIRCLE">CIRCLE</option>
+                              <option value="SQUARE">SQUARE</option>
+                              <option value="SPECIAL">SPECIAL / CUSTOM</option>
+                            </datalist>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Grid de Medidas / Dimensiones */}
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-left text-xs border border-slate-200 rounded-xl overflow-hidden">
+                          <thead className="bg-slate-100/80 text-[10px] font-bold text-slate-600 uppercase border-b border-slate-200">
+                            <tr>
+                              <th className="px-2.5 py-1.5 w-20"></th>
+                              <th className="px-2.5 py-1.5 text-center">Size</th>
+                              <th className="px-2.5 py-1.5 text-center">#</th>
+                              <th className="px-2.5 py-1.5 text-center">Space</th>
+                              <th className="px-2.5 py-1.5">Pitch / Type</th>
+                              <th className="px-2.5 py-1.5">Teeth / Repeat</th>
+                              <th className="px-2.5 py-1.5">Cylinder / Cyl Teeth</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100 font-mono text-xs">
+                            {/* Fila 1: Across */}
+                            <tr className="hover:bg-slate-50/50">
+                              <td className="px-2.5 py-1.5 font-bold font-sans text-slate-700 bg-slate-50/60">
+                                Across:
+                              </td>
+                              <td className="px-2 py-1.5">
+                                <input
+                                  type="text"
+                                  value={formData.sizeAcross || ""}
+                                  onChange={(e) => setFormData({ ...formData, sizeAcross: e.target.value })}
+                                  placeholder="2"
+                                  className="w-full px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg text-center font-bold text-slate-900 focus:bg-white focus:border-[#f6821f] focus:outline-none"
+                                />
+                              </td>
+                              <td className="px-2 py-1.5">
+                                <input
+                                  type="number"
+                                  min="1"
+                                  value={formData.numAcross || 1}
+                                  onChange={(e) => setFormData({ ...formData, numAcross: Number(e.target.value) || 1 })}
+                                  placeholder="4"
+                                  className="w-full px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg text-center font-bold text-slate-900 focus:bg-white focus:border-[#f6821f] focus:outline-none"
+                                />
+                              </td>
+                              <td className="px-2 py-1.5">
+                                <input
+                                  type="text"
+                                  value={formData.spaceAcross || ""}
+                                  onChange={(e) => setFormData({ ...formData, spaceAcross: e.target.value })}
+                                  placeholder="1/8"
+                                  className="w-full px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg text-center font-bold text-slate-900 focus:bg-white focus:border-[#f6821f] focus:outline-none"
+                                />
+                              </td>
+                              <td className="px-2 py-1.5">
+                                <div className="flex items-center gap-1 font-sans">
+                                  <span className="text-[10px] text-slate-400 font-semibold w-10">Pitch:</span>
+                                  <input
+                                    type="text"
+                                    value={formData.pitch || "1/8"}
+                                    onChange={(e) => setFormData({ ...formData, pitch: e.target.value })}
+                                    placeholder="1/8"
+                                    className="w-16 px-1.5 py-1 bg-slate-50 border border-slate-200 rounded-lg font-mono text-center font-bold text-slate-900 focus:bg-white focus:border-[#f6821f] focus:outline-none"
+                                  />
+                                </div>
+                              </td>
+                              <td className="px-2 py-1.5">
+                                <div className="flex items-center gap-1 font-sans">
+                                  <span className="text-[10px] text-slate-400 font-semibold w-10">Teeth:</span>
+                                  <input
+                                    type="number"
+                                    min="1"
+                                    value={formData.teeth || 96}
+                                    onChange={(e) => {
+                                      const t = Number(e.target.value) || 0;
+                                      setFormData({ ...formData, teeth: t, cylinderTeeth: t });
+                                    }}
+                                    placeholder="96"
+                                    className="w-16 px-1.5 py-1 bg-slate-50 border border-slate-200 rounded-lg font-mono text-center font-bold text-slate-900 focus:bg-white focus:border-[#f6821f] focus:outline-none"
+                                  />
+                                </div>
+                              </td>
+                              <td className="px-2 py-1.5">
+                                <div className="flex items-center gap-1 font-sans">
+                                  <span className="text-[10px] text-slate-400 font-semibold w-16 truncate">Cyl #:</span>
+                                  <input
+                                    type="text"
+                                    value={formData.cylinderNumber || ""}
+                                    onChange={(e) => setFormData({ ...formData, cylinderNumber: e.target.value })}
+                                    placeholder="CIL-96"
+                                    className="w-24 px-1.5 py-1 bg-slate-50 border border-slate-200 rounded-lg font-mono text-center text-slate-900 focus:bg-white focus:border-[#f6821f] focus:outline-none"
+                                  />
+                                </div>
+                              </td>
+                            </tr>
+
+                            {/* Fila 2: Around */}
+                            <tr className="hover:bg-slate-50/50">
+                              <td className="px-2.5 py-1.5 font-bold font-sans text-slate-700 bg-slate-50/60">
+                                Around:
+                              </td>
+                              <td className="px-2 py-1.5">
+                                <input
+                                  type="text"
+                                  value={formData.sizeAround || ""}
+                                  onChange={(e) => setFormData({ ...formData, sizeAround: e.target.value })}
+                                  placeholder="6"
+                                  className="w-full px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg text-center font-bold text-slate-900 focus:bg-white focus:border-[#f6821f] focus:outline-none"
+                                />
+                              </td>
+                              <td className="px-2 py-1.5">
+                                <input
+                                  type="number"
+                                  min="1"
+                                  value={formData.numAround || 1}
+                                  onChange={(e) => setFormData({ ...formData, numAround: Number(e.target.value) || 1 })}
+                                  placeholder="2"
+                                  className="w-full px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg text-center font-bold text-slate-900 focus:bg-white focus:border-[#f6821f] focus:outline-none"
+                                />
+                              </td>
+                              <td className="px-2 py-1.5">
+                                <input
+                                  type="text"
+                                  value={formData.spaceAround || ""}
+                                  onChange={(e) => setFormData({ ...formData, spaceAround: e.target.value })}
+                                  placeholder="0"
+                                  className="w-full px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg text-center text-slate-400 focus:bg-white focus:border-[#f6821f] focus:outline-none"
+                                />
+                              </td>
+                              <td className="px-2 py-1.5">
+                                <div className="flex items-center gap-1 font-sans">
+                                  <span className="text-[10px] text-slate-400 font-semibold w-10">Type:</span>
+                                  <select
+                                    value={formData.dieType || "Circumf"}
+                                    onChange={(e) => setFormData({ ...formData, dieType: e.target.value })}
+                                    className="w-24 px-1.5 py-1 bg-slate-50 border border-slate-200 rounded-lg text-[11px] font-bold text-slate-800 focus:bg-white focus:border-[#f6821f] focus:outline-none cursor-pointer"
+                                  >
+                                    <option value="Circumf">Circumf</option>
+                                    <option value="Rotary">Rotary</option>
+                                    <option value="Magnetic">Magnetic</option>
+                                    <option value="Flatbed">Flatbed</option>
+                                  </select>
+                                </div>
+                              </td>
+                              <td className="px-2 py-1.5">
+                                <div className="flex items-center gap-1 font-sans">
+                                  <span className="text-[10px] text-slate-400 font-semibold w-10">Repeat:</span>
+                                  <input
+                                    type="number"
+                                    step="any"
+                                    value={formData.repeatLength || 0}
+                                    onChange={(e) => setFormData({ ...formData, repeatLength: Number(e.target.value) || 0 })}
+                                    placeholder="12.0000"
+                                    className="w-20 px-1.5 py-1 bg-slate-50 border border-slate-200 rounded-lg font-mono text-center font-bold text-slate-900 focus:bg-white focus:border-[#f6821f] focus:outline-none"
+                                  />
+                                </div>
+                              </td>
+                              <td className="px-2 py-1.5">
+                                <div className="flex items-center gap-1 font-sans">
+                                  <span className="text-[10px] text-slate-400 font-semibold w-16 truncate">Cyl Teeth:</span>
+                                  <input
+                                    type="number"
+                                    min="1"
+                                    value={formData.cylinderTeeth || 96}
+                                    onChange={(e) => setFormData({ ...formData, cylinderTeeth: Number(e.target.value) || 0 })}
+                                    placeholder="96"
+                                    className="w-16 px-1.5 py-1 bg-slate-50 border border-slate-200 rounded-lg font-mono text-center font-bold text-slate-900 focus:bg-white focus:border-[#f6821f] focus:outline-none"
+                                  />
+                                </div>
+                              </td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+
+                    {/* Sub-bloque B: Troqueles Adicionales (Add'l Die #) */}
+                    <div className="bg-white p-3.5 rounded-2xl border border-slate-200/80 space-y-2.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
+                          <Settings2 className="w-3 h-3 text-[#f6821f]" />
+                          <span>Add'l Die # (Troqueles Adicionales / Perforadores / Plecadores)</span>
+                        </span>
+                        <button
+                          type="button"
+                          onClick={handleAddAdditionalDie}
+                          className="px-2 py-0.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[10px] transition cursor-pointer flex items-center gap-1"
+                        >
+                          <Plus className="w-3 h-3 text-slate-500" />
+                          <span>Agregar Troquel</span>
+                        </button>
+                      </div>
+
+                      <div className="overflow-x-auto border border-slate-200 rounded-xl">
+                        <table className="w-full text-left text-xs">
+                          <thead className="bg-slate-100/90 text-[10px] font-bold text-slate-600 uppercase border-b border-slate-200">
+                            <tr>
+                              <th className="px-2.5 py-1.5">Add'l Die #</th>
+                              <th className="px-2 py-1.5 text-center w-16">Qty</th>
+                              <th className="px-2 py-1.5 w-28">Shape</th>
+                              <th className="px-2 py-1.5 text-center w-20">Teeth</th>
+                              <th className="px-2.5 py-1.5">Note</th>
+                              <th className="px-2 py-1.5 text-center w-10"></th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100 font-mono text-xs">
+                            {formData.additionalDies.length === 0 ? (
+                              <tr>
+                                <td colSpan={6} className="px-3 py-3 text-center text-slate-400 font-sans italic text-[11px]">
+                                  Sin troqueles adicionales requeridos (haga clic en "+ Agregar Troquel" si requiere troquel secundario, perforado o corte continuo).
+                                </td>
+                              </tr>
+                            ) : (
+                              formData.additionalDies.map((ad, idx) => (
+                                <tr key={idx} className="hover:bg-slate-50/50">
+                                  <td className="px-2 py-1">
+                                    <input
+                                      type="text"
+                                      value={ad.dieNumber}
+                                      onChange={(e) => handleAdditionalDieChange(idx, "dieNumber", e.target.value)}
+                                      placeholder="DIE-PERF-01"
+                                      className="w-full px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg uppercase font-bold text-slate-900 focus:bg-white focus:border-[#f6821f] focus:outline-none"
+                                    />
+                                  </td>
+                                  <td className="px-2 py-1">
+                                    <input
+                                      type="number"
+                                      min="1"
+                                      value={ad.qty}
+                                      onChange={(e) => handleAdditionalDieChange(idx, "qty", Number(e.target.value) || 1)}
+                                      className="w-full px-1 py-1 bg-slate-50 border border-slate-200 rounded-lg text-center font-bold text-slate-900 focus:bg-white focus:border-[#f6821f] focus:outline-none"
+                                    />
+                                  </td>
+                                  <td className="px-2 py-1">
+                                    <input
+                                      type="text"
+                                      value={ad.shape}
+                                      onChange={(e) => handleAdditionalDieChange(idx, "shape", e.target.value)}
+                                      placeholder="PERF"
+                                      className="w-full px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg uppercase text-slate-800 focus:bg-white focus:border-[#f6821f] focus:outline-none"
+                                    />
+                                  </td>
+                                  <td className="px-2 py-1">
+                                    <input
+                                      type="text"
+                                      value={ad.teeth}
+                                      onChange={(e) => handleAdditionalDieChange(idx, "teeth", e.target.value)}
+                                      placeholder="96"
+                                      className="w-full px-1 py-1 bg-slate-50 border border-slate-200 rounded-lg text-center font-bold text-slate-900 focus:bg-white focus:border-[#f6821f] focus:outline-none"
+                                    />
+                                  </td>
+                                  <td className="px-2 py-1">
+                                    <input
+                                      type="text"
+                                      value={ad.note}
+                                      onChange={(e) => handleAdditionalDieChange(idx, "note", e.target.value)}
+                                      placeholder="Nota para operador..."
+                                      className="w-full px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg text-slate-700 font-sans text-xs focus:bg-white focus:border-[#f6821f] focus:outline-none"
+                                    />
+                                  </td>
+                                  <td className="px-2 py-1 text-center">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleRemoveAdditionalDie(idx)}
+                                      className="text-slate-400 hover:text-rose-600 transition cursor-pointer p-1"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  </td>
+                                </tr>
+                              ))
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+
+                    {/* Sub-bloque C: Part# & Descripciones */}
+                    <div className="bg-white p-3.5 rounded-2xl border border-slate-200/80 space-y-2.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
+                          <Tag className="w-3 h-3 text-[#f6821f]" />
+                          <span>Part# &amp; Descripciones del Producto a Fabricar</span>
+                        </span>
+                        <button
+                          type="button"
+                          onClick={handleAddPart}
+                          className="px-2 py-0.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[10px] transition cursor-pointer flex items-center gap-1"
+                        >
+                          <Plus className="w-3 h-3 text-slate-500" />
+                          <span>Agregar Parte</span>
+                        </button>
+                      </div>
+
+                      <div className="overflow-x-auto border border-slate-200 rounded-xl">
+                        <table className="w-full text-left text-xs">
+                          <thead className="bg-slate-100/90 text-[10px] font-bold text-slate-600 uppercase border-b border-slate-200">
+                            <tr>
+                              <th className="px-3 py-1.5 w-16">Part#</th>
+                              <th className="px-3 py-1.5 w-1/3">Description - 1 (SKU / Código)</th>
+                              <th className="px-3 py-1.5">Description - 2 (Nombre / Detalle de Etiqueta)</th>
+                              <th className="px-2 py-1.5 text-center w-10"></th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100 font-mono text-xs">
+                            {formData.parts.map((pt, idx) => (
+                              <tr key={idx} className="hover:bg-slate-50/50">
+                                <td className="px-2 py-1">
+                                  <input
+                                    type="text"
+                                    value={pt.partNumber}
+                                    onChange={(e) => handlePartChange(idx, "partNumber", e.target.value)}
+                                    className="w-full px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg text-center font-bold text-slate-900 focus:bg-white focus:border-[#f6821f] focus:outline-none"
+                                  />
+                                </td>
+                                <td className="px-2 py-1">
+                                  <input
+                                    type="text"
+                                    value={pt.description1}
+                                    onChange={(e) => handlePartChange(idx, "description1", e.target.value)}
+                                    placeholder="0UPM11 / EW625"
+                                    className="w-full px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg uppercase font-bold text-slate-900 focus:bg-white focus:border-[#f6821f] focus:outline-none"
+                                  />
+                                </td>
+                                <td className="px-2 py-1">
+                                  <input
+                                    type="text"
+                                    value={pt.description2}
+                                    onChange={(e) => handlePartChange(idx, "description2", e.target.value)}
+                                    placeholder="ETIQUETAS DE CARTON IMPRESAS"
+                                    className="w-full px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg uppercase font-semibold text-slate-800 focus:bg-white focus:border-[#f6821f] focus:outline-none"
+                                  />
+                                </td>
+                                <td className="px-2 py-1 text-center">
+                                  {formData.parts.length > 1 && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleRemovePart(idx)}
+                                      className="text-slate-400 hover:text-rose-600 transition cursor-pointer p-1"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  )}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+
+                      {/* Cantidad Corrida & UoM sincronizado */}
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-2 border-t border-slate-100">
+                        <div>
+                          <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                            Cantidad Corrida Programada *
+                          </label>
+                          <input
+                            type="number"
+                            min="1"
+                            step="any"
+                            required
+                            value={formData.targetQuantity}
                             onChange={(e) => {
-                              const rep = salesReps.find((r) => r.id === e.target.value);
-                              setFormData({
-                                ...formData,
-                                salesRepId: e.target.value,
-                                salesRepName: rep ? rep.name : "",
+                              const q = Number(e.target.value) || 1;
+                              setFormData((prev) => {
+                                const lines = [...prev.lines];
+                                if (lines[0]) {
+                                  lines[0].quantity = q;
+                                  lines[0].amount = Math.round(q * lines[0].rate * 100) / 100;
+                                }
+                                return { ...prev, targetQuantity: q, lines };
                               });
                             }}
-                            className="w-full px-3 py-2 text-xs bg-white border border-slate-300 rounded-xl focus:border-[#f6821f]"
-                          >
-                            <option value="">-- Sin asignar --</option>
-                            {salesReps.map((r) => (
-                              <option key={r.id} value={r.id}>
-                                {r.name}
-                              </option>
-                            ))}
-                          </select>
+                            className="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl font-mono text-slate-900 font-black text-xs focus:bg-white focus:border-[#f6821f] focus:outline-none transition"
+                          />
                         </div>
                         <div>
                           <label className="block text-[11px] font-semibold text-slate-700 mb-1">
-                            Estado Comercial
+                            Unidad de Medida
                           </label>
                           <select
-                            value={formData.status}
-                            onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                            className="w-full px-3 py-2 text-xs bg-white border border-slate-300 rounded-xl focus:border-[#f6821f]"
+                            value={formData.unitOfMeasure}
+                            onChange={(e) => setFormData({ ...formData, unitOfMeasure: e.target.value })}
+                            className="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-900 text-xs focus:bg-white focus:border-[#f6821f] focus:outline-none transition cursor-pointer"
                           >
-                            <option value="Borrador">Borrador</option>
-                            <option value="Enviada">Enviada al Cliente</option>
-                            <option value="Aprobada">Aprobada</option>
-                            <option value="Rechazada">Rechazada</option>
+                            <option value="UND">UND (Unidades)</option>
+                            <option value="MILLAR">MILLAR (Millares)</option>
+                            <option value="BOBINA">BOBINA (Rollos / Bobinas)</option>
+                            <option value="ROLLO">ROLLO (Rollos)</option>
+                            <option value="KG">KG (Kilogramos)</option>
                           </select>
                         </div>
+                        <div className="flex flex-col justify-end">
+                          <span className="text-[10px] text-slate-400 pb-1">Resumen del Producto</span>
+                          <span className="font-mono text-xs font-bold text-slate-800 truncate" title={`${formData.productSku} - ${formData.productName}`}>
+                            {formData.productSku || "-"} : {formData.productName || "-"}
+                          </span>
+                        </div>
                       </div>
+                    </div>
+
+                    {/* Sub-bloque D: Inks & Plates */}
+                    <div className="bg-white p-3.5 rounded-2xl border border-slate-200/80 space-y-2.5">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
+                            <Palette className="w-3 h-3 text-[#f6821f]" />
+                            <span>Inks &amp; Printing Plates (Tintas &amp; Clisés Flexográficos)</span>
+                          </span>
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-orange-100 text-[#f6821f] border border-orange-200 font-mono">
+                            {formData.inks.reduce((sum, ink) => sum + (Number(ink.plates) || 0), 0)} Placas en Total
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={handleAddInk}
+                          className="px-2 py-0.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[10px] transition cursor-pointer flex items-center gap-1"
+                        >
+                          <Plus className="w-3 h-3 text-slate-500" />
+                          <span>Agregar Tinta</span>
+                        </button>
+                      </div>
+
+                      <div className="overflow-x-auto border border-slate-200 rounded-xl">
+                        <table className="w-full text-left text-xs">
+                          <thead className="bg-slate-100/90 text-[10px] font-bold text-slate-600 uppercase border-b border-slate-200">
+                            <tr>
+                              <th className="px-2.5 py-1.5 w-24">Ink</th>
+                              <th className="px-2.5 py-1.5 w-40">Description</th>
+                              <th className="px-2.5 py-1.5">PMS # / Color</th>
+                              <th className="px-2 py-1.5 text-center w-14">Sides</th>
+                              <th className="px-2 py-1.5 text-center w-14">Plates</th>
+                              <th className="px-2 py-1.5 w-20">Plate#</th>
+                              <th className="px-2 py-1.5 text-center w-20">Cov %</th>
+                              <th className="px-2 py-1.5 text-center w-10"></th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100 font-mono text-xs">
+                            {formData.inks.length === 0 ? (
+                              <tr>
+                                <td colSpan={8} className="px-3 py-3 text-center text-slate-400 font-sans italic text-[11px]">
+                                  Sin tintas configuradas. Haga clic en "+ Agregar Tinta" para añadir colores al tiraje.
+                                </td>
+                              </tr>
+                            ) : (
+                              formData.inks.map((ink, idx) => {
+                                const colorDot = getPmsColorPreview(ink.pmsNumber);
+                                return (
+                                  <tr key={idx} className="hover:bg-slate-50/50">
+                                    <td className="px-1.5 py-1">
+                                      <input
+                                        type="text"
+                                        value={ink.ink}
+                                        onChange={(e) => handleInkChange(idx, "ink", e.target.value)}
+                                        placeholder="HF-MIX"
+                                        className="w-full px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg uppercase font-bold text-slate-900 focus:bg-white focus:border-[#f6821f] focus:outline-none"
+                                      />
+                                    </td>
+                                    <td className="px-1.5 py-1">
+                                      <input
+                                        type="text"
+                                        value={ink.description}
+                                        onChange={(e) => handleInkChange(idx, "description", e.target.value)}
+                                        placeholder="INKS MIXED FLEXO"
+                                        className="w-full px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg uppercase text-slate-800 text-[11px] focus:bg-white focus:border-[#f6821f] focus:outline-none"
+                                      />
+                                    </td>
+                                    <td className="px-1.5 py-1">
+                                      <div className="flex items-center gap-1.5">
+                                        <span
+                                          className="w-3.5 h-3.5 rounded-full shrink-0 border border-slate-300 shadow-2xs"
+                                          style={{ backgroundColor: colorDot }}
+                                          title={ink.pmsNumber || "Color"}
+                                        />
+                                        <input
+                                          type="text"
+                                          value={ink.pmsNumber}
+                                          onChange={(e) => handleInkChange(idx, "pmsNumber", e.target.value)}
+                                          placeholder="2955C BLUE"
+                                          className="w-full px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg uppercase font-bold text-slate-900 focus:bg-white focus:border-[#f6821f] focus:outline-none"
+                                        />
+                                      </div>
+                                    </td>
+                                    <td className="px-1.5 py-1 text-center">
+                                      <input
+                                        type="number"
+                                        min="1"
+                                        max="2"
+                                        value={ink.sides}
+                                        onChange={(e) => handleInkChange(idx, "sides", Number(e.target.value) || 1)}
+                                        className="w-full px-1 py-1 bg-slate-50 border border-slate-200 rounded-lg text-center font-bold text-slate-900 focus:bg-white focus:border-[#f6821f] focus:outline-none"
+                                      />
+                                    </td>
+                                    <td className="px-1.5 py-1 text-center">
+                                      <input
+                                        type="number"
+                                        min="1"
+                                        value={ink.plates}
+                                        onChange={(e) => handleInkChange(idx, "plates", Number(e.target.value) || 1)}
+                                        className="w-full px-1 py-1 bg-slate-50 border border-slate-200 rounded-lg text-center font-bold text-slate-900 focus:bg-white focus:border-[#f6821f] focus:outline-none"
+                                      />
+                                    </td>
+                                    <td className="px-1.5 py-1">
+                                      <input
+                                        type="text"
+                                        value={ink.plateNumber}
+                                        onChange={(e) => handleInkChange(idx, "plateNumber", e.target.value)}
+                                        placeholder="PL-01"
+                                        className="w-full px-1.5 py-1 bg-slate-50 border border-slate-200 rounded-lg text-slate-700 text-center focus:bg-white focus:border-[#f6821f] focus:outline-none"
+                                      />
+                                    </td>
+                                    <td className="px-1.5 py-1 text-center">
+                                      <div className="flex items-center gap-1">
+                                        <input
+                                          type="number"
+                                          min="0"
+                                          max="100"
+                                          value={ink.coveragePercent}
+                                          onChange={(e) => handleInkChange(idx, "coveragePercent", Number(e.target.value) || 0)}
+                                          placeholder="25"
+                                          className="w-12 px-1 py-1 bg-slate-50 border border-slate-200 rounded-lg text-right font-bold text-slate-900 focus:bg-white focus:border-[#f6821f] focus:outline-none"
+                                        />
+                                        <span className="text-[10px] text-slate-400 font-sans">%</span>
+                                      </div>
+                                    </td>
+                                    <td className="px-1.5 py-1 text-center">
+                                      <button
+                                        type="button"
+                                        onClick={() => handleRemoveInk(idx)}
+                                        className="text-slate-400 hover:text-rose-600 transition cursor-pointer p-1"
+                                      >
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                      </button>
+                                    </td>
+                                  </tr>
+                                );
+                              })
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Sección 3: Términos & Fechas Comerciales */}
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4 bg-slate-50 p-4 rounded-2xl border border-slate-200/80 text-xs">
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                        Válida Hasta
+                      </label>
+                      <input
+                        type="date"
+                        required
+                        value={formData.validUntil}
+                        onChange={(e) => setFormData({ ...formData, validUntil: e.target.value })}
+                        className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-xl focus:border-[#f6821f]"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                        Términos de Pago
+                      </label>
+                      <select
+                        value={formData.paymentTerms}
+                        onChange={(e) => setFormData({ ...formData, paymentTerms: e.target.value })}
+                        className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-xl focus:border-[#f6821f]"
+                      >
+                        <option value="Contado">Contado</option>
+                        <option value="Neto 15 días">Neto 15 días</option>
+                        <option value="Neto 30 días">Neto 30 días</option>
+                        <option value="Neto 45 días">Neto 45 días</option>
+                        <option value="Neto 60 días">Neto 60 días</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                        Moneda
+                      </label>
+                      <select
+                        value={formData.currency}
+                        onChange={(e) => setFormData({ ...formData, currency: e.target.value })}
+                        className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-xl focus:border-[#f6821f]"
+                      >
+                        <option value="USD">USD ($ - Dólar)</option>
+                        <option value="HNL">HNL (L - Lempira)</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                        Estado Comercial
+                      </label>
+                      <select
+                        value={formData.status}
+                        onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                        className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-xl focus:border-[#f6821f]"
+                      >
+                        <option value="Borrador">Borrador</option>
+                        <option value="Enviada">Enviada al Cliente</option>
+                        <option value="Aprobada">Aprobada</option>
+                        <option value="Rechazada">Rechazada</option>
+                      </select>
                     </div>
                   </div>
 
@@ -2404,6 +3737,20 @@ export default function QuotesModule({
               </span>
             </div>
             <div className="flex items-center gap-2">
+              {onEmitWorkOrder && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowPrintModal(false);
+                    onEmitWorkOrder(activePrintQuote);
+                  }}
+                  className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-xl transition cursor-pointer"
+                  title="Emitir Orden de Producción / Trabajo a partir de esta cotización"
+                >
+                  <Cog className="w-3.5 h-3.5 text-indigo-600" />
+                  <span>Emitir O.T.</span>
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => window.print()}
@@ -2479,6 +3826,59 @@ export default function QuotesModule({
                   </p>
                 </div>
               </div>
+
+              {/* Especificaciones Flexográficas / Troquel & Tintas */}
+              {(activePrintQuote.dieNumber || activePrintQuote.partItems || activePrintQuote.inks) && (
+                <div className="border border-slate-200 rounded-xl p-3.5 bg-slate-50/70 text-[11px] space-y-2">
+                  <div className="flex items-center justify-between border-b border-slate-200 pb-1.5">
+                    <span className="font-bold text-slate-800 uppercase tracking-wider text-[10px] flex items-center gap-1.5">
+                      <Settings2 className="w-3.5 h-3.5 text-[#f6821f]" />
+                      Especificación Técnica & Troquel Flexográfico
+                    </span>
+                    <span className="font-mono text-slate-600 text-[10px] font-semibold">
+                      Troquel #{activePrintQuote.dieNumber || "N/A"} • {activePrintQuote.dieShape || "Estándar"}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-4 gap-2 text-slate-600">
+                    <div>
+                      <span className="font-semibold text-slate-700">Cavidades (Across):</span> {activePrintQuote.sizeAcross || "0"}&quot; × {activePrintQuote.numAcross || 1}
+                    </div>
+                    <div>
+                      <span className="font-semibold text-slate-700">Avance (Around):</span> {activePrintQuote.sizeAround || "0"}&quot; × {activePrintQuote.numAround || 1}
+                    </div>
+                    <div>
+                      <span className="font-semibold text-slate-700">Dientes / Paso:</span> {activePrintQuote.teeth || activePrintQuote.cylinderTeeth || "-"}T ({activePrintQuote.pitch || "1/8"})
+                    </div>
+                    <div>
+                      <span className="font-semibold text-slate-700">Repetición / Cilindro:</span> {activePrintQuote.repeatLength || "-"}&quot; / #{activePrintQuote.cylinderNumber || "-"}
+                    </div>
+                  </div>
+
+                  {/* Tintas */}
+                  {parseJsonArray(activePrintQuote.inks).length > 0 && (
+                    <div className="pt-1.5 border-t border-slate-200">
+                      <span className="font-semibold text-slate-700 text-[10px] block mb-1">Tintas de Impresión:</span>
+                      <div className="flex flex-wrap gap-1.5">
+                        {parseJsonArray(activePrintQuote.inks).map((ink: any, idx: number) => (
+                          <span
+                            key={idx}
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-white border border-slate-200 text-[10px] font-medium text-slate-700 shadow-2xs"
+                          >
+                            <span
+                              className="w-2 h-2 rounded-full border border-slate-300 shrink-0"
+                              style={{ backgroundColor: getPmsColorPreview(ink.pmsNumber || ink.description) }}
+                            />
+                            <span className="font-bold text-slate-900">{ink.ink || `T${idx + 1}`}:</span>
+                            <span>{ink.description || ink.pmsNumber || "Tinta"}</span>
+                            {ink.plates ? <span className="text-slate-400">({ink.plates} pl.)</span> : null}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Tabla de Productos */}
               <table className="w-full text-left text-xs border-collapse">

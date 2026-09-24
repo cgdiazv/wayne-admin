@@ -102,6 +102,31 @@ export async function PATCH(
     if (body.inventoryAccountCode !== undefined) updateData.inventoryAccountCode = body.inventoryAccountCode;
     if (body.inventoryAccountName !== undefined) updateData.inventoryAccountName = body.inventoryAccountName;
 
+    // Flexo Die, Cylinder & Inks Specification
+    if (body.dieNumber !== undefined) updateData.dieNumber = body.dieNumber;
+    if (body.dieShape !== undefined) updateData.dieShape = body.dieShape;
+    if (body.sizeAcross !== undefined) updateData.sizeAcross = body.sizeAcross;
+    if (body.numAcross !== undefined) updateData.numAcross = body.numAcross ? Number(body.numAcross) : null;
+    if (body.spaceAcross !== undefined) updateData.spaceAcross = body.spaceAcross;
+    if (body.sizeAround !== undefined) updateData.sizeAround = body.sizeAround;
+    if (body.numAround !== undefined) updateData.numAround = body.numAround ? Number(body.numAround) : null;
+    if (body.spaceAround !== undefined) updateData.spaceAround = body.spaceAround;
+    if (body.pitch !== undefined) updateData.pitch = body.pitch;
+    if (body.teeth !== undefined) updateData.teeth = body.teeth ? Number(body.teeth) : null;
+    if (body.dieType !== undefined) updateData.dieType = body.dieType;
+    if (body.repeatLength !== undefined) updateData.repeatLength = body.repeatLength ? Number(body.repeatLength) : null;
+    if (body.cylinderNumber !== undefined) updateData.cylinderNumber = body.cylinderNumber;
+    if (body.cylinderTeeth !== undefined) updateData.cylinderTeeth = body.cylinderTeeth ? Number(body.cylinderTeeth) : null;
+    if (body.additionalDies !== undefined) {
+      updateData.additionalDies = typeof body.additionalDies === "string" ? body.additionalDies : JSON.stringify(body.additionalDies);
+    }
+    if (body.partItems !== undefined) {
+      updateData.partItems = typeof body.partItems === "string" ? body.partItems : JSON.stringify(body.partItems);
+    }
+    if (body.inks !== undefined) {
+      updateData.inks = typeof body.inks === "string" ? body.inks : JSON.stringify(body.inks);
+    }
+
     // Si se actualizan items o costos
     if (Array.isArray(body.items)) {
       const materialCost = body.items.reduce(

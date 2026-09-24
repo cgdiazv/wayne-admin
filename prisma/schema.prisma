@@ -491,20 +491,72 @@ model SalesInvoiceLine {
 model Quote {
   id               String        @id @default(cuid())
   quoteNumber      String        @unique // e.g. "COT-2026-0001"
+  title            String?       @default("Cotización y Especificación Técnica")
   customerId       String?
+  customerCode     String?       // e.g. "VFS200"
   customerName     String        @default("Cliente Contado")
   customerRtn      String?
   customerAddress  String?
+  customerAddress1 String?
+  customerAddress2 String?
+  customerCity     String?
+  customerState    String?       @default("PA")
+  customerZip      String?
   customerEmail    String?
   customerPhone    String?
+  phoneExt         String?
+  customerFax      String?
+  contactName      String?
   quoteDate        String        // e.g. "2026-09-04"
   validUntil       String        // e.g. "2026-10-04"
+  dueDate          String?
+  fromJobNo        String?
+  openedDate       String?
+  statusCode       String?       @default("Open") // "Open" | "Closed"
+  completionStatus String?       @default("Incomplete") // "Incomplete" | "Complete" | "Pending" | "Cancelled"
+  division         String?       @default("HH")
   paymentTerms     String        @default("Neto 30 días")
   currency         String        @default("USD")
   salesRepId       String?
   salesRepName     String?
+  salespersonCode  String?       @default("005")
+  isBroker         Boolean?      @default(false)
   notes            String?
   termsConditions  String?
+
+  // Flexo Tooling & Geometry
+  dieNumber        String?       // e.g. "FHR020055"
+  dieShape         String?       // e.g. "NTCH RL TG"
+  sizeAcross       String?       // e.g. "2"
+  numAcross        Int?          @default(4)
+  spaceAcross      String?       // e.g. "1/8"
+  sizeAround       String?       // e.g. "6"
+  numAround        Int?          @default(2)
+  spaceAround      String?       // e.g. ""
+  pitch            String?       @default("1/8")
+  teeth            Int?          @default(96)
+  dieType          String?       @default("Circumf")
+  repeatLength     Float?        @default(12.0)
+  cylinderNumber   String?
+  cylinderTeeth    Int?          @default(96)
+  additionalDies   String?       // JSON: AdditionalDie[]
+  partItems        String?       // JSON: PartItem[]
+  inks             String?       // JSON: InkItem[]
+
+  // Product & Production specs
+  productSku       String?
+  productName      String?
+  targetQuantity   Float?        @default(1000)
+  unitOfMeasure    String?       @default("UND")
+
+  // Costing & pricing breakdown
+  materialCost     Float?        @default(0)
+  laborCost        Float?        @default(0)
+  overheadCost     Float?        @default(0)
+  totalEstimatedCost Float?      @default(0)
+  unitCost         Float?        @default(0)
+  marginPercent    Float?        @default(35)
+
   discount         Float         @default(0)
   subtotal         Float         @default(0)
   taxRate          Float         @default(15) // ISV % (15% o 18%)
@@ -886,6 +938,25 @@ model Estimate {
   productName           String
   targetQuantity        Float          @default(1)
   unitOfMeasure         String         @default("UND")
+
+  // Especificación Técnica de Troquelado e Impresión Flexo
+  dieNumber             String?        // e.g. "FHR020055"
+  dieShape              String?        // e.g. "NTCH RL TG"
+  sizeAcross            String?        // e.g. "2"
+  numAcross             Int?           // e.g. 4
+  spaceAcross           String?        // e.g. "1/8"
+  sizeAround            String?        // e.g. "6"
+  numAround             Int?           // e.g. 2
+  spaceAround           String?        // e.g. ""
+  pitch                 String?        // e.g. "1/8"
+  teeth                 Int?           // e.g. 96
+  dieType               String?        // e.g. "Circumf"
+  repeatLength          Float?         // e.g. 12.0000
+  cylinderNumber        String?        // e.g. ""
+  cylinderTeeth         Int?           // e.g. 96
+  additionalDies        String?        // JSON string de troqueles adicionales
+  partItems             String?        // JSON string de partes y descripciones
+  inks                  String?        // JSON string de tintas y placas
   
   // Costeo Técnico
   materialCost          Float          @default(0) // Suma de insumos consumibles

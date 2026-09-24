@@ -14,7 +14,6 @@ import VendorPaymentsModule from "@/components/VendorPaymentsModule";
 import BankReconciliationModule from "@/components/BankReconciliationModule";
 import SalesOrdersModule from "@/components/SalesOrdersModule";
 import ProductionModule from "@/components/ProductionModule";
-import EstimatesModule, { Estimate } from "@/components/EstimatesModule";
 import { Skeleton, CardSkeleton, TableRowsSkeleton } from "@/components/Skeleton";
 
 
@@ -201,7 +200,7 @@ type PurchaseInvoice = {
   createdAt?: string;
 };
 
-type NavItem = "dashboard" | "plan-cuentas" | "transacciones" | "conciliacion-bancaria" | "caja-chica" | "estimaciones" | "clientes" | "cotizaciones" | "pedidos-venta" | "proveedores" | "vendedores" | "comisiones" | "inventario" | "lotes" | "series" | "produccion" | "notas-credito-debito" | "reportes" | "configuracion" | "factura-editor" | "lista-facturas" | "lista-ordenes-compra" | "orden-compra-editor" | "factura-compra-lista" | "factura-compra-editor" | "deposito-bancario" | "recibir-pago" | "agregar-gasto" | "pagar-proveedor" | "pagos-proveedores" | "devoluciones-proveedor" | "antiguedad-saldos" | "antiguedad-saldos-proveedores" | "estado-cuenta-cliente" | "retenciones-isv";
+type NavItem = "dashboard" | "plan-cuentas" | "transacciones" | "conciliacion-bancaria" | "caja-chica" | "clientes" | "cotizaciones" | "pedidos-venta" | "proveedores" | "vendedores" | "comisiones" | "inventario" | "lotes" | "series" | "produccion" | "notas-credito-debito" | "reportes" | "configuracion" | "factura-editor" | "lista-facturas" | "lista-ordenes-compra" | "orden-compra-editor" | "factura-compra-lista" | "factura-compra-editor" | "deposito-bancario" | "recibir-pago" | "agregar-gasto" | "pagar-proveedor" | "pagos-proveedores" | "devoluciones-proveedor" | "antiguedad-saldos" | "antiguedad-saldos-proveedores" | "estado-cuenta-cliente" | "retenciones-isv";
 
 
 
@@ -6833,24 +6832,6 @@ export default function AdminDashboard() {
             )}
           </div>
 
-          {/* Estimaciones (Ubicado directamente abajo de Contabilidad) */}
-          <div className="pt-1">
-            <button
-              onClick={() => setCurrentView("estimaciones")}
-              title={sidebarCollapsed ? "Estimaciones" : undefined}
-              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl transition cursor-pointer text-slate-700 hover:bg-slate-100 ${
-                currentView === "estimaciones"
-                  ? "bg-[#fff7ed] text-[#f6821f] font-semibold shadow-xs"
-                  : "text-slate-600 hover:text-slate-900"
-              }`}
-            >
-              <div className="flex items-center gap-3 truncate">
-                <FileSpreadsheet className={`w-4 h-4 shrink-0 ${currentView === "estimaciones" ? "text-[#f6821f]" : "text-slate-600"}`} />
-                {!sidebarCollapsed && <span>Estimaciones</span>}
-              </div>
-            </button>
-          </div>
-
           {/* Ventas Collapsible Group */}
           <div className="pt-1">
             <button
@@ -7319,9 +7300,8 @@ export default function AdminDashboard() {
                   {currentView === "transacciones" && "Contabilidad / Transacciones Bancarias"}
                   {currentView === "caja-chica" && "Contabilidad / Arqueo & Control de Caja Chica"}
                   {currentView === "conciliacion-bancaria" && "Contabilidad / Conciliación de Extracto Mensual"}
-                  {currentView === "estimaciones" && "Estimaciones & Cotizaciones a Clientes"}
                   {currentView === "clientes" && "Directorio de Clientes"}
-                  {currentView === "cotizaciones" && "Ventas / Cotizaciones & Presupuestos"}
+                  {currentView === "cotizaciones" && "Ventas / Cotizaciones & Especificaciones"}
                   {currentView === "pedidos-venta" && "Ventas / Pedidos de Venta (Sales Orders)"}
                   {currentView === "lista-facturas" && "Gestión de Facturas"}
                   {currentView === "notas-credito-debito" && "Notas de Crédito / Débito"}
@@ -9719,26 +9699,6 @@ export default function AdminDashboard() {
                   </table>
                 </div>
               </div>
-            </div>
-          )}
-
-          {/* ================= VIEW: ESTIMACIONES ================= */}
-          {currentView === "estimaciones" && (
-            <div className="animate-in fade-in duration-150 p-6">
-              <EstimatesModule
-                onBackToDashboard={() => setCurrentView("dashboard")}
-                inventory={inventory}
-                customers={customers}
-                accounts={accounts}
-                companySettings={companySettings}
-                formatCurrency={formatCurrency}
-                onEmitWorkOrder={(est) => {
-                  setEstimateForProduction(est);
-                  setProductionActiveTab("work-orders");
-                  setCurrentView("produccion");
-                }}
-                onNavigateToAccounts={() => setCurrentView("plan-cuentas")}
-              />
             </div>
           )}
 
@@ -16077,6 +16037,18 @@ export default function AdminDashboard() {
                 }}
                 onNavigateToInvoices={() => setCurrentView("lista-facturas")}
                 onNavigateToSalesOrders={() => setCurrentView("pedidos-venta")}
+                onEmitWorkOrder={(quote) => {
+                  setEstimateForProduction({
+                    ...quote,
+                    estimateNumber: quote.quoteNumber,
+                    productSku: quote.productSku || (quote.lines && quote.lines[0]?.sku) || "ETIQ-001",
+                    productName: quote.productName || (quote.lines && quote.lines[0]?.productName) || "Etiqueta Flexográfica",
+                    targetQuantity: quote.targetQuantity || (quote.lines && quote.lines[0]?.quantity) || 1000,
+                    unitOfMeasure: quote.unitOfMeasure || "UND",
+                  });
+                  setProductionActiveTab("work-orders");
+                  setCurrentView("produccion");
+                }}
                 onNavigateToAccounting={() => {
                   fetch("/api/accounts")
                     .then((r) => r.json())
